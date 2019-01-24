@@ -7,7 +7,7 @@ class AnchorGenerator(object):
         scales
         ratios
         scale_major
-        ctr
+        ctr  # anchor的中心点坐标
     Returns:
         
     """
@@ -26,13 +26,13 @@ class AnchorGenerator(object):
     def gen_base_anchors(self):
         w = self.base_size
         h = self.base_size
-        if self.ctr is None:
+        if self.ctr is None:  #如果不输入中心点，则取w/2，h/2为中心点
             x_ctr = 0.5 * (w - 1)
             y_ctr = 0.5 * (h - 1)
         else:
             x_ctr, y_ctr = self.ctr
 
-        h_ratios = torch.sqrt(self.ratios)
+        h_ratios = torch.sqrt(self.ratios)  #
         w_ratios = 1 / h_ratios
         if self.scale_major:
             ws = (w * w_ratios[:, None] * self.scales[None, :]).view(-1)
