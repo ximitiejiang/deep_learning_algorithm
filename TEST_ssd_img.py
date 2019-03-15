@@ -79,7 +79,7 @@ if __name__ == "__main__":
     test_this_img = True
     
     if test_this_img:
-        img_path = './data/misc/test14.jpg'    
+        img_path = './data/misc/test13.jpg'    
         config_file = './config/cfg_ssd300_vgg16_voc.py'
         weights_path = './weights/myssd/epoch_24.pth'
         class_name = 'voc'

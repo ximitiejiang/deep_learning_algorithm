@@ -2,7 +2,8 @@
 
 a simplifier ssd detector implement in pytorch
 ![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test14_result.jpeg)
-this ssd implement is simplified from [mmdetection](https://github.com/open-mmlab/mmdetection)
+![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test13_result.png)
+this ssd implementation is simplified from [mmdetection](https://github.com/open-mmlab/mmdetection)
 
 ### features
 curently it support multi-GPU training on parallel mode, support cpu/gpu nms, and support training on coco

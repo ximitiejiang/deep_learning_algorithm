@@ -27,4 +27,6 @@ $ ln -s
 # %% part2
 # add sys path
 import sys, os
-sys.path.insert(0, os.path.abspath('.'))
+path = os.path.abspath('.')
+if not path in sys.path:
+    sys.path.insert(0, path)

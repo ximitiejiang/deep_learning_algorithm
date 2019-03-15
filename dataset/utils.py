@@ -259,7 +259,7 @@ if __name__ == '__main__':
         vis_bbox(img2[...,[2,0,1]], bbox, label-1, label_names=classes)  # vis_bbox内部会bgr转rgb，所以这里要用bgr输入
     
     if source == 'coco':
-        from coco_dataset import CocoDataset
+        from dataset.coco_dataset import CocoDataset
         data_root = '../data/coco/'
         img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[1, 1, 1], to_rgb=True)
         cfg_train=dict(

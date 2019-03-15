@@ -5,10 +5,10 @@ import numpy as np
 from mmcv.parallel import DataContainer as DC
 from torch.utils.data import Dataset
 from collections import Sequence
-from transforms import (ImageTransform, BboxTransform, MaskTransform,
+from .transforms import (ImageTransform, BboxTransform, MaskTransform,
                          Numpy2Tensor)
 #from dataset.utils import to_tensor, random_scale
-from extra_aug import ExtraAugmentation
+from .extra_aug import ExtraAugmentation
 from pycocotools.coco import COCO
 
 def to_tensor(data):

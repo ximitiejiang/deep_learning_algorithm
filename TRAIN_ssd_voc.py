@@ -73,7 +73,7 @@ def batch_processor(model, data, train_mode):
 
     return outputs  
   
-def train(cfg_path):
+def train(cfg_path, dataset_class):
     """借用mmcv的Runner框架进行训练，包括里边的hooks作为lr更新，loss计算的工具
     1. dataset的数据集输出打包了img/gt_bbox/label/，采用DataContainer封装
     2. Dataloader的default_collate用定制collate替换，从而支持dataset的多类型数据
@@ -106,7 +106,7 @@ def train(cfg_path):
     
     # prepare data & dataloader
     # Runner要求dataloader放在list里: 使workflow里每个flow对应一个dataloader
-    dataset = get_dataset(cfg.data.train, VOCDataset)
+    dataset = get_dataset(cfg.data.train, dataset_class)
     batch_size = cfg.gpus * cfg.data.imgs_per_gpu
     num_workers = cfg.gpus * cfg.data.workers_per_gpu
     dataloader = [DataLoader(dataset, 
@@ -132,5 +132,5 @@ def train(cfg_path):
     
 if __name__ == '__main__':
     cfg_path = 'config/cfg_ssd300_vgg16_voc.py'
-    train(cfg_path)
+    train(cfg_path, VOCDataset)
     
