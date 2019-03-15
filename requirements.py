@@ -5,5 +5,26 @@ Created on Wed Jan  9 16:00:51 2019
 
 @author: ubuntu
 """
+# %% part1 dependency
+"""
+# -----install mmcv-----
+$ pip3 install mmcv . #
+
+# -----install addict-----
+$ pip3 install addict
+
+# -----create data symlink-----
+$ cd ssd
+$ mkdir data
+$ ln -s /home/ubuntu/MyDatasets/coco
+$ ln -s /home/ubuntu/MyDatasets/voc/VOCdevkit
+
+# -----create weights symlink-----
+$ cd ssd
+$ mkdir weights
+$ ln -s 
+"""
+# %% part2
+# add sys path
 import sys, os
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.abspath('.'))
