@@ -46,7 +46,7 @@ test_cfg = dict(
 # model training and testing settings
 # dataset settings
 dataset_type = 'CocoDataset'
-data_root = '../data/coco/'
+data_root = './data/coco/'
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[1, 1, 1], to_rgb=True)
 data = dict(
     imgs_per_gpu=2,  # 从4改成2
@@ -123,7 +123,7 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-gpus=1
+gpus=2
 total_epochs = 24
 dist_params = dict(backend='nccl')
 log_level = 'INFO'

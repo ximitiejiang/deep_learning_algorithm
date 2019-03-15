@@ -46,7 +46,7 @@ test_cfg = dict(
 # dataset settings
 dataset_type = 'VOCDataset'
 #data_root = 'data/VOCdevkit/'  # 修改了数据目录地址，源码是假定train文件放在根目录
-data_root = '../data/VOCdevkit/'
+data_root = './data/VOCdevkit/'
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[1, 1, 1], to_rgb=True)
 data = dict(
     imgs_per_gpu=2,   # 从4改成2
