@@ -1,8 +1,13 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Mar 15 11:05:27 2019
+#!/usr/bin/env bash
 
-@author: ubuntu
-"""
+PYTHON=${PYTHON:-"python"}
 
+echo 'cleaning the documents before compiling...'
+cd mmdet/ops/roi_align
+if [ -d "build" ]; then
+    rm -r build
+fi
+
+cd ../nms
+make clean
+make PYTHON=${PYTHON}
