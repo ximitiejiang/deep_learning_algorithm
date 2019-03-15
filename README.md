@@ -1,3 +1,3 @@
 # simple_ssd_pytorch
-a simplifier SSD implement in pytorch
+a simplifier ssd detector implement in pytorch
 
