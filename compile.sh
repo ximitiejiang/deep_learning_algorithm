@@ -10,3 +10,5 @@ fi
 
 make clean
 make PYTHON=${PYTHON}
+
+echo 'successfully compile!'

@@ -1,6 +1,3 @@
-# 用这个makefile调用setup没有成功
-# 改成直接build setup成功了： python3 setup.py build_ext --inplace
-
 PYTHON=${PYTHON:-python}
 
 all:
@@ -9,3 +6,4 @@ all:
 
 clean:
 	rm -f *.so
+	rm -f *.cpp
