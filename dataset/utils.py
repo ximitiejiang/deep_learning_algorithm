@@ -109,12 +109,12 @@ def vis_bbox(img, bbox, label=None, score=None, score_thr=0, label_names=None,
             sc = score[i]
             caption.append('{:.2f}'.format(sc))
         if len(caption) > 0:
-            ax.text(bb[0], bb[1],
+            ax.text(bb[0], bb[3],     # 改到左下角点(xmin,ymin,xmax,ymax) ->(xmin,ymax)
                     ': '.join(caption),
                     style='italic',
-                    color = 'b',  # 默认是黑色，这里设为blue
-                    bbox={'facecolor': 'white', 'alpha': 0.3, 'pad': 1}) 
-                    #文字底色：白色，透明度0.2，边空1
+                    color = 'white',  # 默认是白色字体，这里设为blue
+                    bbox={'facecolor': color, 'alpha': 1, 'pad': 0}) 
+                    #文字底色跟边框颜色一样，透明度=1表示不透明，边空1
     return ax
 
 

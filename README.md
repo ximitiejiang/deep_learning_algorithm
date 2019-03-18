@@ -6,13 +6,13 @@ This is a simplifier ssd detector implement in pytorch, base document on [here](
 this ssd implementation is simplified from [mmdetection](https://github.com/open-mmlab/mmdetection)
 
 ### features
-![model structure](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/ssd.jpeg)
-curently it support VGG16 backbone, the pretrained weights is from caffe on [here](https://s3.ap-northeast-2.amazonaws.com/open-mmlab/pretrain/third_party/vgg16_caffe-292e1171.pth)
+curently it support VGG16 backbone, the pretrained weights is from caffe on [here](https://s3.ap-northeast-2.amazonaws.com/open-mmlab/pretrain/third_party/vgg16_caffe-292e1171.pth).
 besides this, other features include:
 + support multi-GPU training on parallel mode
 + support cpu/gpu nms
 + support training on coco/voc daaset
 + mean precision data to be update soon
+![model structure](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/ssd.jpg)
 
 ### installation(test enviroments)
 + pytorch 0.4.1, cudn9.0, cython, mmcv

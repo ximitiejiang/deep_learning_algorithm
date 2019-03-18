@@ -69,7 +69,7 @@ def test_img(img_path, config_file, weights_path, class_name='voc', device = 'cu
     bboxes = np.vstack(result)
     scores = bboxes[:,-1]
     img = cv2.imread(img_path, 1)
-    vis_bbox(img.copy(), bboxes, label=labels, score=scores, score_thr=0.4, 
+    vis_bbox(img.copy(), bboxes, label=labels, score=scores, score_thr=0.2, 
              label_names=class_names,
              instance_colors=None, alpha=1., linewidth=1.5, ax=None)
     
@@ -79,8 +79,9 @@ if __name__ == "__main__":
     test_this_img = True
     
     if test_this_img:
-        img_path = './data/misc/test13.jpg'    
+        img_path = './data/misc/test15.jpg'    
         config_file = './config/cfg_ssd300_vgg16_voc.py'
-        weights_path = './weights/myssd/epoch_24.pth'
+#        weights_path = './weights/myssd/epoch_24.pth'
+        weights_path = './weights/mmdetection/ssd300_voc_vgg16_caffe_240e_20181221-2f05dd40.pth'
         class_name = 'voc'
         test_img(img_path, config_file, weights_path, class_name=class_name)
