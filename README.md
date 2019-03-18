@@ -22,7 +22,7 @@ besides this, other features include:
 + add repo root to sys path (or run requriements.py to temporarily add repo root to sys path).
 + the necessary document structure is as below:
 
-'''
+```
 simple_ssd_pytorch
 ├── config
 ├── data
@@ -37,7 +37,7 @@ simple_ssd_pytorch
 ├── TEST_ssd_img.py
 ├── TRAIN_ssd_coco.py
 ├── TRAIN_ssd_voc.py
-'''
+```
 
 ### train & test
 + run train_xxx.py for training on specific dataset, currently support voc07/12 and coco2017
