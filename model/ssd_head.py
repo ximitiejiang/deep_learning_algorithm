@@ -243,10 +243,15 @@ class SSDHead(nn.Module):
         return dict(loss_cls=losses_cls, loss_reg=losses_reg)
     
     def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg, rescale=False):
-        """用于在test时计算bbox"""
+        """用于在test时生成anchors，然后基于anchors和cls_scores/bbox_preds计算bbox
+        1. 获得每层的mlvl_anchors[(a,4),(b,4),...], 共6组
+           获得每层的cls_score[(b,c,h,w),(b,c,h,w),...], 共6组
+           获得每层的bbox_pred[(b,c,h,w),(b,c,h,w),...], 共6组
+        2. 以上3组核心数据送入get_bboxes_single()
+        """
         assert len(cls_scores) == len(bbox_preds)
         num_levels = len(cls_scores)
-
+        # 38*38*4 + 19*19*6 + 10*10*6 + 5*5*6 + 3*3*4 + 1×1×4 = 8732
         mlvl_anchors = [
             self.anchor_generators[i].grid_anchors(cls_scores[i].size()[-2:],
                                                    self.anchor_strides[i])
@@ -254,10 +259,10 @@ class SSDHead(nn.Module):
         ]
         result_list = []
         for img_id in range(len(img_metas)):
-            cls_score_list = [
+            cls_score_list = [   # cls_scores([b,c,h,w],[],[],[],[],[]) -> img1([c,h,w],[],[],[],[],[]) + img2([],[],[],[],[],[]) 
                 cls_scores[i][img_id].detach() for i in range(num_levels)
             ]
-            bbox_pred_list = [
+            bbox_pred_list = [   # bbox_preds([b,c,h,w],[],[],[],[],[]) -> img1([c,h,w],[],[],[],[],[]) + img2([],[],[],[],[],[])
                 bbox_preds[i][img_id].detach() for i in range(num_levels)
             ]
             img_shape = img_metas[img_id]['img_shape']
@@ -282,12 +287,12 @@ class SSDHead(nn.Module):
         for cls_score, bbox_pred, anchors in zip(cls_scores, bbox_preds,
                                                  mlvl_anchors):
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
-            cls_score = cls_score.permute(1, 2, 0).reshape(
+            cls_score = cls_score.permute(1, 2, 0).reshape( # (c,h,w) -> (h,w,c) -> (-1, 21)or(-1,81)
                 -1, self.cls_out_channels)
             if self.use_sigmoid_cls:
                 scores = cls_score.sigmoid()
             else:
-                scores = cls_score.softmax(-1)
+                scores = cls_score.softmax(-1)              # softmax(-1)?
             bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
             nms_pre = cfg.get('nms_pre', -1)
             if nms_pre > 0 and scores.shape[0] > nms_pre:

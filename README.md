@@ -4,6 +4,7 @@ This is a simplifier ssd detector implement in pytorch, base document on [here](
 ![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test14_result.jpeg)
 ![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test11_result.jpg)
 ![video_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/video_result.jpg)
+
 this ssd implementation is simplified from [mmdetection](https://github.com/open-mmlab/mmdetection)
 
 ### features
@@ -16,17 +17,21 @@ besides this, other features include:
 ![model structure](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/ssd.jpg)
 
 some details for the model:
-+ input img size requirement: (300,300) or (500,500)
++ input img size: (300,300) or (500,500)
 + vgg16 output with extra layers: (vgg/L22: (512,38,38)), (vgg/L34: (1024,19,19)),
 (extra/1: (512,10,10)), (extra/3: (256,5,5)), (extra/5: (256,3,3)), (extra/1: (256,1,1))
-+ base anchors: with base size (), and 5 types of ratios(1,2,1/2,3,1/3), 
-but evently choose anchors nums for 6 featmap (4,6,6,6,4,4)
-+ total anchors: 38*38*4 + 19*19*6 + 10*10*6 + 5*5*6 + 3*3*4 + 1*1*4 = 8732
++ base anchors: base size is get from ratios of anchor with img, this ratios is a prior knowledge in article.
+and 2 types of scales(1, sqrt(max_size/min_size)), and 3 or 5 types of ratios(1,2,1/2) or(1,2,1/2,3,1/3), 
+total base anchors for each featmaps are (4,6,6,6,4,4), a trick here is ratio_major, means sort ratio first.
+if 4 base anchors means (2,1)*(1,3)[:4], and if 6 base anchors means (2,1)*(1,5)[:6]
++ total anchors: `38*38*4 + 19*19*6 + 10*10*6 + 5*5*6 + 3*3*4 + 1*1*4 = 8732`
 + grid anchors: 
-+ anchor targets: assign anchors with ious(-1 means, 0 means, 1~n means), but no anchor sampling applied.  
-+ bbox classify: using 
-+ bbox coordinate regression: using
-+ no nms using on training, using nms on testing
++ anchor targets: assign anchors with ious(-1 means no_use, 0 means bg, 1~n means fg), but no anchor sampling applied.
+so in order to avoid inbalance of fg and bg, hard negtive mining method is applied in loss calculate stage. 
++ bbox classify: using weighted smooth l1 loss func
++ bbox coordinate regression: using weighted cross_entropy loss func
++ as hard negtive mining was used on training,so no nms using on training, 
+but using nms on testing imgs in ssd head module, nms or soft_nms can be chosen.
 
 ### installation(test enviroments)
 + pytorch 0.4.1, cudn9.0, cython, mmcv
