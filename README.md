@@ -2,7 +2,8 @@
 
 This is a simplifier ssd detector implement in pytorch, base document on [here](https://arxiv.org/pdf/1512.02325.pdf)
 ![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test14_result.jpeg)
-![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test13_result.png)
+![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test11_result.jpg)
+![video_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/video_result.jpg)
 this ssd implementation is simplified from [mmdetection](https://github.com/open-mmlab/mmdetection)
 
 ### features
@@ -13,6 +14,19 @@ besides this, other features include:
 + support training on coco/voc daaset
 + mean precision data to be update soon
 ![model structure](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/ssd.jpg)
+
+some details for the model:
++ input img size requirement: (300,300) or (500,500)
++ vgg16 output with extra layers: (vgg/L22: (512,38,38)), (vgg/L34: (1024,19,19)),
+(extra/1: (512,10,10)), (extra/3: (256,5,5)), (extra/5: (256,3,3)), (extra/1: (256,1,1))
++ base anchors: with base size (), and 5 types of ratios(1,2,1/2,3,1/3), 
+but evently choose anchors nums for 6 featmap (4,6,6,6,4,4)
++ total anchors: 38*38*4 + 19*19*6 + 10*10*6 + 5*5*6 + 3*3*4 + 1*1*4 = 8732
++ grid anchors: 
++ anchor targets: assign anchors with ious(-1 means, 0 means, 1~n means), but no anchor sampling applied.  
++ bbox classify: using 
++ bbox coordinate regression: using
++ no nms using on training, using nms on testing
 
 ### installation(test enviroments)
 + pytorch 0.4.1, cudn9.0, cython, mmcv

@@ -26,10 +26,10 @@ class AnchorGenerator(object):
 
         h_ratios = torch.sqrt(self.ratios)
         w_ratios = 1 / h_ratios
-        if self.scale_major:
+        if self.scale_major:  # scale_major则把scale的值定义成行(1,n)，展平后就是scale按行，结果是scale先排序
             ws = (w * w_ratios[:, None] * self.scales[None, :]).view(-1)
             hs = (h * h_ratios[:, None] * self.scales[None, :]).view(-1)
-        else:
+        else:               # ratio_major则把ratio定义成行(1,m)，展平后
             ws = (w * self.scales[:, None] * w_ratios[None, :]).view(-1)
             hs = (h * self.scales[:, None] * h_ratios[None, :]).view(-1)
 

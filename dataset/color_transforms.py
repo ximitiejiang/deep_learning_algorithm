@@ -8,7 +8,24 @@ Created on Wed Jan  9 10:16:08 2019
 
 import cv2
 
-__all__ = ['bgr2rgb', 'rgb2bgr', 'bgr2hsv', 'hsv2bgr','bgr2gray', 'gray2bgr']
+__all__ = ['color2value', 'bgr2rgb', 'rgb2bgr', 'bgr2hsv', 'hsv2bgr','bgr2gray', 'gray2bgr']
+
+def color2value(color_str):
+    """定义一个把颜色字符串转换成pygame能识别的tuple
+    注意：pygame认可的颜色顺序是rgb
+    用法：color2value('green')
+    """
+    colors = dict(red = (255, 0, 0),
+                  green = (0, 255, 0),
+                  blue = (0, 0, 255),
+                  cyan = (0, 255, 255),
+                  yellow = (255, 255, 0),
+                  magenta = (255, 0, 255),
+                  white = (255, 255, 255),
+                  black = (0, 0, 0),
+                  purple = (255, 0, 255))
+    return colors[color_str]
+    
 
 def convert_color_factory(src, dst):
     """
