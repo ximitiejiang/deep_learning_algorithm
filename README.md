@@ -1,9 +1,9 @@
 # Simple_ssd_pytorch
 
-This is a simplifier ssd detector implement in pytorch, base document on [here](https://arxiv.org/pdf/1512.02325.pdf)
-![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test14_result.jpeg)
-![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test11_result.jpg)
-![video_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/video_result.jpg)
+This is a simplified ssd detector implement in pytorch, base document on [here](https://arxiv.org/pdf/1512.02325.pdf)
+<div align=center>![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test14_result.jpeg)
+<div align=center>![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test11_result.jpg)
+<div align=center>![video_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/video_result.jpg)
 
 this ssd implementation is simplified from [mmdetection](https://github.com/open-mmlab/mmdetection)
 
@@ -14,7 +14,8 @@ besides this, other features include:
 + support cpu/gpu nms
 + support training on coco/voc daaset
 + mean precision data to be update soon
-![model structure](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/ssd.jpg)
+
+![model structure](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/ssd_structure.jpg)
 
 some details for the model:
 + input img size: (300,300) or (500,500)
@@ -23,7 +24,7 @@ some details for the model:
 + base anchors: base size is get from ratios of anchor with img, this ratios is a prior knowledge in article.
 and 2 types of scales(1, sqrt(max_size/min_size)), and 3 or 5 types of ratios(1,2,1/2) or(1,2,1/2,3,1/3), 
 total base anchors for each featmaps are (4,6,6,6,4,4), a trick here is ratio_major, means sort ratio first.
-if 4 base anchors means (2,1)*(1,3)[:4], and if 6 base anchors means (2,1)*(1,5)[:6]
+if 4 base anchors means `(2,1)*(1,3)[:4]`, and if 6 base anchors means `(2,1)*(1,5)[:6]`
 + total anchors: `38*38*4 + 19*19*6 + 10*10*6 + 5*5*6 + 3*3*4 + 1*1*4 = 8732`
 + grid anchors: 
 + anchor targets: assign anchors with ious(-1 means no_use, 0 means bg, 1~n means fg), but no anchor sampling applied.

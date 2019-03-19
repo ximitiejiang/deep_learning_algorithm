@@ -287,15 +287,15 @@ class SSDHead(nn.Module):
         for cls_score, bbox_pred, anchors in zip(cls_scores, bbox_preds,
                                                  mlvl_anchors):
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
-            cls_score = cls_score.permute(1, 2, 0).reshape( # (c,h,w) -> (h,w,c) -> (-1, 21)or(-1,81)
+            cls_score = cls_score.permute(1, 2, 0).reshape( # (c,h,w) -> (h,w,c) -> (h*w*nclass, 21)or(h*w*nclass,81)
                 -1, self.cls_out_channels)
             if self.use_sigmoid_cls:
                 scores = cls_score.sigmoid()
             else:
-                scores = cls_score.softmax(-1)              # softmax(-1)?
-            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+                scores = cls_score.softmax(-1)                    # softmax(-1) get scores in (0,1) for each row(row sum=1)
+            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4) # (c,h,w) -> (h,w,c) -> (h*w*4, 4) or (h*w*6,4)
             nms_pre = cfg.get('nms_pre', -1)
-            if nms_pre > 0 and scores.shape[0] > nms_pre:
+            if nms_pre > 0 and scores.shape[0] > nms_pre:  # nms_pre mean pre_nms, not use for ssd
                 if self.use_sigmoid_cls:
                     max_scores, _ = scores.max(dim=1)
                 else:
@@ -304,10 +304,10 @@ class SSDHead(nn.Module):
                 anchors = anchors[topk_inds, :]
                 bbox_pred = bbox_pred[topk_inds, :]
                 scores = scores[topk_inds, :]
-            bboxes = delta2bbox(anchors, bbox_pred, self.target_means,
+            bboxes = delta2bbox(anchors, bbox_pred, self.target_means, 
                                 self.target_stds, img_shape)
-            mlvl_bboxes.append(bboxes)
-            mlvl_scores.append(scores)
+            mlvl_bboxes.append(bboxes)  # (m,4)
+            mlvl_scores.append(scores)  # (n,)
         mlvl_bboxes = torch.cat(mlvl_bboxes)
         if rescale:
             mlvl_bboxes /= mlvl_bboxes.new_tensor(scale_factor)
