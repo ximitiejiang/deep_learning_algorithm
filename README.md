@@ -1,9 +1,9 @@
 # Simple_ssd_pytorch
 
 This is a simplified ssd detector implement in pytorch, base document on [here](https://arxiv.org/pdf/1512.02325.pdf)
-<div align=center>![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test14_result.jpeg)
-<div align=center>![test_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test11_result.jpg)
-<div align=center>![video_img](https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/video_result.jpg)
+<div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test14_result.jpeg"/></div>
+<div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test11_result.jpg"/></div>
+<div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/video_result.jpg"/></div>
 
 this ssd implementation is simplified from [mmdetection](https://github.com/open-mmlab/mmdetection)
 
