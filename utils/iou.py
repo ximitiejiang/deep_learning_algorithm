@@ -2,7 +2,8 @@ import torch
 
 
 def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False):
-    """Calculate overlap between two set of bboxes.
+    """针对tensor的ious计算
+    Calculate overlap between two set of bboxes.
 
     If ``is_aligned`` is ``False``, then calculate the ious between each bbox
     of bboxes1 and bboxes2, otherwise the ious between each aligned pair of
@@ -48,15 +49,15 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False):
         lt = torch.max(bboxes1[:, None, :2], bboxes2[:, :2])  # [rows, cols, 2]
         rb = torch.min(bboxes1[:, None, 2:], bboxes2[:, 2:])  # [rows, cols, 2]
 
-        wh = (rb - lt + 1).clamp(min=0)  # [rows, cols, 2]
-        overlap = wh[:, :, 0] * wh[:, :, 1]
+        wh = (rb - lt + 1).clamp(min=0)  # [rows, cols, 2], 2 columns means (xmax-min, ymax-ymin)
+        overlap = wh[:, :, 0] * wh[:, :, 1]      # [rows, cols], w*h
         area1 = (bboxes1[:, 2] - bboxes1[:, 0] + 1) * (
-            bboxes1[:, 3] - bboxes1[:, 1] + 1)
+            bboxes1[:, 3] - bboxes1[:, 1] + 1)   # (rows,)
 
         if mode == 'iou':
             area2 = (bboxes2[:, 2] - bboxes2[:, 0] + 1) * (
-                bboxes2[:, 3] - bboxes2[:, 1] + 1)
-            ious = overlap / (area1[:, None] + area2 - overlap)
+                bboxes2[:, 3] - bboxes2[:, 1] + 1)   # (cols,)
+            ious = overlap / (area1[:, None] + area2 - overlap)  # (r,c)/((r,1)+(c,)-(r,c)) = (r,c)/((r,c)-(r,c))
         else:
             ious = overlap / (area1[:, None])
 

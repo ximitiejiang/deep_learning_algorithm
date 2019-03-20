@@ -68,7 +68,7 @@ class MaxIoUAssigner():
         if bboxes.shape[0] == 0 or gt_bboxes.shape[0] == 0:
             raise ValueError('No gt or bboxes')
         bboxes = bboxes[:, :4]
-        overlaps = bbox_overlaps(gt_bboxes, bboxes)
+        overlaps = bbox_overlaps(gt_bboxes, bboxes) # (m,n) m is gt row_num, n is anchor row_num
 
         if (self.ignore_iof_thr > 0) and (gt_bboxes_ignore is not None) and (
                 gt_bboxes_ignore.numel() > 0):
@@ -105,7 +105,7 @@ class MaxIoUAssigner():
 
         # for each anchor, which gt best overlaps with it
         # for each anchor, the max iou of all gts
-        max_overlaps, argmax_overlaps = overlaps.max(dim=0)
+        max_overlaps, argmax_overlaps = overlaps.max(dim=0)  # 取n列anchor的每一列最大iou代表该anchor，作为主要评价数据(max_overlaps)
         # for each gt, which anchor best overlaps with it
         # for each gt, the max iou of all proposals
         gt_max_overlaps, gt_argmax_overlaps = overlaps.max(dim=1)

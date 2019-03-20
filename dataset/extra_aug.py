@@ -99,7 +99,8 @@ class Expand(object):
         return img, boxes, labels
 
 def bbox_overlaps(bboxes1, bboxes2, mode='iou'):
-    """Calculate the ious between each bbox of bboxes1 and bboxes2.
+    """针对ndarray的iou计算，
+    Calculate the ious between each bbox of bboxes1 and bboxes2.
 
     Args:
         bboxes1(ndarray): shape (n, 4)
@@ -148,7 +149,10 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou'):
 
 
 class RandomCrop(object):
-    """随机切割
+    """随机切割：随机体现在一方面是随机选择切割ious的大小(从0/0.1/0.3/0.5/0.7/0.9/1)，即要求切出来的图片大小跟gt bbox
+    相比，计算的最小ious要大于随机出来的iou值，这样每次虽然随机切割，但每次包含的gt bbox尺寸也不同，但至少要包含一点(因为ious>0.1)
+    另一方面是随机定义一个w,h,计算该切出图片跟gt bbox的ious(包含在上面的过程)
+    同时，强制要求切出来的图片要包含所有bbox的中心点，以确保gt bbox至少1/4在切出的图片上，否则太小就没有训练意义了
     """
     def __init__(self,
                  min_ious=(0.1, 0.3, 0.5, 0.7, 0.9),
