@@ -13,7 +13,9 @@ import torch.nn.functional as F
 from .vgg import VGG
 from .weight_init import constant_init, normal_init, kaiming_init, xavier_init
 from .checkpoint import load_checkpoint
+from utils.registry_build import registered
 
+@registered.register_module
 class SSDVGG(VGG):
     extra_setting = {
         300: (256, 'S', 512, 128, 'S', 256, 128, 256, 128, 256),

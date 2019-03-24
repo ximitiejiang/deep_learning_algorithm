@@ -11,25 +11,28 @@ import numpy as np
 import pycocotools.mask as maskUtils
 import mmcv
 
-from .ssdvgg import SSDVGG
-from .ssd_head import SSDHead
 from dataset.utils import tensor2imgs
 from dataset.class_names import get_classes
+from utils.registry_build import registered, build_module
 
+@registered.register_module
 class OneStageDetector(nn.Module):
     """one stage单级检测器: 整合了base/singlestagedetector在一起
-    1. 采用ssd head作为bbox head来使用： bbox head的本质应该是输出最终结果。
-    虽然ssd head继承自anchor head但他并没有用来生成rois，所以作为bbox head使用。
-    2. 
     """
-    def __init__(self, cfg, pretrained=None):  # 输入参数修改成cfg，同时预训练模型参数网址可用了
+    def __init__(self, cfg):
         super(OneStageDetector, self).__init__()
-        self.backbone = SSDVGG(**cfg.model.backbone)        
-        self.bbox_head = SSDHead(**cfg.model.bbox_head)    
+#        self.backbone = SSDVGG(**cfg.model.backbone)        
+#        self.bbox_head = SSDHead(**cfg.model.bbox_head)
+        self.cfg = cfg
+        
+        self.backbone = build_module(cfg.model.backbone, registered)
+        self.bbox_head = build_module(cfg.model.bbox_head, registered)
+        if cfg.model.neck is not None:
+            self.neck = build_module(cfg.model.neck, registered)
 
         self.train_cfg = cfg.train_cfg
         self.test_cfg = cfg.test_cfg
-        self.init_weights(pretrained=pretrained)
+        self.init_weights(pretrained=cfg.model.pretrained)
 
     def init_weights(self, pretrained=None):
         if pretrained is not None:
@@ -41,6 +44,8 @@ class OneStageDetector(nn.Module):
 
     def extract_feat(self, img):
         x = self.backbone(img)
+        if self.cfg.model.neck is not None:
+            x = self.neck(x)
         return x
 
     def forward_train(self, img, img_metas, gt_bboxes, gt_labels):

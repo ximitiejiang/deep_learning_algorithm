@@ -23,7 +23,9 @@ from utils.multi_apply import multi_apply
 from utils.bbox_reg import delta2bbox
 from .weight_init import xavier_init  
 from .losses import weighted_smoothl1
+from utils.registry_build import registered
 
+@registered.register_module
 class SSDHead(nn.Module):
 
     def __init__(self,
