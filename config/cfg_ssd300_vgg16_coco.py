@@ -123,7 +123,7 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-gpus=2
+gpus=1
 total_epochs = 24
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
