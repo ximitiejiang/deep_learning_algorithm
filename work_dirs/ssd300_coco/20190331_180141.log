@@ -1,0 +1,2 @@
+2019-03-31 18:01:41,292 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/simple_ssd_pytorch/work_dirs/ssd300_coco
+2019-03-31 18:01:41,294 - INFO - workflow: [('train', 1)], max: 24 epochs
