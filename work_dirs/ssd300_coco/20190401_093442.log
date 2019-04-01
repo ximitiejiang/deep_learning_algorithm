@@ -1,0 +1,4 @@
+2019-04-01 09:34:42,301 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/simple_ssd_pytorch/work_dirs/ssd300_coco
+2019-04-01 09:34:42,302 - INFO - workflow: [('train', 1)], max: 24 epochs
+2019-04-01 10:50:49,370 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/mmdetection/ex4_faster_rcnn_r50_fpn_voc0712/work_dirs/faster_rcnn_r50_fpn_1x
+2019-04-01 10:50:49,371 - INFO - workflow: [('train', 1)], max: 12 epochs
