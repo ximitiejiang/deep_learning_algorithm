@@ -20,6 +20,7 @@ from utils.coco_eval import evaluation
 
 from dataset.utils import get_dataset
 from dataset.voc_dataset import VOCDataset
+from dataset.coco_dataset import CocoDataset
 from model.one_stage_detector import OneStageDetector
 
 def single_test(model, data_loader, show=False):
@@ -75,9 +76,8 @@ def main():
     1. args parse用直接输入替代
     2. 
     """
-    """TODO: 模型是在VOC训练的，但在COCO上评价，合理吗？"""
-    config_path = './config/cfg_ssd300_vgg16_voc.py'  
-    checkpoint_path = './weights/myssd/epoch_24.pth'
+    config_path = './config/cfg_ssd300_vgg16_voc.py'   # 注意：cfg和模型需要匹配，因为不同数据集类别数不一样，  
+    checkpoint_path = './weights/myssd/epoch_24.pth'   
     cfg = mmcv.Config.fromfile(config_path)
     out_file = 'dataset_eval_result/results.pkl'  # 注意这里要选择pkl而不能选择json，因为outputs里边包含array，用json无法保存
     eval_type = ['bbox']      # proposal_fast是mmdetection自己的实现
@@ -93,7 +93,7 @@ def main():
 #    cfg.model.pretrained = None
 
 #    dataset = obj_from_dict(cfg.data.test, datasets, dict(test_mode=True))
-    dataset = get_dataset(cfg.data.test, VOCDataset)
+    dataset = get_dataset(cfg.data.test, CocoDataset)
     
     cfg.gpus = 1
     
