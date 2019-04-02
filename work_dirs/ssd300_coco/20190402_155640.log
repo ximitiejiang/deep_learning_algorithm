@@ -1,0 +1,7 @@
+2019-04-02 15:56:40,698 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/simple_ssd_pytorch/work_dirs/ssd300_coco
+2019-04-02 15:56:40,699 - INFO - workflow: [('train', 1)], max: 24 epochs
+2019-04-02 15:56:51,960 - INFO - Epoch [1][50/293165]	lr: 0.00016, eta: 18 days, 6:44:09, time: 0.224, data_time: 0.015, loss_cls: 19.1146, loss_reg: 3.8392, loss: 22.9538
+2019-04-02 15:56:55,149 - INFO - Epoch [1][100/293165]	lr: 0.00019, eta: 11 days, 17:41:41, time: 0.064, data_time: 0.002, loss_cls: 16.7674, loss_reg: 3.5438, loss: 20.3113
+2019-04-02 15:56:58,348 - INFO - Epoch [1][150/293165]	lr: 0.00021, eta: 9 days, 13:28:22, time: 0.064, data_time: 0.002, loss_cls: 12.1870, loss_reg: 3.4877, loss: 15.6747
+2019-04-02 15:57:01,555 - INFO - Epoch [1][200/293165]	lr: 0.00024, eta: 8 days, 11:26:35, time: 0.064, data_time: 0.002, loss_cls: 8.7327, loss_reg: 3.3855, loss: 12.1182
+2019-04-02 15:57:04,752 - INFO - Epoch [1][250/293165]	lr: 0.00027, eta: 7 days, 19:44:21, time: 0.064, data_time: 0.002, loss_cls: 7.3973, loss_reg: 3.6025, loss: 10.9998

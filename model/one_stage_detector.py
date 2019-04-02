@@ -87,7 +87,7 @@ class OneStageDetector(nn.Module):
     
     def simple_test(self, img, img_meta, rescale=False):
         """用于测试时单图前向计算：
-        输出
+        基于ssd head的output，使用get_bbox()函数获得模型的概率化分类和定位输出
         """
         x = self.extract_feat(img)
         outs = self.bbox_head(x)

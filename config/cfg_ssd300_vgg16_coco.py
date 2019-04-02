@@ -123,8 +123,8 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-gpus=1
-total_epochs = 24
+gpus=2
+total_epochs = 12
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/ssd300_coco'
