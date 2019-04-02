@@ -9,6 +9,7 @@ from torch.utils.data.sampler import Sampler
 
 
 class GroupSampler(Sampler):
+    """用于dataloader中数据采样"""
 
     def __init__(self, dataset, samples_per_gpu=1):
         assert hasattr(dataset, 'flag')
