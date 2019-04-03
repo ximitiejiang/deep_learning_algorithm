@@ -197,7 +197,16 @@ class VOCDataset(Dataset):
         
         # 注意这里的对应label是从1开始，所以如果做逆对应就需要-1才能得到对应的真实描述
         self.cat2label = {cat: i + 1 for i, cat in enumerate(self.CLASSES)}
-
+        
+        if 'VOC2007' in self.img_prefix:
+            self.year = 2007
+        elif 'VOC2012' in self.img_prefix:
+            self.year = 2012
+        elif 'VOC2007' in self.img_prefix and 'VOC2012' in self.img_prefix:
+            self.year = 1207
+        else:
+            raise ValueError('Cannot infer dataset year from img_prefix')
+        
     def __len__(self):
         return len(self.img_infos)
 

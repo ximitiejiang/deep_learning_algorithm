@@ -20,10 +20,16 @@ from dataset.utils import get_dataset
 from dataset.voc_dataset import VOCDataset
 #from dataset.coco_dataset import CocoDataset
 from model.one_stage_detector import OneStageDetector
+from utils.config import Config
 
 #from mmdet.core import eval_map
 from utils.map import eval_map
 import numpy as np
+
+import sys,os
+path = os.path.abspath('.')
+if not path in sys.path:
+    sys.path.insert(0, path)
 
 def single_test(model, data_loader, show=False):
     model.eval()
@@ -45,17 +51,20 @@ def single_test(model, data_loader, show=False):
     return results
 
 
-def _data_func(data, device_id):
-    data = scatter(collate([data], samples_per_gpu=1), [device_id])[0]
-    return dict(return_loss=False, rescale=True, **data)
+#def _data_func(data, device_id):
+#    data = scatter(collate([data], samples_per_gpu=1), [device_id])[0]
+#    return dict(return_loss=False, rescale=True, **data)
 
 
-def test_dataset_result():
-
-    config_path = './config/cfg_ssd300_vgg16_voc.py'   # 注意：cfg和模型需要匹配，因为不同数据集类别数不一样，  
-    checkpoint_path = './weights/myssd/epoch_24.pth'   
-    cfg = mmcv.Config.fromfile(config_path)
-    out_file = './weights/mssd/results.pkl'  # 注意这里要选择pkl而不能选择json，因为outputs里边包含array，用json无法保存
+def dataset_result(dataset, cfg, checkpoint_path, out_file):
+    """用于指定数据集的预测结果生成：
+    Args:
+        cfg:  定义cfg文件路径
+        checkpoint_path:  定义已训练模型参数路径(模型cfg文件必须跟模型参数文件匹配)
+        out_file(.pkl): 定义目标pkl文件的存放路径 
+    Returns:
+        
+    """
 #    eval_type = ['bbox']      # proposal_fast是mmdetection自己的实现
 #    eval_type = ['proposal','bbox']   # 这几种是coco api的实现包括['proposal','bbox','segm','keypoints']，已跑通
                                     
@@ -66,16 +75,10 @@ def test_dataset_result():
     # set cudnn_benchmark
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
-#    cfg.model.pretrained = None
-
-#    dataset = obj_from_dict(cfg.data.test, datasets, dict(test_mode=True))
-    dataset = get_dataset(cfg.data.test, VOCDataset)
     
     cfg.gpus = 1
     
     if cfg.gpus == 1:
-#        model = build_detector(
-#            cfg.model, train_cfg=None, test_cfg=cfg.test_cfg)
         model = OneStageDetector(cfg)
         
         load_checkpoint(model, checkpoint_path)
@@ -110,39 +113,12 @@ def test_dataset_result():
         print('writing results to {}'.format(out_file))  
         mmcv.dump(outputs, out_file)  # 先把模型的测试结果输出到文件中: 如果文件不存在会创建  
         
-        # 基于result, 进行评估
-        voc_eval(out_file, dataset, iou_thr=0.5)
-        
-
-#        eval_types = eval_type
-#        if eval_types:
-#            print('Starting evaluate {}'.format(' and '.join(eval_types)))
-#            if eval_types == ['proposal_fast']:
-#                result_file = out_file
-##                coco_eval(result_file, eval_types, dataset.coco)  # result_file传入coco_eval()
-#                """用自己写的evaluation()"""
-#                evaluation(result_file, dataset.coco, eval_types=eval_types)
-#            
-#            else:
-#                if not isinstance(outputs[0], dict):
-#                    result_file = out_file + '.json'
-#                    results2json(dataset, outputs, result_file)
-##                    coco_eval(result_file, eval_types, dataset.coco)
-#                    """用自己写的evaluation()"""
-#                    evaluation(result_file, dataset.coco, eval_types=eval_types)
-#                else:
-#                    for name in outputs[0]:
-#                        print('\nEvaluating {}'.format(name))
-#                        outputs_ = [out[name] for out in outputs]
-#                        result_file = out_file + '.{}.json'.format(name)
-#                        results2json(dataset, outputs_, result_file)
-#                        coco_eval(result_file, eval_types, dataset.coco)
-
-
 
 
 def voc_eval(result_file, dataset, iou_thr=0.5):
-    det_results = mmcv.load(result_file)
+    """voc数据集结果评估
+    """
+    det_results = mmcv.load(result_file)  # 加载结果文件
     gt_bboxes = []
     gt_labels = []
     gt_ignore = []
@@ -180,5 +156,12 @@ if __name__ == '__main__':
 #    cfg = mmcv.Config.fromfile(args.config)
 #    test_dataset = mmcv.runner.obj_from_dict(cfg.data.test, datasets)
 #    voc_eval(args.result, test_dataset, args.iou_thr)
+    config_path = './config/cfg_ssd300_vgg16_voc.py'   # 注意：cfg和模型需要匹配，因为不同数据集类别数不一样，  
+    checkpoint_path = './weights/myssd/epoch_24.pth'   
+    out_file = './weights/myssd/results.pkl'
     
-    test_dataset_result()
+    cfg = Config.fromfile(config_path)
+    dataset = get_dataset(cfg.data.test, VOCDataset)
+    
+#    dataset_result(dataset, cfg, checkpoint_path, out_file)
+    voc_eval(out_file, dataset, iou_thr=0.5)

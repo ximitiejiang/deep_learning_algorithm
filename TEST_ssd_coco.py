@@ -22,6 +22,10 @@ from dataset.utils import get_dataset
 from dataset.voc_dataset import VOCDataset
 from dataset.coco_dataset import CocoDataset
 from model.one_stage_detector import OneStageDetector
+import sys,os
+path = os.path.abspath('.')
+if not path in sys.path:
+    sys.path.insert(0, path)
 
 def single_test(model, data_loader, show=False):
     model.eval()

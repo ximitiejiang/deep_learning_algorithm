@@ -21,7 +21,11 @@ from utils.config import Config
 from model.one_stage_detector import OneStageDetector
 from dataset.coco_dataset import CocoDataset
 from dataset.utils import get_dataset
-
+import sys,os
+path = os.path.abspath('.')
+if not path in sys.path:
+    sys.path.insert(0, path)
+    
 def get_dist_info():
     if dist._initialized:
         rank = dist.get_rank()

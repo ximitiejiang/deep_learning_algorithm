@@ -15,8 +15,9 @@ import torch.nn.functional as F
 #from .anchor_head import AnchorHead
 #from ..registry import HEADS
 #from mmcv.cnn import xavier_init
-from mmdet.core import multiclass_nms
+#from mmdet.core import multiclass_nms
 
+from utils.bbox_nms import multiclass_nms
 from utils.anchor_generator import AnchorGenerator
 from utils.anchor_target import anchor_target
 from utils.multi_apply import multi_apply  
@@ -245,7 +246,10 @@ class SSDHead(nn.Module):
         return dict(loss_cls=losses_cls, loss_reg=losses_reg)
     
     def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg, rescale=False):
-        """用于在test时生成anchors，然后基于anchors和cls_scores/bbox_preds计算bbox
+        """核心功能是吧网络输出score化，deltabbox化，过滤包括score过滤和nms过滤
+        而在ssd的测试阶段和在faster rcnn的anchor head阶段这个get bbox功能是有差别的。
+        ssd测试阶段是多分类，所以采用softmax生成score，然后统一做一次score+nms，限定到20个
+        faster rcnn这个阶段是2分类，所以采用sigmoid生成score,然后先score提取一次2000个,组合后nms提取一次2000个
         1. 获得每层的mlvl_anchors[(a,4),(b,4),...], 共6组
            获得每层的cls_score[(b,c,h,w),(b,c,h,w),...], 共6组
            获得每层的bbox_pred[(b,c,h,w),(b,c,h,w),...], 共6组
@@ -283,6 +287,13 @@ class SSDHead(nn.Module):
                           scale_factor,
                           cfg,
                           rescale=False):
+        """针对ssd的get bboxes用于把ssd head网络输出score化，delta2bbox化，然后统一做score过滤(0.02)和nms过滤(0.45)
+            cls_scores(6,)  (h,w,21*4) or (h,w,21*6)
+            bbox_preds(6,)
+        Returns:
+            det_bboxes(n,5)
+            det_labels(n,)
+        """
         assert len(cls_scores) == len(bbox_preds) == len(mlvl_anchors)
         mlvl_bboxes = []
         mlvl_scores = []
@@ -291,7 +302,7 @@ class SSDHead(nn.Module):
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
             cls_score = cls_score.permute(1, 2, 0).reshape( # (c,h,w) -> (h,w,c) -> (h*w*nclass, 21)or(h*w*nclass,81)
                 -1, self.cls_out_channels)
-            if self.use_sigmoid_cls:
+            if self.use_sigmoid_cls:      
                 scores = cls_score.sigmoid()
             else:
                 scores = cls_score.softmax(-1)                    # softmax(-1) get scores in (0,1) for each row(row sum=1)
@@ -312,11 +323,11 @@ class SSDHead(nn.Module):
             mlvl_scores.append(scores)  # (n,)
         mlvl_bboxes = torch.cat(mlvl_bboxes)
         if rescale:
-            mlvl_bboxes /= mlvl_bboxes.new_tensor(scale_factor)
+            mlvl_bboxes /= mlvl_bboxes.new_tensor(scale_factor) # (8732,4)/(4,) ->(8732,4)相当与把bbox尺寸恢复到原图大小
         mlvl_scores = torch.cat(mlvl_scores)
         if self.use_sigmoid_cls:
             padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)
             mlvl_scores = torch.cat([padding, mlvl_scores], dim=1)
         det_bboxes, det_labels = multiclass_nms(
-            mlvl_bboxes, mlvl_scores, cfg.score_thr, cfg.nms, cfg.max_per_img)
+            mlvl_bboxes, mlvl_scores, cfg.score_thr, cfg.nms, cfg.max_per_img) # multiclass_nms分别做score(0.02)过滤和nms过滤(0.45)
         return det_bboxes, det_labels

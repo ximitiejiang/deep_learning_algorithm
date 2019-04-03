@@ -1,10 +1,10 @@
 import torch
-from nms import nms_wrapper
+from utils.nms import nms_wrapper
 import numpy as np
 
 def multiclass_nms(multi_bboxes, multi_scores, score_thr, nms_cfg, max_num=-1):
     """NMS for multi-class bboxes.
-
+    同时进行nms筛选和得分筛选：先进行nms筛选，如果数量大于指定个数(200)，则再按score降序筛选一轮
     Args:
         multi_bboxes (Tensor): shape (n, #class*4) or (n, 4)
         multi_scores (Tensor): shape (n, #class)
@@ -22,10 +22,10 @@ def multiclass_nms(multi_bboxes, multi_scores, score_thr, nms_cfg, max_num=-1):
     bboxes, labels = [], []
     nms_cfg_ = nms_cfg.copy()
     nms_type = nms_cfg_.pop('type', 'nms')
-    nms_op = getattr(nms_wrapper, nms_type)
+    nms_op = getattr(nms_wrapper, nms_type)   # 提取nms操作类型
     
     for i in range(1, num_classes):
-        cls_inds = multi_scores[:, i] > score_thr
+        cls_inds = multi_scores[:, i] > score_thr  # cls_inds(8732), 代表每个循环的这个类，对应了几个bbox
         if not cls_inds.any():
             continue
         # get bboxes and scores of this class

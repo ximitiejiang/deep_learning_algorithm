@@ -17,7 +17,10 @@ from dataset.transforms import ImageTransform
 from dataset.class_names import get_classes
 from dataset.utils import vis_bbox
 from model.one_stage_detector import OneStageDetector
-
+import sys,os
+path = os.path.abspath('.')
+if not path in sys.path:
+    sys.path.insert(0, path)
 
 def test_cam(img_path, config_file, weights_path, class_name='voc', device = 'cuda:0'):
     """测试单张图片：相当于恢复模型和参数后进行单次前向计算得到结果
