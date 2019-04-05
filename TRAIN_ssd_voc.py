@@ -101,7 +101,7 @@ def train(cfg_path, dataset_class):
     logger.info('Distributed training: {}'.format(distributed))
     logger.info('DataParallel training: {}'.format(parallel))
     # build model & detector
-    model = OneStageDetector(cfg, pretrained=cfg.model.pretrained)
+    model = OneStageDetector(cfg)
 #    model = OneStageDetector(cfg)
     if not parallel:
         model = model.cuda()

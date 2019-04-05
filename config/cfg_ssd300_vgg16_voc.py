@@ -49,8 +49,8 @@ dataset_type = 'VOCDataset'
 data_root = './data/VOCdevkit/'
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[1, 1, 1], to_rgb=True)
 data = dict(
-    imgs_per_gpu=2,   # 从4改成2
-    workers_per_gpu=2,
+    imgs_per_gpu=4,     # 这个由每张GPU的显存决定(查看训练时显存是否有空闲)，从4改成2, 但mAP从78降到72, 改回4看看显存占用情况
+    workers_per_gpu=2,  # 这个由每个GPU的算力决定(查看训练时GPU占用多高)
     train=dict(
         type='RepeatDataset',
         times=10,
@@ -126,12 +126,12 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-gpus = 1      # 增加该句，从arg里边移过来因为build_dataloader函数需要
+gpus = 2      # 增加该句，从arg里边移过来因为build_dataloader函数需要
 total_epochs = 24
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/ssd300_voc'
 load_from = None
-resume_from = None
-#resume_from = './work_dirs/ssd300_voc/latest.pth'
+#resume_from = None
+resume_from = './work_dirs/ssd300_voc/latest.pth'
 workflow = [('train', 1)]

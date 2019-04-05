@@ -274,10 +274,9 @@ def eval_map(det_results,
     """Evaluate mAP of a dataset.
 
     Args:
-        det_results (list): a list of list, [[cls1_det, cls2_det, ...], ...]
-        gt_bboxes (list): ground truth bboxes of each image, a list of K*4
-            array.
-        gt_labels (list): ground truth labels of each image, a list of K array
+        det_results (list): list with list with array, (4950,)=n_imgs, (20,)=n_classes, (n,5)=n_bboxes
+        gt_bboxes (list): (4950,), (n,4)
+        gt_labels (list): (4950,), (n,)
         gt_ignore (list): gt ignore indicators of each image, a list of K array
         scale_ranges (list, optional): [(min1, max1), (min2, max2), ...]
         iou_thr (float): IoU threshold
