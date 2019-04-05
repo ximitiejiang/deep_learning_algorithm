@@ -1,8 +1,8 @@
 # model settings
-input_size = 300
+input_size = 512   # 图片尺寸加大
 model = dict(
     type='SingleStageDetector',
-    pretrained='open-mmlab://vgg16_caffe',   
+    pretrained='open-mmlab://vgg16_caffe',
     backbone=dict(
         type='SSDVGG',
         input_size=input_size,
@@ -16,11 +16,11 @@ model = dict(
     bbox_head=dict(
         type='SSDHead',
         input_size=input_size,
-        in_channels=(512, 1024, 512, 256, 256, 256),
+        in_channels=(512, 1024, 512, 256, 256, 256, 256),   # bbox输出变为7路(有5路extra layer)
         num_classes=21,
-        anchor_strides=(8, 16, 32, 64, 100, 300),
-        basesize_ratio_range=(0.2, 0.9),
-        anchor_ratios=([2], [2, 3], [2, 3], [2, 3], [2], [2]),
+        anchor_strides=(8, 16, 32, 64, 128, 256, 512),      # 7 layers的anchor的base size定义
+        basesize_ratio_range=(0.15, 0.9),                   # anchor的比例范围定义微调
+        anchor_ratios=([2], [2, 3], [2, 3], [2, 3], [2, 3], [2], [2]),  # 中间增加一层的ratio定义
         target_means=(.0, .0, .0, .0),
         target_stds=(0.1, 0.1, 0.2, 0.2)))
 cudnn_benchmark = True
@@ -45,12 +45,11 @@ test_cfg = dict(
 # model training and testing settings
 # dataset settings
 dataset_type = 'VOCDataset'
-#data_root = 'data/VOCdevkit/'  # 修改了数据目录地址，源码是假定train文件放在根目录
-data_root = './data/VOCdevkit/'
+data_root = './data/VOCdevkit/'    # 位置调整
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[1, 1, 1], to_rgb=True)
 data = dict(
-    imgs_per_gpu=4,     # 这个由每张GPU的显存决定(查看训练时显存是否有空闲)，从4改成2, 但mAP从78降到72, 改回4看看显存占用情况
-    workers_per_gpu=2,  # 这个由每个GPU的算力决定(查看训练时GPU占用多高)
+    imgs_per_gpu=4,
+    workers_per_gpu=2,
     train=dict(
         type='RepeatDataset',
         times=10,
@@ -61,7 +60,7 @@ data = dict(
                 data_root + 'VOC2012/ImageSets/Main/trainval.txt'
             ],
             img_prefix=[data_root + 'VOC2007/', data_root + 'VOC2012/'],
-            img_scale=(300, 300),
+            img_scale=(512, 512),      # 增大图片尺寸
             img_norm_cfg=img_norm_cfg,
             size_divisor=None,
             flip_ratio=0.5,
@@ -86,7 +85,7 @@ data = dict(
         type=dataset_type,
         ann_file=data_root + 'VOC2007/ImageSets/Main/test.txt',
         img_prefix=data_root + 'VOC2007/',
-        img_scale=(300, 300),
+        img_scale=(512, 512),     # 增大图片尺寸
         img_norm_cfg=img_norm_cfg,
         size_divisor=None,
         flip_ratio=0,
@@ -98,7 +97,7 @@ data = dict(
         type=dataset_type,
         ann_file=data_root + 'VOC2007/ImageSets/Main/test.txt',
         img_prefix=data_root + 'VOC2007/',
-        img_scale=(300, 300),
+        img_scale=(512, 512),   # 增大图片尺寸
         img_norm_cfg=img_norm_cfg,
         size_divisor=None,
         flip_ratio=0,
@@ -107,8 +106,8 @@ data = dict(
         test_mode=True,
         resize_keep_ratio=False))
 # optimizer
-optimizer = dict(type='SGD', lr=2e-4, momentum=0.9, weight_decay=5e-4) # 学习率是8块GPU的，
-optimizer_config = dict()                                    # 所以在1块GPU下从1e-3改为了1e-4， 2块改成2e-4
+optimizer = dict(type='SGD', lr=1e-3, momentum=0.9, weight_decay=5e-4)   # 从8块GPU的1e-3变为2e-4
+optimizer_config = dict()
 # learning policy
 lr_config = dict(
     policy='step',
@@ -126,12 +125,11 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-gpus = 2      # 增加该句，从arg里边移过来因为build_dataloader函数需要
+gpus = 1
 total_epochs = 24
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/ssd300_voc'
+work_dir = './work_dirs/ssd512_voc'
 load_from = None
-#resume_from = None
-resume_from = './weights/myssd/weight_4imgspergpu/epoch_21.pth'
+resume_from = None
 workflow = [('train', 1)]

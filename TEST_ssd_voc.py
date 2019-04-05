@@ -118,10 +118,10 @@ def voc_eval(result_file, dataset, iou_thr=0.5):
 
 if __name__ == '__main__':
     config_path = './config/cfg_ssd300_vgg16_voc.py'   # 注意：cfg和模型需要匹配，因为不同数据集类别数不一样，  
-#    checkpoint_path = './weights/myssd/weight_2imgspergpu/epoch_24.pth'   
-    checkpoint_path = './work_dirs/ssd300_voc/epoch_21.pth'
+    checkpoint_path = './weights/myssd/weight_4imgspergpu/epoch_24.pth'   
+#    checkpoint_path = './work_dirs/ssd300_voc/epoch_24.pth'
 #    checkpoint_path = './weights/mmdetection/ssd300_voc_vgg16_caffe_240e_20181221-2f05dd40.pth'
-    out_file = './weights/myssd/weight_4imgspergpu/results_21.pkl'
+    out_file = './weights/myssd/weight_4imgspergpu/results_24.pkl'
     
     cfg = Config.fromfile(config_path)
     dataset = get_dataset(cfg.data.test, VOCDataset)

@@ -9,3 +9,5 @@ Created on Fri Mar  8 12:08:40 2019
 
 from .ssd_head import SSDHead
 from .ssdvgg import SSDVGG
+from .mlfpn_neck import MLFPN
+from .m2detvgg import M2detVGG

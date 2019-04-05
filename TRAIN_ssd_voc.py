@@ -5,7 +5,10 @@ Created on Tue Mar  5 15:42:09 2019
 
 @author: ubuntu
 """
-
+import sys,os
+path = os.path.abspath('.')
+if not path in sys.path:
+    sys.path.insert(0, path)        
 import logging
 from torch.utils.data import DataLoader
 import torch.distributed as dist
@@ -17,14 +20,10 @@ from mmcv.parallel import MMDataParallel, collate
 
 from mmcv.runner import Runner
 from dataset.sampler import GroupSampler  # 用于dataloader采样定义
-from utils.config import Config
 from model.one_stage_detector import OneStageDetector
+from utils.config import Config
 from dataset.voc_dataset import VOCDataset
 from dataset.utils import get_dataset
-import sys,os
-path = os.path.abspath('.')
-if not path in sys.path:
-    sys.path.insert(0, path)
     
 def get_dist_info():
     if dist._initialized:
@@ -135,6 +134,14 @@ def train(cfg_path, dataset_class):
     
     
 if __name__ == '__main__':
+    # ssd300
     cfg_path = 'config/cfg_ssd300_vgg16_voc.py'
+    
+    # ssd512
+#    cfg_path = 'config/cfg_ssd512_vgg16_voc.py' 
+    
+    # ssd512 + mlfpn
+#    cfg_path = 'config/cfg_ssd512_vgg16_mlfpn_voc.py'
+    
     train(cfg_path, VOCDataset)
     

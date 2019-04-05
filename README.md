@@ -72,7 +72,16 @@ simple_ssd_pytorch
 + [ ] support distributed training
 
 ### mAP results
-+ train setting 1: 2 imgs per GPU, 2 workers per GPU, SGD lr = 2e-4, momentum=0.9, weight_decay=5e-4
++ benchmarking
+    [from here](https://github.com/open-mmlab/mmdetection/blob/master/MODEL_ZOO.md)
+    + mAP = 0.778 (mmdet SSD300-vgg)
+    + mAP = 0.804 (mmdet SSD512-vgg)
+    [from here](https://github.com/qijiezhao/pytorch-ssd)
+    + mAP = 0.805 (m2det300-vgg) 
+    + mAP = 0.821 (m2det512-vgg)
+    + mAP = 0.827 (m2det512-resnet101)
+    
++ train setting 1(SSD300): 2 imgs per GPU, 2 workers per GPU, SGD lr = 2e-4, momentum=0.9, weight_decay=5e-4
     + mAP = 0.348 (epoch 3)
     + mAP = 0.507 (epoch 6)
     + mAP = 0.649 (epoch 12)
@@ -105,68 +114,42 @@ simple_ssd_pytorch
 | mAP         |      |       |        |           | 0.721 |
 +-------------+------+-------+--------+-----------+-------+
 ```
-+ training setting 2: 4 imgs per GPU, 2 workers per GPU, SGD lr = 2e-4, momentum=0.9, weight_decay=5e-4  (add batch size)
++ training setting 2(SSD300): 4 imgs per GPU, 2 workers per GPU, SGD lr = 2e-4, momentum=0.9, weight_decay=5e-4  (add batch size)
     + mAP = 0.695 (epoch 3)
     + mAP = 0.721 (epoch 6)
     + mAP = 0.750 (epoch 12)
-    + mAP = 0.774 (epoch 21)
+    + mAP = 0.774 (epoch 24)
 ```
 +-------------+------+-------+--------+-----------+-------+
 | class       | gts  | dets  | recall | precision | ap    |
 +-------------+------+-------+--------+-----------+-------+
-| aeroplane   | 285  | 1414  | 0.916  | 0.186     | 0.823 |
-| bicycle     | 337  | 1387  | 0.917  | 0.226     | 0.845 |
-| bird        | 459  | 3267  | 0.882  | 0.125     | 0.741 |
-| boat        | 263  | 3649  | 0.901  | 0.066     | 0.735 |
-| bottle      | 469  | 6685  | 0.783  | 0.055     | 0.504 |
-| bus         | 213  | 1119  | 0.958  | 0.186     | 0.850 |
-| car         | 1201 | 6965  | 0.953  | 0.169     | 0.862 |
-| cat         | 358  | 1230  | 0.939  | 0.275     | 0.881 |
-| chair       | 756  | 11854 | 0.853  | 0.056     | 0.604 |
-| cow         | 244  | 1039  | 0.955  | 0.236     | 0.837 |
-| diningtable | 206  | 1546  | 0.922  | 0.128     | 0.737 |
-| dog         | 489  | 1871  | 0.939  | 0.248     | 0.846 |
-| horse       | 348  | 1100  | 0.943  | 0.304     | 0.867 |
-| motorbike   | 325  | 1142  | 0.926  | 0.269     | 0.833 |
-| person      | 4528 | 27828 | 0.923  | 0.152     | 0.794 |
-| pottedplant | 480  | 7459  | 0.790  | 0.051     | 0.514 |
-| sheep       | 242  | 1455  | 0.909  | 0.153     | 0.784 |
-| sofa        | 239  | 1157  | 0.937  | 0.215     | 0.789 |
-| train       | 282  | 1132  | 0.936  | 0.236     | 0.866 |
-| tvmonitor   | 308  | 2711  | 0.925  | 0.106     | 0.765 |
+| aeroplane   | 285  | 1420  | 0.909  | 0.184     | 0.819 |
+| bicycle     | 337  | 1359  | 0.911  | 0.229     | 0.845 |
+| bird        | 459  | 3459  | 0.893  | 0.120     | 0.742 |
+| boat        | 263  | 3520  | 0.901  | 0.069     | 0.737 |
+| bottle      | 469  | 6781  | 0.783  | 0.055     | 0.506 |
+| bus         | 213  | 1068  | 0.958  | 0.194     | 0.848 |
+| car         | 1201 | 6527  | 0.952  | 0.180     | 0.862 |
+| cat         | 358  | 1264  | 0.936  | 0.267     | 0.873 |
+| chair       | 756  | 12013 | 0.862  | 0.056     | 0.605 |
+| cow         | 244  | 1073  | 0.951  | 0.227     | 0.831 |
+| diningtable | 206  | 1557  | 0.932  | 0.129     | 0.734 |
+| dog         | 489  | 1903  | 0.939  | 0.244     | 0.847 |
+| horse       | 348  | 1111  | 0.943  | 0.301     | 0.864 |
+| motorbike   | 325  | 1152  | 0.935  | 0.269     | 0.839 |
+| person      | 4528 | 29187 | 0.924  | 0.145     | 0.792 |
+| pottedplant | 480  | 7516  | 0.788  | 0.051     | 0.518 |
+| sheep       | 242  | 1424  | 0.913  | 0.157     | 0.789 |
+| sofa        | 239  | 1151  | 0.941  | 0.216     | 0.786 |
+| train       | 282  | 1077  | 0.940  | 0.249     | 0.863 |
+| tvmonitor   | 308  | 2842  | 0.929  | 0.102     | 0.770 |
 +-------------+------+-------+--------+-----------+-------+
 | mAP         |      |       |        |           | 0.774 |
 +-------------+------+-------+--------+-----------+-------+
 ```
-+ training setting 3: 4 imgs per GPU, 2 workers per GPU, SGD lr = 4e-4, momentum=0.9, weight_decay=5e-4  (add lr)
++ training setting 3(SSD300): 4 imgs per GPU, 2 workers per GPU, SGD lr = 4e-4, momentum=0.9, weight_decay=5e-4  (add lr)
     + to be update
 
-+ training result from mmdetection(24 epoch)
-```
-+-------------+------+-------+--------+-----------+-------+
-| class       | gts  | dets  | recall | precision | ap    |
-+-------------+------+-------+--------+-----------+-------+
-| aeroplane   | 285  | 1249  | 0.912  | 0.210     | 0.828 |
-| bicycle     | 337  | 1252  | 0.926  | 0.252     | 0.840 |
-| bird        | 459  | 3222  | 0.887  | 0.128     | 0.755 |
-| boat        | 263  | 3195  | 0.905  | 0.076     | 0.714 |
-| bottle      | 469  | 6585  | 0.808  | 0.058     | 0.514 |
-| bus         | 213  | 1068  | 0.967  | 0.196     | 0.856 |
-| car         | 1201 | 6092  | 0.952  | 0.193     | 0.866 |
-| cat         | 358  | 1210  | 0.941  | 0.280     | 0.878 |
-| chair       | 756  | 11011 | 0.870  | 0.062     | 0.611 |
-| cow         | 244  | 1082  | 0.947  | 0.224     | 0.837 |
-| diningtable | 206  | 1479  | 0.913  | 0.133     | 0.745 |
-| dog         | 489  | 1859  | 0.947  | 0.252     | 0.849 |
-| horse       | 348  | 1085  | 0.928  | 0.304     | 0.862 |
-| motorbike   | 325  | 1111  | 0.945  | 0.281     | 0.849 |
-| person      | 4528 | 27554 | 0.924  | 0.154     | 0.798 |
-| pottedplant | 480  | 7343  | 0.796  | 0.052     | 0.516 |
-| sheep       | 242  | 1331  | 0.917  | 0.170     | 0.787 |
-| sofa        | 239  | 1153  | 0.967  | 0.222     | 0.801 |
-| train       | 282  | 1093  | 0.926  | 0.242     | 0.875 |
-| tvmonitor   | 308  | 2568  | 0.932  | 0.113     | 0.773 |
-+-------------+------+-------+--------+-----------+-------+
-| mAP         |      |       |        |           | 0.778 |
-+-------------+------+-------+--------+-----------+------
-```
++ training setting 4(SSD512): 4 imgs per GPU, 2 workers per GPU, SGD lr = 2e-4, momentum=0.9, weight_decay=5e-4, adding MLFPN neck
+    + to be update
+       
