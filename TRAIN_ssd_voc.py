@@ -18,7 +18,8 @@ from functools import partial
 
 from mmcv.parallel import MMDataParallel, collate
 
-from mmcv.runner import Runner
+#from mmcv.runner import Runner
+from utils.runner.runner import Runner
 from dataset.sampler import GroupSampler  # 用于dataloader采样定义
 from model.one_stage_detector import OneStageDetector
 from utils.config import Config

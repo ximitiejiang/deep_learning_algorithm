@@ -87,6 +87,9 @@ class CocoDataset(Dataset):
     ]
 
     The `ann` field is optional for testing.
+    
+    Returns:
+            data(dict): {'img':, 'img_meta':, }, 并且每个items.values都打包成DataContainer对象，.data可获得具体数据
     """
 
     CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',

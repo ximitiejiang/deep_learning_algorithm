@@ -9,14 +9,16 @@ from torch.utils.data.sampler import Sampler
 
 
 class GroupSampler(Sampler):
-    """用于dataloader中数据采样"""
+    """用于dataloader中数据采样, 如果设置sampler=GroupSampler, 则shuffler需设为False
+    __iter__方法返回迭代对象，__len__方法返回采样个数
+    """
 
     def __init__(self, dataset, samples_per_gpu=1):
         assert hasattr(dataset, 'flag')
         self.dataset = dataset
         self.samples_per_gpu = samples_per_gpu
         self.flag = dataset.flag.astype(np.int64)
-        self.group_sizes = np.bincount(self.flag)
+        self.group_sizes = np.bincount(self.flag)   # return (2,) count 0 & 1 quantity.
         self.num_samples = 0
         for i, size in enumerate(self.group_sizes):
             self.num_samples += int(np.ceil(
@@ -131,3 +133,4 @@ class DistributedGroupSampler(Sampler):
 
     def set_epoch(self, epoch):
         self.epoch = epoch
+

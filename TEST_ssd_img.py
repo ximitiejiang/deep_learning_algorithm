@@ -87,4 +87,5 @@ if __name__ == "__main__":
         weights_path = './weights/myssd/epoch_24.pth'
 #        weights_path = './weights/mmdetection/ssd300_voc_vgg16_caffe_240e_20181221-2f05dd40.pth'
         class_name = 'voc'
+        
         test_img(img_path, config_file, weights_path, class_name=class_name)

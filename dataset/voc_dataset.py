@@ -111,7 +111,7 @@ class VOCDataset(Dataset):
             ann_file(list): ['ann1', 'ann2'..] 代表图片名检索文件，可以包含1-n个数据源的不同检索文件
             img_prefix(list): 代表检索文件名的前缀，前缀+检索文件名 = 完整文件名
         Returns:
-            data(dict): {'img':, 'img_meta':, }
+            data(dict): {'img':, 'img_meta':, }, 并且每个items.values都打包成DataContainer对象，.data可获得具体数据
     """
 
     CLASSES = ('aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car',
