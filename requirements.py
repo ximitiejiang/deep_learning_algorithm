@@ -23,6 +23,10 @@ $ ln -s /home/ubuntu/MyDatasets/voc/VOCdevkit
 $ cd ssd
 $ mkdir weights
 $ ln -s 
+
+# ------show tensorboardX result------
+$ go to work_dirs/tf_logs
+
 """
 # %% part2
 # add sys path

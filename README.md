@@ -1,13 +1,13 @@
 # Simple_ssd_pytorch
 
-This is a simplified ssd detector implement in pytorch, base document on [here](https://arxiv.org/pdf/1512.02325.pdf)
+Originally i want to implement a simplifier SSD detector in this repo, but now it has already integrated some other one-stage detector algorithms, including SSD, M2det, RetinaNet.
 <div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test14_result.jpeg"/></div>
 <div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test11_result.jpg"/></div>
 <div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/video_result.jpg"/></div>
 
-this ssd implementation is simplified from [mmdetection](https://github.com/open-mmlab/mmdetection)
+the ssd detector implementation is simplified from [mmdetection](https://github.com/open-mmlab/mmdetection)
 
-### features
+### Features
 curently it support VGG16 backbone, the pretrained weights is from caffe on [here](https://s3.ap-northeast-2.amazonaws.com/open-mmlab/pretrain/third_party/vgg16_caffe-292e1171.pth).
 besides this, other features include:
 + support multi-GPU training on parallel mode
@@ -34,7 +34,7 @@ so in order to avoid inbalance of fg and bg, hard negtive mining method is appli
 + as hard negtive mining was used on training,so no nms using on training, 
 but using nms on testing imgs in ssd head module, nms or soft_nms can be chosen.
 
-### installation(test enviroments)
+### Installation(test enviroments)
 + pytorch 0.4.1, cudn9.0, cython, mmcv
 + git clone this repo
 + create data folder in repo root and create symlink to your own dataset source documents.
@@ -64,18 +64,13 @@ simple_ssd_pytorch
 + run test_xxx_img.py for testing one pic based on trained model.
 + run test_xxx_xxx.py for evaluating the model mAP on specific dataset.
 
-### TODO
-+ [x] support eval on coco dataset
-+ [x] support eval on voc
-+ [ ] add MLFPN on SSD
-+ [ ] add RetinaNet detector
-+ [ ] support distributed training
-
 ### mAP results
 + benchmarking
-    [from here](https://github.com/open-mmlab/mmdetection/blob/master/MODEL_ZOO.md)
+
+    [from here](https://github.com/open-mmlab/mmdetection/blob/master/MODEL_ZOO.md)    
     + mAP = 0.778 (mmdet SSD300-vgg)
     + mAP = 0.804 (mmdet SSD512-vgg)
+    
     [from here](https://github.com/qijiezhao/pytorch-ssd)
     + mAP = 0.805 (m2det300-vgg) 
     + mAP = 0.821 (m2det512-vgg)
@@ -147,9 +142,16 @@ simple_ssd_pytorch
 | mAP         |      |       |        |           | 0.774 |
 +-------------+------+-------+--------+-----------+-------+
 ```
-+ training setting 3(SSD300): 4 imgs per GPU, 2 workers per GPU, SGD lr = 4e-4, momentum=0.9, weight_decay=5e-4  (add lr)
-    + to be update
 
-+ training setting 4(SSD512): 4 imgs per GPU, 2 workers per GPU, SGD lr = 2e-4, momentum=0.9, weight_decay=5e-4, adding MLFPN neck
-    + to be update
-       
++ training setting 3(SSD512): 4 imgs per GPU, 2 workers per GPU, SGD lr = 1e-3, momentum=0.9, weight_decay=5e-4, adding MLFPN neck and with bigger lr
+    + batch size analysis: trainset=5011(voc07)+11540(voc12), totally 16551(07+12), so after 10 times repeatdataset, the total length of dataset is 165510
+    and if 2GPUs and 4 pics per GPU, batch size should be 8, so the iter_num = 165510/8 = 20689(20688.75) 
+    + mAP = 0.385 (epoch 4, with warmup lr and base lr= 0.001), the lr is too big, so decrease to 0.0002
+    + mAP 
+      
+### Todo
++ [x] support eval on coco dataset
++ [x] support eval on voc
++ [x] add MLFPN in the module lib
++ [ ] add RetinaNet detector
++ [ ] support distributed training

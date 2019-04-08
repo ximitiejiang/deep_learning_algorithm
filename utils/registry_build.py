@@ -23,8 +23,9 @@ class Registry():
         
     def register_module(self, cls):
         """用于作为装饰器接收类，把类加入module dict，最终装饰器也返回该类
-        该注册操作在第一个类初始化时就会作为装饰器优先运行，从而完成所有类的搜集注册
-        在detection任务中，就会在主程序的detector创建并初始化时调用到这个函数，一步完成所有类的注册
+        该注册操作在类被导入时就会作为装饰器优先运行，从而完成所有类的搜集注册
+        但前提是相关的类必须要执行导入操作，这步导入操作统一在__init__文件中执行，然后就完成了registery操作
+        这种搜集类的方法适合于比较分散的类，如果是集中在一个文件的类，建议用import导入，然后getattr(file_name, class_name)来获得类
         """
         if not issubclass(cls, nn.Module):
             raise TypeError(

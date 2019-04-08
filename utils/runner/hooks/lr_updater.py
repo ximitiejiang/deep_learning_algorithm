@@ -6,7 +6,11 @@ from .hook import Hook
 
 
 class LrUpdaterHook(Hook):
-
+    """设置warmup lr和regular lr
+    流程：设置base_lr -> 设置regular_lr -> 判断epoch: 小于warmup epoch则用warmup_lr设置，大于则用regular_lr设置
+    warmup lr: 在每个iter调整(before_train_iter)，通常定义在前500个iter,
+    regular lr: 在每个epoch调整(before_train_epoch)，
+    """
     def __init__(self,
                  by_epoch=True,
                  warmup=None,
@@ -38,12 +42,16 @@ class LrUpdaterHook(Hook):
             param_group['lr'] = lr
 
     def get_lr(self, runner, base_lr):
+        """用该函数来计算regular lr的值，如steplr步长减缓, explr指数减缓, polylr
+        被get_regular_lr调用
+        """
         raise NotImplementedError
 
     def get_regular_lr(self, runner):
         return [self.get_lr(runner, _base_lr) for _base_lr in self.base_lr]
 
     def get_warmup_lr(self, cur_iters):
+        """用该函数来计算初始预热学习率lr"""
         if self.warmup == 'constant':
             warmup_lr = [_lr * self.warmup_ratio for _lr in self.regular_lr]
         elif self.warmup == 'linear':
@@ -64,12 +72,14 @@ class LrUpdaterHook(Hook):
         ]
 
     def before_train_epoch(self, runner):
+        """regular_lr的调整通常基于epoch，放在这里"""
         if not self.by_epoch:
             return
-        self.regular_lr = self.get_regular_lr(runner)
+        self.regular_lr = self.get_regular_lr(runner)   # 更新一个list
         self._set_lr(runner, self.regular_lr)
 
     def before_train_iter(self, runner):
+        """warmup的调整通常基于iter，放在这里"""
         cur_iter = runner.iter
         if not self.by_epoch:
             self.regular_lr = self.get_regular_lr(runner)
@@ -83,13 +93,13 @@ class LrUpdaterHook(Hook):
                 return
             elif cur_iter == self.warmup_iters:
                 self._set_lr(runner, self.regular_lr)
-            else:
+            else:  # 设置warmup lr
                 warmup_lr = self.get_warmup_lr(cur_iter)
                 self._set_lr(runner, warmup_lr)
 
 
 class FixedLrUpdaterHook(LrUpdaterHook):
-
+    """如果不变更学习率，则采用这个hook"""
     def __init__(self, **kwargs):
         super(FixedLrUpdaterHook, self).__init__(**kwargs)
 
@@ -97,8 +107,29 @@ class FixedLrUpdaterHook(LrUpdaterHook):
         return base_lr
 
 
-class StepLrUpdaterHook(LrUpdaterHook):
+class ListLrUpdaterHook(LrUpdaterHook):
+    """采用list形式手动调整lr：
+    比如epoch_list=[4, 12, 20], lr_list = [0.0005, 0.0002, 0.00005]
+    逻辑是小于ep[i]则取lr[i]
+    """
+    def __init__(self, epoch_list, lr_list, **kwargs):
+        super(ListLrUpdaterHook, self).__init__(**kwargs)
+        self.epoch_list = epoch_list
+        self.lr_list = lr_list
+    
+    def get_lr(self, runner, base_lr):
+        progress = runner.epoch
+        for ep, lr in zip(self.epoch_list, self.lr_list):
+            if progress < ep:
+                return lr
 
+
+class StepLrUpdaterHook(LrUpdaterHook):
+    """采用阶梯式学习率减缓：每个阶梯减缓gamma倍, 也就是lr*gamma^[1,2,3...]，
+    如果gamma取0.1,则每个阶梯减缓1/10,1/100,...
+    如果gamma取0.5,则每个接替减缓1/2,1/4...
+    step指定阶梯比如[16,20]代表第16个epoch，第22个epoch
+    """
     def __init__(self, step, gamma=0.1, **kwargs):
         assert isinstance(step, (list, int))
         if isinstance(step, list):
@@ -121,9 +152,9 @@ class StepLrUpdaterHook(LrUpdaterHook):
         exp = len(self.step)
         for i, s in enumerate(self.step):
             if progress < s:
-                exp = i
+                exp = i       # epoch<16则exp=0, 16<epoch<22则exp=1, epoch>22则exp=2
                 break
-        return base_lr * self.gamma**exp
+        return base_lr * self.gamma**exp   # lr*0.1^0, lr*0.1^1, lr*0.1^2
 
 
 class ExpLrUpdaterHook(LrUpdaterHook):
@@ -134,7 +165,7 @@ class ExpLrUpdaterHook(LrUpdaterHook):
 
     def get_lr(self, runner, base_lr):
         progress = runner.epoch if self.by_epoch else runner.iter
-        return base_lr * self.gamma**progress
+        return base_lr * self.gamma**progress  # lr*0.5^n
 
 
 class PolyLrUpdaterHook(LrUpdaterHook):
@@ -150,7 +181,7 @@ class PolyLrUpdaterHook(LrUpdaterHook):
         else:
             progress = runner.iter
             max_progress = runner.max_iters
-        return base_lr * (1 - progress / max_progress)**self.power
+        return base_lr * (1 - progress / max_progress)**self.power  # lr*((1-n)/20)^p
 
 
 class InvLrUpdaterHook(LrUpdaterHook):

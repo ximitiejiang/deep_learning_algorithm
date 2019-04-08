@@ -373,10 +373,12 @@ class Runner(object):
                             ' or dict, not {}'.format(type(lr_config)))
 
     def register_logger_hooks(self, log_config):
+        """对于每个间隔都要更新的hook统一用logger hook来初始化，
+        包括texthook, tensorboardhook，最终一起通过register_hook来注册"""
         log_interval = log_config['interval']
-        for info in log_config['hooks']:
+        for info_dict in log_config['hooks']:
             logger_hook = obj_from_dict(
-                info, hooks, default_args=dict(interval=log_interval))
+                info_dict, hooks, default_args=dict(interval=log_interval))
             self.register_hook(logger_hook, priority='VERY_LOW')
 
     def register_training_hooks(self,
@@ -398,6 +400,7 @@ class Runner(object):
             optimizer_config = {}
         if checkpoint_config is None:
             checkpoint_config = {}
+        # 默认的5个hooks
         self.register_lr_hooks(lr_config)
         self.register_hook(self.build_hook(optimizer_config, OptimizerHook))
         self.register_hook(self.build_hook(checkpoint_config, CheckpointHook))

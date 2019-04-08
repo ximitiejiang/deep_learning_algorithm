@@ -11,12 +11,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-#from mmdet.core import (AnchorGenerator, anchor_target, weighted_smoothl1, multi_apply)
-#from .anchor_head import AnchorHead
-#from ..registry import HEADS
-#from mmcv.cnn import xavier_init
-#from mmdet.core import multiclass_nms
-
 from utils.bbox_nms import multiclass_nms
 from utils.anchor_generator import AnchorGenerator
 from utils.anchor_target import anchor_target
