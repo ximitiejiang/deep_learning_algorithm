@@ -1,4 +1,5 @@
 import torch.nn as nn
+import numpy as np
 import torch
 import math
 
@@ -45,6 +46,11 @@ def kaiming_init(module,
             module.weight, mode=mode, nonlinearity=nonlinearity)
     if hasattr(module, 'bias') and module.bias is not None:
         nn.init.constant_(module.bias, bias)
+
+def bias_init_with_prob(prior_prob):
+    """ initialize conv/fc bias value according to giving probablity (for retinanet)"""
+    bias_init = float(-np.log((1 - prior_prob) / prior_prob))
+    return bias_init
 
 
 def calculate_gain(nonlinearity, param=None):

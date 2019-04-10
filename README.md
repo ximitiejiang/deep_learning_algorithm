@@ -65,6 +65,9 @@ simple_ssd_pytorch
 + run test_xxx_xxx.py for evaluating the model mAP on specific dataset.
 
 ### mAP results
+
+Note: using repeatdataset to load dataset 10 times for each epoch, which means below epoch num should be 10 times than conventional epoch num. For example, below epoch 6 means No.60 epoch for a dataset.
+
 + benchmarking
 
     [from here](https://github.com/open-mmlab/mmdetection/blob/master/MODEL_ZOO.md)    
@@ -114,6 +117,7 @@ simple_ssd_pytorch
     + mAP = 0.721 (epoch 6)
     + mAP = 0.750 (epoch 12)
     + mAP = 0.774 (epoch 24)
+    + insight: bigger batch size can improve the mAP
 ```
 +-------------+------+-------+--------+-----------+-------+
 | class       | gts  | dets  | recall | precision | ap    |
@@ -146,8 +150,12 @@ simple_ssd_pytorch
 + training setting 3(SSD512): 4 imgs per GPU, 2 workers per GPU, SGD lr = 1e-3, momentum=0.9, weight_decay=5e-4, adding MLFPN neck and with bigger lr
     + batch size analysis: trainset=5011(voc07)+11540(voc12), totally 16551(07+12), so after 10 times repeatdataset, the total length of dataset is 165510
     and if 2GPUs and 4 pics per GPU, batch size should be 8, so the iter_num = 165510/8 = 20689(20688.75) 
+    + bigger lr issue(lr from 2e-4 to 1e-3): lead to fast decrease of the loss, but also lead to stable status after 3 epoches. 
     + mAP = 0.385 (epoch 4, with warmup lr and base lr= 0.001), the lr is too big, so decrease to 0.0002
-    + mAP 
+    + mAP = 0.580 (epoch 8, with step lr = 0.0002), not too much improvement for the loss when decrease the lr
+    + mAP = 0.570 (epoch 9, with step lr = 0.001), no improvement or even worse loss by adding num_img_per_gpu from 4 to 8, and lr increase to 0.001 which is same with original paper(0.002 for 4 GPU, here use 0.001 for 2 GPU) 
+    + mAP = 0.664 (epoch 12, with step lr = 0.0002), loss decrease again from 3.7 to 3.2 by decrease lr back to 0.0002 with 8 imgs per GPU, comparing with epoch 8, batch img increase helps(4 to 8), lr increase not helps.
+    + mAP = 0.xxx (epoch 15, with step lr = 0.0002), training with lr=0.0002 util epoch 20, which is same as original paper(4gpu/lr0.0004 util epoch20)
       
 ### Todo
 + [x] support eval on coco dataset

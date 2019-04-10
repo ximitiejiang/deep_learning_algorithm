@@ -25,7 +25,7 @@ class M2detHead(SSDHead):
                  input_size = 512,      # 相同保留
                  planes = 256,           # 代表tums最终输出层数
                  num_levels = 8,
-                 num_classes = 81,
+                 num_classes = 21,
                  anchor_strides = [8, 16, 32, 64, 128, 256],  # 代表特征图的缩放比例，也就是每个特征图上cell对应的原图大小，也就是原图所要布置anchor的尺寸空间(可以此计算ctx,cty)
                  size_pattern = [0.06, 0.15, 0.33, 0.51, 0.69, 0.87, 1.05],  # 代表anchors尺寸跟img的比例, 前6个数是min_size比例，后6个数是max_size比例，可以此计算anchor最小最大尺寸
                  size_featmaps = [(64,64), (32,32), (16,16), (8,8), (4,4), (2,2)],

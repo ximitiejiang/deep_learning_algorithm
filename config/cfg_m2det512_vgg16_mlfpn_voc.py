@@ -62,7 +62,7 @@ dataset_type = 'VOCDataset'
 data_root = './data/VOCdevkit/'    # 位置调整
 img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[1, 1, 1], to_rgb=True)
 data = dict(
-    imgs_per_gpu=4,
+    imgs_per_gpu=8,    # 从4改为8看看效果（4是mmdetection的一般设置，但m2det上来就是16/32之类的大batch size）
     workers_per_gpu=2,
     train=dict(
         type='RepeatDataset',
@@ -134,8 +134,8 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    epoch_list=[4, 10, 16, 22],  # 更新epoch
-    lr_list=[0.0002, 0.0002, 0.0001, 0.00005]) # 更新lr
+    epoch_list=[4, 8, 16, 22],  # 更新epoch
+    lr_list=[0.0002, 0.0002, 0.0002, 0.0004]) # 更新lr
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(

@@ -1652,24 +1652,3 @@
 2019-04-08 08:20:56,318 - INFO - Epoch [4][20550/20689]	lr: 0.00100, eta: 2 days, 22:56:12, time: 0.596, data_time: 0.007, loss_cls: 3.3326, loss_reg: 1.2672, loss: 4.5998
 2019-04-08 08:21:26,230 - INFO - Epoch [4][20600/20689]	lr: 0.00100, eta: 2 days, 22:55:37, time: 0.598, data_time: 0.007, loss_cls: 3.4826, loss_reg: 1.3164, loss: 4.7990
 2019-04-08 08:21:56,054 - INFO - Epoch [4][20650/20689]	lr: 0.00100, eta: 2 days, 22:55:01, time: 0.596, data_time: 0.008, loss_cls: 3.3411, loss_reg: 1.2703, loss: 4.6114
-2019-04-08 08:22:50,792 - INFO - Epoch [5][50/20689]	lr: 0.00100, eta: 2 days, 22:52:05, time: 0.614, data_time: 0.019, loss_cls: 3.3495, loss_reg: 1.2418, loss: 4.5912
-2019-04-08 12:08:08,504 - INFO - load checkpoint from ./work_dirs/m2det512_voc/latest.pth
-2019-04-08 12:08:09,145 - INFO - resumed epoch 4, iter 82756
-2019-04-08 12:08:09,165 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/simple_ssd_pytorch/work_dirs/m2det512_voc
-2019-04-08 12:08:09,167 - INFO - workflow: [('train', 1)], max: 24 epochs
-2019-04-08 12:08:41,148 - INFO - Epoch [5][50/20689]	lr: 0.00100, eta: 3 days, 1:29:45, time: 0.640, data_time: 0.023, loss_cls: 3.3258, loss_reg: 1.3224, loss: 4.6482
-2019-04-08 12:09:12,323 - INFO - Epoch [5][100/20689]	lr: 0.00100, eta: 3 days, 0:33:56, time: 0.623, data_time: 0.008, loss_cls: 3.4357, loss_reg: 1.3230, loss: 4.7587
-2019-04-08 12:09:43,659 - INFO - Epoch [5][150/20689]	lr: 0.00100, eta: 3 days, 0:22:16, time: 0.627, data_time: 0.008, loss_cls: 3.5257, loss_reg: 1.3143, loss: 4.8400
-2019-04-08 12:10:15,040 - INFO - Epoch [5][200/20689]	lr: 0.00100, eta: 3 days, 0:17:49, time: 0.628, data_time: 0.008, loss_cls: 3.3908, loss_reg: 1.2898, loss: 4.6806
-2019-04-08 13:04:02,746 - INFO - load checkpoint from ./work_dirs/m2det512_voc/latest.pth
-2019-04-08 13:08:12,870 - INFO - resumed epoch 4, iter 82756
-2019-04-08 13:08:36,795 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/simple_ssd_pytorch/work_dirs/m2det512_voc
-2019-04-08 13:08:37,723 - INFO - workflow: [('train', 1)], max: 24 epochs
-2019-04-08 13:20:00,822 - INFO - load checkpoint from ./work_dirs/m2det512_voc/latest.pth
-2019-04-08 13:20:01,425 - INFO - resumed epoch 4, iter 82756
-2019-04-08 13:20:24,392 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/simple_ssd_pytorch/work_dirs/m2det512_voc
-2019-04-08 13:20:24,844 - INFO - workflow: [('train', 1)], max: 24 epochs
-2019-04-08 13:22:58,869 - INFO - load checkpoint from ./work_dirs/m2det512_voc/latest.pth
-2019-04-08 13:22:59,435 - INFO - resumed epoch 4, iter 82756
-2019-04-08 13:22:59,447 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/simple_ssd_pytorch/work_dirs/m2det512_voc
-2019-04-08 13:22:59,448 - INFO - workflow: [('train', 1)], max: 24 epochs
