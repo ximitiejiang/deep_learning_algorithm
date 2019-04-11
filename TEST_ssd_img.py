@@ -21,22 +21,14 @@ path = os.path.abspath('.')
 if not path in sys.path:
     sys.path.insert(0, path)
 
-def test_img(img_path, config_file, weights_path, class_name='voc', device = 'cuda:0'):
-    """测试单张图片：相当于恢复模型和参数后进行单次前向计算得到结果
-    注意由于没有dataloader，所以送入model的数据需要手动合成img_meta
-    1. 模型输入data的结构：需要手动配出来
-    2. 模型输出result的结构：
-    Args:
-        img(array): (h,w,c)-bgr
-        config_file(str): config文件路径
-        device(str): 'cpu'/'cuda:0'/'cuda:1'
-        class_name(str): 'voc' or 'coco'
+def prepare_data_model(img_path, config_file, model_class, weights_path, device = 'cuda:0'):
+    """准备data(img),model
     """
     # 1. 配置文件
     cfg = Config.fromfile(config_file)
     cfg.model.pretrained = None     # eval模式不再加载backbone的预训练参数，因为都在后边的checkpoints里边包含了。通过model load checkpoint统一来操作。
     # 2. 模型
-    model = OneStageDetector(cfg)
+    model = model_class(cfg)
     _ = load_checkpoint(model, weights_path)
     model = model.to(device)
     model.eval()             
@@ -60,16 +52,32 @@ def test_img(img_path, config_file, weights_path, class_name='voc', device = 'cu
                      flip=False)]
 
     data = dict(img=[img], img_meta=[img_meta])
+    return data, model
+
+
+def test_img(img_path, config_file, model_class, weights_path, class_name='voc', device = 'cuda:0'):
+    """测试单张图片：相当于恢复模型和参数后进行单次前向计算得到结果
+    注意由于没有dataloader，所以送入model的数据需要手动合成img_meta
+    1. 模型输入data的结构：需要手动配出来
+    2. 模型输出result的结构：
+    Args:
+        img(array): (h,w,c)-bgr
+        config_file(str): config文件路径
+        device(str): 'cpu'/'cuda:0'/'cuda:1'
+        class_name(str): 'voc' or 'coco'
+    """    
+    data, model = prepare_data_model(img_path, config_file, model_class, weights_path, device = 'cuda:0')
     
-    # 5. 结果计算: result    
+    # 5. 结果计算: result(20,)-(n,5)或(n,5)代表20类每一类的预测bbox结果，有就是(n,5)没有就是(0,5)，
+    # 其中5列代表(xmin,ymin,xmax,ymax,score)    
     with torch.no_grad():
         result = model(**data, return_loss=False, rescale=True)
     # 6. 结果显示
     class_names = get_classes(class_name)
     labels = [np.full(bbox.shape[0], i, dtype=np.int32) 
                 for i, bbox in enumerate(result)]
-    labels = np.concatenate(labels)
-    bboxes = np.vstack(result)
+    labels = np.concatenate(labels)  # (m,)
+    bboxes = np.vstack(result)       # (m,5)
     scores = bboxes[:,-1]
     img = cv2.imread(img_path, 1)
     vis_bbox(img.copy(), bboxes, label=labels, score=scores, score_thr=0.2, 
@@ -82,10 +90,10 @@ if __name__ == "__main__":
     test_this_img = True
     
     if test_this_img:
-        img_path = './data/misc/test12.jpg'    
+        img_path = './data/misc/001000.jpg'    
         config_file = './config/cfg_ssd300_vgg16_voc.py'
-        weights_path = './weights/myssd/epoch_24.pth'
-#        weights_path = './weights/mmdetection/ssd300_voc_vgg16_caffe_240e_20181221-2f05dd40.pth'
+        model_class = OneStageDetector
+        weights_path = './weights/myssd/weight_4imgspergpu/epoch_24.pth'
         class_name = 'voc'
         
-        test_img(img_path, config_file, weights_path, class_name=class_name)
+        test_img(img_path, config_file, model_class, weights_path, class_name=class_name)

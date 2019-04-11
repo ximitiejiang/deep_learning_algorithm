@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 from torch.utils.data.dataset import ConcatDataset as _ConcatDataset
 from matplotlib import pyplot as plt
-from dataset.color_transforms import color2value
+from dataset.color_transforms import color2value, colors
 
 def tensor2imgs(tensor, mean=(0, 0, 0), std=(1, 1, 1), to_rgb=True):
     """把tensor数据逆变换成可以显示img数据：逆rgb化，逆chw化，逆归一化，逆tensor化
@@ -142,7 +142,6 @@ def vis_bbox(img, bbox, label=None, score=None, score_thr=0, label_names=None,
         Returns the Axes object with the plot for further tweaking.
 
     """
-            
     if label is not None and not len(bbox) == len(label):
         raise ValueError('The length of label must be same as that of bbox')
     if score is not None and not len(bbox) == len(score):
@@ -164,36 +163,51 @@ def vis_bbox(img, bbox, label=None, score=None, score_thr=0, label_names=None,
     # If there is no bounding box to display, visualize the image and exit.
     if len(bbox) == 0:
         return ax
-
+    
+    # instance_colors可以等于list: [255,0,0]
+    # 也可等于None
+    # 否则等于随机7种颜色之一
+    color_list = []
+    for color in colors.values():
+        color_list.append(color)
+    color_list.pop(-1) # 去除白色，用于文字颜色
+    random_colors = np.stack(color_list, axis=0)  # (7,3)
+    random_colors = np.tile(random_colors, (12,1))[:len(label_names),:]  # (84,3) -> (20,3)or(80,3)
+    
     if instance_colors is None:
-        # Red
-        instance_colors = np.zeros((len(bbox), 3), dtype=np.float32)
-        instance_colors[:, 0] = 255
-    instance_colors = np.array(instance_colors)
+        instance_colors = random_colors
+#        instance_colors = np.zeros((len(bbox), 3), dtype=np.float32)
+#        instance_colors[:, 0] = 255
+    else:
+        assert len(instance_colors) == 3, 'instance_colors should be a list [n1,n2,n3].'
+        instance_colors = np.tile(instance_colors, (len(label_names), 1))
+#    instance_colors = np.array(instance_colors)
 
     for i, bb in enumerate(bbox):        # xyxy to xywh
         xy = (bb[0], bb[1])
         height = bb[3] - bb[1]
         width = bb[2] - bb[0]
-                
-        color = instance_colors[i % len(instance_colors)] / 255
-        ax.add_patch(plt.Rectangle(
-            xy, width, height, fill=False,
-            edgecolor=color, linewidth=linewidth, alpha=alpha))
-
+        # 先定义默认颜色        
+        color = instance_colors[0] / 255  # 默认用第一个颜色红色[255,0,255]作为常规显示图片和bbox, 但要归一到（0-1）来表示颜色
+        
         caption = []
         if label is not None and label_names is not None:
             lb = label[i]
             caption.append(label_names[lb])
+            color = instance_colors[lb] /255     # 如果有标签，则按标签类别定义颜色
         if score is not None:
             sc = score[i]
             caption.append('{:.2f}'.format(sc))
+        ax.add_patch(plt.Rectangle(
+            xy, width, height, fill=False,
+            edgecolor=color, linewidth=linewidth, alpha=alpha))
+
         if len(caption) > 0:
-            ax.text(bb[0], bb[3],     # 改到左下角点(xmin,ymin,xmax,ymax) ->(xmin,ymax)
+            ax.text(bb[0], bb[1]-2,     # 改到左下角点(xmin,ymin,xmax,ymax) ->(xmin,ymax)
                     ': '.join(caption),
                     style='italic',
-                    color = 'white',  # 默认是白色字体，这里设为blue
-                    bbox={'facecolor': color, 'alpha': 1, 'pad': 0}) 
+                    color = 'white',  # 默认是白色字体
+                    bbox={'facecolor': color, 'alpha': 0.5, 'pad': 0}) 
                     #文字底色跟边框颜色一样，透明度=1表示不透明，边空1
     return ax
 

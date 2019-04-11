@@ -155,7 +155,10 @@ Note: using repeatdataset to load dataset 10 times for each epoch, which means b
     + mAP = 0.580 (epoch 8, with step lr = 0.0002), not too much improvement for the loss when decrease the lr
     + mAP = 0.570 (epoch 9, with step lr = 0.001), no improvement or even worse loss by adding num_img_per_gpu from 4 to 8, and lr increase to 0.001 which is same with original paper(0.002 for 4 GPU, here use 0.001 for 2 GPU) 
     + mAP = 0.664 (epoch 12, with step lr = 0.0002), loss decrease again from 3.7 to 3.2 by decrease lr back to 0.0002 with 8 imgs per GPU, comparing with epoch 8, batch img increase helps(4 to 8), lr increase not helps.
-    + mAP = 0.xxx (epoch 15, with step lr = 0.0002), training with lr=0.0002 util epoch 20, which is same as original paper(4gpu/lr0.0004 util epoch20)
+    + mAP = 0.680 (epoch 16, with step lr = 0.0002), loss decrease from 3.2 to 2.9 by using lr=0.0002 util epoch 20, which is same as original paper(4gpu/lr0.0004 util epoch20)
+    + mAP =  (epoch 20, with step lr = 0.0002), by using lr=0.0002
+    + mAP =  (epoch 24, with step lr = 0.00002), by using lr=0.00002
+    + mAP =  (epoch 28, with step lr = 0.000002), by using lr=0.000002
       
 ### Todo
 + [x] support eval on coco dataset

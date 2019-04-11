@@ -43,10 +43,11 @@ def load_log(log_path_list):
 
 if __name__ == "__main__":
     # m2det512
-    log_path_list = ['../work_dirs/m2det512_voc/20190407_181009.log',
-                     '../work_dirs/m2det512_voc/20190408_181146.log',
-                     '../work_dirs/m2det512_voc/20190409_182341.log',
-                     '../work_dirs/m2det512_voc/20190409_221321.log']  
+    log_path_list = ['../work_dirs/m2det512_voc/20190407_181009.log',   # 1-4
+                     '../work_dirs/m2det512_voc/20190408_181146.log',   # 5-8
+                     '../work_dirs/m2det512_voc/20190409_182341.log',   # 9
+                     '../work_dirs/m2det512_voc/20190409_221321.log',   # 10-12
+                     '../work_dirs/m2det512_voc/20190410_175628.log',]  # 13-16
     # ssd300_voc_4img_per_GPU
 #    log_path = ['../work_dirs/ssd300_voc/20190404_181044.log']   
     
