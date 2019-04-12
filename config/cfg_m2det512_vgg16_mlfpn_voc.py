@@ -135,7 +135,7 @@ lr_config = dict(
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
     epoch_list=[4, 8, 20, 24],  # 更新epoch
-    lr_list=[0.0002, 0.0002, 0.0002, 0.0004]) # 更新lr
+    lr_list=[0.0002, 0.0002, 0.0002, 0.00004]) # 更新lr
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
@@ -146,7 +146,7 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-gpus=1
+gpus=2
 total_epochs = 24
 dist_params = dict(backend='nccl')
 log_level = 'INFO'

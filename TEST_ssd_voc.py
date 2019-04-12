@@ -127,8 +127,8 @@ if __name__ == '__main__':
 
     # for m2det
     config_path = './config/cfg_m2det512_vgg16_mlfpn_voc.py'
-    checkpoint_path = './weights/myssd/weight_m2det512/epoch_16.pth'
-    out_file = './weights/myssd/weight_m2det512/results_16.pkl'
+    checkpoint_path = './weights/myssd/weight_m2det512/epoch_20.pth'
+    out_file = './weights/myssd/weight_m2det512/results_20.pkl'
     
     cfg = Config.fromfile(config_path)
     dataset = get_dataset(cfg.data.test, VOCDataset)
