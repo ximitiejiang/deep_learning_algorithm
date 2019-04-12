@@ -134,8 +134,8 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    epoch_list=[4, 8, 20, 24],  # 更新epoch
-    lr_list=[0.0002, 0.0002, 0.0002, 0.00004]) # 更新lr
+    epoch_list=[4, 8, 20, 24, 28],  # 更新epoch
+    lr_list=[0.0002, 0.0002, 0.0002, 0.00002, 0.000002]) # 更新lr
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
@@ -147,7 +147,7 @@ log_config = dict(
 # yapf:enable
 # runtime settings
 gpus=2
-total_epochs = 24
+total_epochs = 28
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/m2det512_voc'

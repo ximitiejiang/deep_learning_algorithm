@@ -1,12 +1,37 @@
 import os.path as osp
-import sys
+import os, sys
 from argparse import ArgumentParser
 from collections import Iterable
 from importlib import import_module
 
 from addict import Dict
 
-#from .path import check_file_exist
+
+def configfromfile(filename):
+    """一个简版获取cfg参数的函数，输出为Dict类型，可直接引用参数
+    例如： cfg = configfromfile('cfg_ssd300_voc.py')
+           cfg.gpu     # 即可直接获得gpu参数
+    """
+    filename = os.path.abspath(os.path.expanduser(filename))
+    # check_file_exist(filename)
+    assert filename.endswith('.py'), 'The config file should be .py file.'
+    module_name = os.path.basename(filename)[:-3]
+    if '.' in module_name:
+        raise ValueError('Dots are not allowed in config file path.')
+    
+    config_dir = os.path.dirname(filename)
+    sys.path.insert(0, config_dir)
+    # import
+    cfg_data = import_module(module_name)
+    sys.path.pop(0)
+    # prepare dict
+    cfg_dict = {
+        name: value
+        for name, value in cfg_data.__dict__.items()
+        if not name.startswith('__')
+    }
+    cfg_dict = Dict(cfg_dict)
+    return cfg_dict
 
 
 class ConfigDict(Dict):
