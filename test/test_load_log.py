@@ -48,7 +48,9 @@ if __name__ == "__main__":
                      '../work_dirs/m2det512_voc/20190409_182341.log',   # 9
                      '../work_dirs/m2det512_voc/20190409_221321.log',   # 10-12
                      '../work_dirs/m2det512_voc/20190410_175628.log',   # 13-16
-                     '../work_dirs/m2det512_voc/20190411_183847.log']   # 17-
+                     '../work_dirs/m2det512_voc/20190411_183847.log',   # 17-20
+                     '../work_dirs/m2det512_voc/20190412_183426.log',   # 21
+                     '../work_dirs/m2det512_voc/20190412_214256.log']   # 22-27
     # ssd300_voc_4img_per_GPU
 #    log_path = ['../work_dirs/ssd300_voc/20190404_181044.log']   
     
