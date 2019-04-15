@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 from torch.utils.data.dataset import ConcatDataset as _ConcatDataset
 from matplotlib import pyplot as plt
-from dataset.color_transforms import color2value, colors
+from dataset.color_transforms import color2value, COLORS
 
 def tensor2imgs(tensor, mean=(0, 0, 0), std=(1, 1, 1), to_rgb=True):
     """把tensor数据逆变换成可以显示img数据：逆rgb化，逆chw化，逆归一化，逆tensor化
@@ -23,32 +23,10 @@ def tensor2imgs(tensor, mean=(0, 0, 0), std=(1, 1, 1), to_rgb=True):
         imgs.append(np.ascontiguousarray(img))
     return imgs
 
-
-def imprepare():
-    """opencv版本下的img准备"""
-    pass
-
-def imshow(img, win_name='', wait_time=0):
-    """opencv版本的imshow, 同时支持在cam下的显示输入
-    """
-    img = imprepare()
-    cv2.imshow(win_name, img)
-
-
-def imshow_det_bboxes(img,
-                      bboxes,
-                      labels,
-                      scores,
-                      class_names=None,
-                      score_thr=0,
-                      bbox_color='green',
-                      text_color='green',
-                      thickness=1,
-                      font_scale=0.5,
-                      show=True,
-                      win_name='',
-                      wait_time=0,
-                      out_file=None):
+    
+def opencv_vis_bbox(img, bboxes, labels, scores, score_thr=0, class_names=None, 
+                    instance_colors=None, thickness=1, font_scale=0.5,
+                    show=True, win_name='cam', wait_time=0, out_file=None): # 如果输出到文件中则指定路径
     """Draw bboxes and class labels (with scores) on an image.
 
     Args:
@@ -79,33 +57,36 @@ def imshow_det_bboxes(img,
         inds = scores > score_thr
         bboxes = bboxes[inds, :]
         labels = labels[inds]
-
-    bbox_color = color2value(bbox_color)
-    text_color = color2value(text_color)
+    
+    color_list = []
+    for color in COLORS.values():
+        color_list.append(color)
+    color_list.pop(-1) # the last one is white, reserve for text only, not for bboxes
+    random_colors = np.stack(color_list, axis=0)  # (7,3)
+    random_colors = np.tile(random_colors, (12,1))[:len(class_names),:]  # (84,3) -> (20,3)or(80,3)
 
     for bbox, label in zip(bboxes, labels):
         bbox_int = bbox.astype(np.int32)
         left_top = (bbox_int[0], bbox_int[1])
         right_bottom = (bbox_int[2], bbox_int[3])
         cv2.rectangle(
-            img, left_top, right_bottom, bbox_color, thickness=thickness)
+            img, left_top, right_bottom, random_colors[label].tolist(), thickness=thickness)
         label_text = class_names[
             label] if class_names is not None else 'cls {}'.format(label)
         if len(bbox) > 4:
             label_text += '|{:.02f}'.format(bbox[-1])
         cv2.putText(img, label_text, (bbox_int[0], bbox_int[1] - 2),
-                    cv2.FONT_HERSHEY_COMPLEX, font_scale, text_color)
+                    cv2.FONT_HERSHEY_COMPLEX, font_scale, random_colors[label].tolist())
 
-    if show:
-        imshow(img, win_name, wait_time)
     if out_file is not None:
-        imwrite(img, out_file)
+        cv2.imwrite(out_file, img)
+    if show:
+        cv2.imshow(win_name, img)
 
 
-def vis_bbox(img, bbox, label=None, score=None, score_thr=0, label_names=None,
-             instance_colors=None, alpha=1., linewidth=1.5, ax=None):
-    """另外一个图片+bbox显示的代码，感觉效果比cv2的好上几条街(来自chainercv)
-    对应数据格式和注释已修改为匹配现有voc/coco数据集。
+def vis_bbox(img, bboxes, labels=None, scores=None, score_thr=0, class_names=None,
+             instance_colors=None, alpha=1., linewidth=1.5, ax=None, saveto=None):
+    """另外一个图片+bbox显示的代码
     注意，该img输入为hwc/bgr(因为在test环节用这种格式较多)，如果在train等环节使用，
     就需要把img先从chw/rgb转成hwc/bgr
     Args:
@@ -117,13 +98,13 @@ def vis_bbox(img, bbox, label=None, score=None, score_thr=0, label_names=None,
             by :math:`(x_{min}, y_{min}, x_{max}, y_{max})` in the second axis.
         label (ndarray): An integer array of shape :math:`(R,)`.
             The values correspond to id for label names stored in
-            :obj:`label_names`. This is optional.
+            :obj:`class_names`. This is optional.
         score (~numpy.ndarray): A float array of shape :math:`(R,)`.
              Each value indicates how confident the prediction is.
              This is optional.
         score_thr(float): A float in (0, 1), bboxes scores with lower than
             score_thr will be skipped. if 0 means all bboxes will be shown.
-        label_names (iterable of strings): Name of labels ordered according
+        class_names (iterable of strings): Name of labels ordered according
             to label ids. If this is :obj:`None`, labels will be skipped.
         instance_colors (iterable of tuples): List of colors.
             Each color is RGB format and the range of its values is
@@ -142,17 +123,17 @@ def vis_bbox(img, bbox, label=None, score=None, score_thr=0, label_names=None,
         Returns the Axes object with the plot for further tweaking.
 
     """
-    if label is not None and not len(bbox) == len(label):
+    if labels is not None and not len(bboxes) == len(labels):
         raise ValueError('The length of label must be same as that of bbox')
-    if score is not None and not len(bbox) == len(score):
+    if scores is not None and not len(bboxes) == len(scores):
         raise ValueError('The length of score must be same as that of bbox')
     
     if score_thr > 0:                      # 只显示置信度大于阀值的bbox
-        score_id = score > score_thr
+        score_id = scores > score_thr
         # 获得scores, bboxes
-        score = score[score_id]
-        bbox = bbox[score_id]
-        label = label[score_id]
+        scores = scores[score_id]
+        bboxes = bboxes[score_id]
+        labels = labels[score_id]
         
     if ax is None:
         fig = plt.figure()
@@ -161,18 +142,18 @@ def vis_bbox(img, bbox, label=None, score=None, score_thr=0, label_names=None,
         img = img[...,[2,1,0]]         # hwc/bgr to rgb
         ax.imshow(img.astype(np.uint8))
     # If there is no bounding box to display, visualize the image and exit.
-    if len(bbox) == 0:
+    if len(bboxes) == 0:
         return ax
     
     # instance_colors可以等于list: [255,0,0]
     # 也可等于None
     # 否则等于随机7种颜色之一
     color_list = []
-    for color in colors.values():
+    for color in COLORS.values():
         color_list.append(color)
     color_list.pop(-1) # 去除白色，用于文字颜色
     random_colors = np.stack(color_list, axis=0)  # (7,3)
-    random_colors = np.tile(random_colors, (12,1))[:len(label_names),:]  # (84,3) -> (20,3)or(80,3)
+    random_colors = np.tile(random_colors, (12,1))[:len(class_names),:]  # (84,3) -> (20,3)or(80,3)
     
     if instance_colors is None:
         instance_colors = random_colors
@@ -180,10 +161,10 @@ def vis_bbox(img, bbox, label=None, score=None, score_thr=0, label_names=None,
 #        instance_colors[:, 0] = 255
     else:
         assert len(instance_colors) == 3, 'instance_colors should be a list [n1,n2,n3].'
-        instance_colors = np.tile(instance_colors, (len(label_names), 1))
+        instance_colors = np.tile(instance_colors, (len(class_names), 1))
 #    instance_colors = np.array(instance_colors)
 
-    for i, bb in enumerate(bbox):        # xyxy to xywh
+    for i, bb in enumerate(bboxes):        # xyxy to xywh
         xy = (bb[0], bb[1])
         height = bb[3] - bb[1]
         width = bb[2] - bb[0]
@@ -191,12 +172,12 @@ def vis_bbox(img, bbox, label=None, score=None, score_thr=0, label_names=None,
         color = instance_colors[0] / 255  # 默认用第一个颜色红色[255,0,255]作为常规显示图片和bbox, 但要归一到（0-1）来表示颜色
         
         caption = []
-        if label is not None and label_names is not None:
-            lb = label[i]
-            caption.append(label_names[lb])
+        if labels is not None and class_names is not None:
+            lb = labels[i]
+            caption.append(class_names[lb])
             color = instance_colors[lb] /255     # 如果有标签，则按标签类别定义颜色
-        if score is not None:
-            sc = score[i]
+        if scores is not None:
+            sc = scores[i]
             caption.append('{:.2f}'.format(sc))
         ax.add_patch(plt.Rectangle(
             xy, width, height, fill=False,
@@ -209,6 +190,8 @@ def vis_bbox(img, bbox, label=None, score=None, score_thr=0, label_names=None,
                     color = 'white',  # 默认是白色字体
                     bbox={'facecolor': color, 'alpha': 0.5, 'pad': 0}) 
                     #文字底色跟边框颜色一样，透明度=1表示不透明，边空1
+    if saveto is not None:
+        plt.savefig(saveto)
     return ax
 
 
@@ -350,7 +333,7 @@ if __name__ == '__main__':
         img = data['img'].data.numpy()     # 逆tensor
         img1 = img.transpose(1,2,0)   # 逆chw
         img2 = np.clip((img1 * img_norm_cfg['std'] + img_norm_cfg['mean']).astype(np.int32), 0, 255)  # 逆归一
-        vis_bbox(img2[...,[2,0,1]], bbox, label-1, label_names=classes)  # vis_bbox内部会bgr转rgb，所以这里要用bgr输入
+        vis_bbox(img2[...,[2,0,1]], bbox, label-1, class_names=classes)  # vis_bbox内部会bgr转rgb，所以这里要用bgr输入
     
     if source == 'coco':
         from dataset.coco_dataset import CocoDataset
@@ -394,6 +377,6 @@ if __name__ == '__main__':
         img = data['img'].data.numpy()     # 逆tensor
         img1 = img.transpose(1,2,0)   # 逆chw
         img2 = np.clip((img1 * img_norm_cfg['std'] + img_norm_cfg['mean']).astype(np.int32), 0, 255)  # 逆归一
-        vis_bbox(img2[...,[2,0,1]], bbox, label-1, label_names=classes)  # vis_bbox内部会bgr转rgb，所以这里要用bgr输入
+        vis_bbox(img2[...,[2,0,1]], bbox, label-1, class_names=classes)  # vis_bbox内部会bgr转rgb，所以这里要用bgr输入
         
         

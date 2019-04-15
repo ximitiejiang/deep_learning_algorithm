@@ -10,7 +10,7 @@ import cv2
 
 __all__ = ['color2value', 'bgr2rgb', 'rgb2bgr', 'bgr2hsv', 'hsv2bgr','bgr2gray', 'gray2bgr']
 
-colors = dict(purple = [255, 0, 255],  # purple = magenta
+COLORS = dict(purple = [255, 0, 255],  # purple = magenta
               red = [255, 0, 0],
               green = [0, 255, 0],
               black = [0, 0, 0],

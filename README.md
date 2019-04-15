@@ -60,8 +60,8 @@ simple_ssd_pytorch
 ```
 
 ### train & test
++ run demo.py for inference on img or camera video.
 + run train_xxx.py for training on specific dataset, currently support voc07/12 and coco2017
-+ run test_xxx_img.py for testing one pic based on trained model.
 + run test_xxx_xxx.py for evaluating the model mAP on specific dataset.
 
 ### mAP results

@@ -9,13 +9,12 @@ Created on Sun Mar  3 08:26:28 2019
 import torch
 import cv2
 import numpy as np
-import time
 
 from model.checkpoint import load_checkpoint
 from utils.config import Config
 from dataset.transforms import ImageTransform
 from dataset.class_names import get_classes
-from dataset.utils import vis_bbox
+from dataset.utils import vis_bbox, opencv_vis_bbox
 from model.one_stage_detector import OneStageDetector
 import sys,os
 path = os.path.abspath('.')
@@ -46,7 +45,7 @@ class Tester(object):
         
         return cfg, model
     
-    def preprocess_img(self, cfg, img, transformer=None):
+    def preprocess_data(self, cfg, img, transformer=None):
         ori_shape = img.shape
         if transformer is None:
             transformer = ImageTransform(**cfg.img_norm_cfg)
@@ -68,33 +67,30 @@ class Tester(object):
         data = dict(img=[img], img_meta=[img_meta])
         return data
     
-    def run_single(self, model, img, data, by_plt=True):
+    def run_single(self, model, img, data, show=False, saveto=None):
         """对单张图片计算结果""" 
         with torch.no_grad():
-            result = model(**data, return_loss=False, rescale=True)  # (20,)->(n,5)or(0,5)->(xmin,ymin,xmax,ymax,score)
+            result = model(**data, return_loss=False, rescale=True)  # (20,)->(n,5)or(0,5)->(xmin,ymin,xmax,ymax,score)         
+        # 提取labels
+        labels = [np.full(bbox.shape[0], i, dtype=np.int32) 
+                    for i, bbox in enumerate(result)]    # [(m1,), (m2,)...]
+        labels = np.concatenate(labels)  # (m,)
+        bboxes = np.vstack(result)       # (m,5)
+        scores = bboxes[:,-1]
+        
+        all_results = [bboxes]
+        all_results.append(labels)
+        all_results.append(scores)
+        
+        if show:
+            vis_bbox(img.copy(), *all_results, 
+                     score_thr=0.2, class_names=self.class_names, 
+                     instance_colors=None, alpha=1., linewidth=1.5, ax=None,
+                     saveto=saveto)
+        return all_results
             
-            # 提取labels
-            
-            labels = [np.full(bbox.shape[0], i, dtype=np.int32) 
-                        for i, bbox in enumerate(result)]    # [(m1,), (m2,)...]
-            labels = np.concatenate(labels)  # (m,)
-            bboxes = np.vstack(result)       # (m,5)
-            scores = bboxes[:,-1]
-            
-            if by_plt:
-                vis_bbox(img.copy(), bboxes, label=labels, score=scores, 
-                         score_thr=0.2, label_names=self.class_names,
-                         instance_colors=None, alpha=1., linewidth=1.5, ax=None)
-    
     def run(self, img_path):
-        """根据需要继承该Tester然后修改run()即可"""
-        # cfg, model
-        cfg, model = self.init_cfg_model()
-        # img
-        img = cv2.imread(img_path)
-        data = self.preprocess_img(cfg, img)
-        # run
-        self.run_single(model, img, data)
+        raise NotImplementedError('run() function not implemented!')
         
 
 class TestImg(Tester):
@@ -103,34 +99,52 @@ class TestImg(Tester):
                  dataset_name='voc', device = 'cuda:0'):
         super().__init__(config_file, model_class, weights_path, 
                  dataset_name, device = 'cuda:0')
+    
+    def run(self, img_path):
+        # cfg, model
+        cfg, model = self.init_cfg_model()
+        # img
+        img = cv2.imread(img_path)
+        data = self.preprocess_data(cfg, img)
+        # run
+        _ = self.run_single(model, img, data, show=True, saveto='result.jpg')
         
 
-class TestCam(Tester):
+class TestVideo(Tester):
     
     def __init__(self, config_file, model_class, weights_path, 
                  dataset_name='voc', device = 'cuda:0'):       
         super().__init__(config_file, model_class, weights_path, 
-                 dataset_name, device = 'cuda:0')
+                 dataset_name, device = 'cuda:0')        
         
-    def run(self):
+    def run(self, source):
         """"""
-        # cfg, model
+#        assert isinstance(cam_id, int), 'cam_id should be integers.'
+        if isinstance(source, int):
+            cam_id = source
+            capture = cv2.VideoCapture(cam_id)
+        elif isinstance(source, str):
+            capture = cv2.VideoCapture(source)
+        
         cfg, model = self.init_cfg_model()
-        #
-        cam_id = 0
-        capture = cv2.VideoCapture(cam_id)
+        
         while True:
             ret, img = capture.read()
             if not ret:
                 cv2.destroyAllWindows()
                 capture.release()
                 break
-            data = self.preprocess_img(cfg, img)
+            data = self.preprocess_data(cfg, img)
             
-            self.run_single(model, img, data)
-            result_img = []
-            
-    
+            all_results = self.run_single(model, img, data, show=False, saveto=None)
+            opencv_vis_bbox(img.copy(), *all_results, score_thr=0.2, class_names=self.class_names, 
+                            instance_colors=None, thickness=1, font_scale=0.5,
+                            show=True, win_name='cam', wait_time=0, out_file=None)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                cv2.destroyAllWindows()
+                capture.release()
+                break
+
 
 if __name__ == "__main__":     
     
@@ -145,5 +159,7 @@ if __name__ == "__main__":
 
         test_img = TestImg(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
         test_img.run(img_path)
-#        test_cam = TestCam(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
-#        test_cam.run()
+        
+        test_video = TestVideo(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
+        test_video.run(source=0)
+        

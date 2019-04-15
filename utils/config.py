@@ -24,7 +24,7 @@ def configfromfile(filename):
     # import
     cfg_data = import_module(module_name)
     sys.path.pop(0)
-    # prepare dict
+    # transfer module config data to Dict for easy usage.
     cfg_dict = {
         name: value
         for name, value in cfg_data.__dict__.items()
