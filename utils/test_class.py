@@ -111,7 +111,7 @@ class TestImg(Tester):
         
 
 class TestVideo(Tester):
-    
+    """用于视频或者摄像头的检测"""
     def __init__(self, config_file, model_class, weights_path, 
                  dataset_name='voc', device = 'cuda:0'):       
         super().__init__(config_file, model_class, weights_path, 
@@ -119,12 +119,13 @@ class TestVideo(Tester):
         
     def run(self, source):
         """"""
-#        assert isinstance(cam_id, int), 'cam_id should be integers.'
+        # source can be int(as cam_id) or str(as video path)
         if isinstance(source, int):
             cam_id = source
             capture = cv2.VideoCapture(cam_id)
         elif isinstance(source, str):
             capture = cv2.VideoCapture(source)
+        assert capture.isOpened(), 'Cannot capture source'
         
         cfg, model = self.init_cfg_model()
         
@@ -137,7 +138,7 @@ class TestVideo(Tester):
             data = self.preprocess_data(cfg, img)
             
             all_results = self.run_single(model, img, data, show=False, saveto=None)
-            opencv_vis_bbox(img.copy(), *all_results, score_thr=0.2, class_names=self.class_names, 
+            opencv_vis_bbox(img.copy(), *all_results, score_thr=0.5, class_names=self.class_names, 
                             instance_colors=None, thickness=1, font_scale=0.5,
                             show=True, win_name='cam', wait_time=0, out_file=None)
             if cv2.waitKey(1) & 0xFF == ord('q'):

@@ -1,0 +1,4 @@
+2019-04-16 09:54:20,699 - INFO - load checkpoint from ./work_dirs/m2det512_voc/latest.pth
+2019-04-16 09:54:21,276 - INFO - resumed epoch 26, iter 351722
+2019-04-16 09:54:25,360 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/simple_ssd_pytorch/work_dirs/m2det512_voc
+2019-04-16 09:54:25,361 - INFO - workflow: [('train', 1)], max: 28 epochs

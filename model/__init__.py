@@ -12,3 +12,5 @@ from .m2det_head import M2detHead
 from .ssdvgg import SSDVGG
 from .mlfpn_neck import MLFPN
 from .m2detvgg import M2detVGG
+from .parallel.data_parallel import NNDataParallel
+from .parallel.data_container import DataContainer

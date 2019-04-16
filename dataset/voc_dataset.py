@@ -3,7 +3,7 @@ import torch
 import mmcv
 import numpy as np
 import xml.etree.ElementTree as ET
-from mmcv.parallel import DataContainer as DC
+from model.parallel.data_container import DataContainer as DC
 from torch.utils.data import Dataset
 from collections import Sequence
 from .transforms import (ImageTransform, BboxTransform, MaskTransform, Numpy2Tensor)

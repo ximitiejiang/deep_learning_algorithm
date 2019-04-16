@@ -16,12 +16,11 @@ from collections import OrderedDict
 import torch
 from functools import partial
 
-from mmcv.parallel import MMDataParallel, collate
-
-#from mmcv.runner import Runner
 from utils.runner.runner import Runner
 from dataset.sampler import GroupSampler  # 用于dataloader采样定义
 from model.one_stage_detector import OneStageDetector
+from model.parallel.data_parallel import NNDataParallel
+from model.parallel.collate import collate
 from utils.config import Config
 from dataset.voc_dataset import VOCDataset
 from dataset.utils import get_dataset
@@ -106,7 +105,7 @@ def train(cfg_path, dataset_class):
     if not parallel:
         model = model.cuda()
     else:
-        model = MMDataParallel(model, device_ids = range(cfg.gpus)).cuda()
+        model = NNDataParallel(model, device_ids = range(cfg.gpus)).cuda()
     
     # prepare data & dataloader
     # Runner要求dataloader放在list里: 使workflow里每个flow对应一个dataloader
