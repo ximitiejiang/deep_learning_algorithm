@@ -25,7 +25,7 @@ def tensor2imgs(tensor, mean=(0, 0, 0), std=(1, 1, 1), to_rgb=True):
 
     
 def opencv_vis_bbox(img, bboxes, labels, scores, score_thr=0, class_names=None, 
-                    instance_colors=None, thickness=1, font_scale=0.5,
+                    instance_colors=None, thickness=1, font_scale=0.6,
                     show=True, win_name='cam', wait_time=0, out_file=None): # 如果输出到文件中则指定路径
     """Draw bboxes and class labels (with scores) on an image.
 
@@ -69,15 +69,24 @@ def opencv_vis_bbox(img, bboxes, labels, scores, score_thr=0, class_names=None,
         bbox_int = bbox.astype(np.int32)
         left_top = (bbox_int[0], bbox_int[1])
         right_bottom = (bbox_int[2], bbox_int[3])
-        cv2.rectangle(
-            img, left_top, right_bottom, random_colors[label].tolist(), thickness=thickness)
-        label_text = class_names[
+        cv2.rectangle(                  # 画方框
+            img, left_top, right_bottom, random_colors[label].tolist(), 
+            thickness=thickness)
+        label_text = class_names[       # 准备文字
             label] if class_names is not None else 'cls {}'.format(label)
         if len(bbox) > 4:
             label_text += '|{:.02f}'.format(bbox[-1])
-        cv2.putText(img, label_text, (bbox_int[0], bbox_int[1] - 2),
-                    cv2.FONT_HERSHEY_COMPLEX, font_scale, random_colors[label].tolist())
-
+            
+        txt_w, txt_h = cv2.getTextSize(
+            label_text, cv2.FONT_HERSHEY_DUPLEX, font_scale, thickness = 1)[0]
+        cv2.rectangle(                  # 画文字底色方框
+            img, (bbox_int[0], bbox_int[1]), 
+            (bbox_int[0] + txt_w, bbox_int[1] - txt_h - 4), 
+            random_colors[label].tolist(), -1)
+        cv2.putText(
+            img, label_text, (bbox_int[0], bbox_int[1] - 2),     # 字体选择cv2.FONT_HERSHEY_DUPLEX, 比cv2.FONT_HERSHEY_COMPLEX好一点
+            cv2.FONT_HERSHEY_DUPLEX, font_scale, [255,255,255])  # 字体白色
+        
     if out_file is not None:
         cv2.imwrite(out_file, img)
     if show:

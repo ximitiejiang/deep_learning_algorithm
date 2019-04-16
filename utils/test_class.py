@@ -83,10 +83,15 @@ class Tester(object):
         all_results.append(scores)
         
         if show:
-            vis_bbox(img.copy(), *all_results, 
-                     score_thr=0.2, class_names=self.class_names, 
-                     instance_colors=None, alpha=1., linewidth=1.5, ax=None,
-                     saveto=saveto)
+            vis_bbox(
+                img.copy(), *all_results, score_thr=0.2, class_names=self.class_names, 
+                instance_colors=None, alpha=1., linewidth=1.5, ax=None, saveto=saveto)
+            # opencv版本的显示效果不太好，用matplotlib版本的显示文字较好
+#            opencv_vis_bbox(
+#                img.copy(), *all_results, score_thr=0.2, class_names=self.class_names, 
+#                instance_colors=None, thickness=1, font_scale=0.5,
+#                show=True, win_name='test_pic', wait_time=1, out_file=None)
+            
         return all_results
             
     def run(self, img_path):
@@ -145,22 +150,3 @@ class TestVideo(Tester):
                 cv2.destroyAllWindows()
                 capture.release()
                 break
-
-
-if __name__ == "__main__":     
-    
-    test_this_img = True
-    
-    if test_this_img:
-        img_path = './data/misc/test.jpg'    
-        config_file = './config/cfg_ssd300_vgg16_voc.py'
-        model_class = OneStageDetector
-        weights_path = './weights/myssd/weight_4imgspergpu/epoch_24.pth'
-        dataset_name = 'voc'
-
-        test_img = TestImg(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
-        test_img.run(img_path)
-        
-        test_video = TestVideo(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
-        test_video.run(source=0)
-        

@@ -21,13 +21,18 @@ img_path = './data/misc/test.jpg'
 video_path = './data/misc/challenge.mp4'    
 config_file = './config/cfg_ssd300_vgg16_voc.py'
 weights_path = './weights/myssd/weight_4imgspergpu/epoch_24.pth'
-        
-#test_img = TestImg(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
-#test_img.run(img_path)
 
-test_video = TestVideo(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
-test_video.run(source=0)
+testimg, testcam, testvideo = (0,1,0)
 
-#test_video = TestVideo(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
-#test_video.run(source=video_path)
+if testimg:        
+    test_img = TestImg(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
+    test_img.run(img_path)
+
+if testcam:
+    test_video = TestVideo(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
+    test_video.run(source=0)
+
+if testvideo:
+    test_video = TestVideo(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
+    test_video.run(source=video_path)
     
