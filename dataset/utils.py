@@ -75,7 +75,7 @@ def opencv_vis_bbox(img, bboxes, labels, scores, score_thr=0, class_names=None,
         label_text = class_names[       # 准备文字
             label] if class_names is not None else 'cls {}'.format(label)
         if len(bbox) > 4:
-            label_text += '|{:.02f}'.format(bbox[-1])
+            label_text += ': {:.02f}'.format(bbox[-1])
             
         txt_w, txt_h = cv2.getTextSize(
             label_text, cv2.FONT_HERSHEY_DUPLEX, font_scale, thickness = 1)[0]
