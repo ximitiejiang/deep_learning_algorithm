@@ -84,13 +84,10 @@ class Tester(object):
         
         if show:
             vis_bbox(
-                img.copy(), *all_results, score_thr=0.2, class_names=self.class_names, 
-                instance_colors=None, alpha=1., linewidth=1.5, ax=None, saveto=saveto)
+                img.copy(), *all_results, score_thr=0.3, class_names=self.class_names, saveto=saveto)
             # opencv版本的显示效果不太好，用matplotlib版本的显示文字较好
 #            opencv_vis_bbox(
-#                img.copy(), *all_results, score_thr=0.2, class_names=self.class_names, 
-#                instance_colors=None, thickness=1, font_scale=0.5,
-#                show=True, win_name='test_pic', wait_time=1, out_file=None)
+#                img.copy(), *all_results, score_thr=0.2, class_names=self.class_names, saveto=saveto)
             
         return all_results
             
@@ -144,8 +141,8 @@ class TestVideo(Tester):
             
             all_results = self.run_single(model, img, data, show=False, saveto=None)
             opencv_vis_bbox(img.copy(), *all_results, score_thr=0.5, class_names=self.class_names, 
-                            instance_colors=None, thickness=1, font_scale=0.5,
-                            show=True, win_name='cam', wait_time=0, out_file=None)
+                            instance_colors=None, thickness=2, font_scale=0.5,
+                            show=True, win_name='cam', wait_time=0, saveto=None)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 cv2.destroyAllWindows()
                 capture.release()
