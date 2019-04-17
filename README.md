@@ -2,7 +2,7 @@
 
 Originally i want to implement a simplifier SSD detector in this repo, but now it has already integrated some other one-stage detector algorithms, including SSD, M2det, RetinaNet.
 <div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test14_result.jpg"/></div>
-<div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test_result.jpeg"/></div>
+<div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test_result.jpg"/></div>
 <div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/test12_result.jpg"/></div>
 <div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/video_drive.jpg"/></div>
 
