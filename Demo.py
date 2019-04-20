@@ -22,17 +22,17 @@ video_path = './data/misc/challenge.mp4'
 config_file = './config/cfg_ssd300_vgg16_voc.py'
 weights_path = './weights/myssd/weight_4imgspergpu/epoch_24.pth'
 
-testimg, testcam, testvideo = (0,0,1)
+testimg, testcam, testvideo = (0,0,1)  # choose test mode: 1 means on, 0 means off
 
 if testimg:        
     test_img = TestImg(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
     test_img.run(img_path)
 
-if testcam:
+elif testcam:
     test_video = TestVideo(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
     test_video.run(source=0)
 
-if testvideo:
+elif testvideo:
     test_video = TestVideo(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
     test_video.run(source=video_path)
     
