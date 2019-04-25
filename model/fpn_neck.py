@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from .weights_init import xavier_init, kaiming_init, constant_init
+from model.weight_init import xavier_init, kaiming_init, constant_init
 from utils.registry_build import registered
 import warnings
 

@@ -141,7 +141,10 @@ if __name__ == '__main__':
 #    cfg_path = 'config/cfg_ssd512_vgg16_voc.py' 
     
     # ssd512 + mlfpn
-    cfg_path = 'config/cfg_m2det512_vgg16_mlfpn_voc.py'
+#    cfg_path = 'config/cfg_m2det512_vgg16_mlfpn_voc.py'
+    
+    # retinanet 
+    cfg_path = 'config/cfg_retinanet_r50_fpn_voc.py'
     
     train(cfg_path, VOCDataset)
     

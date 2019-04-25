@@ -50,10 +50,10 @@ test_cfg = dict(
     max_per_img=100)
 # dataset settings
 dataset_type = 'VOCDataset'
-data_root = '../data/VOCdevkit/'
+data_root = './data/VOCdevkit/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)  # 采用的是pytorch的模型，但mean/std还是用的caffe的？？？
-data = dict(           # repeatdataset不加了，直接只训练12个epoch就结束(to be clarified)
+data = dict(           # repeatdataset不加了，在coco训练12epoch，voc上调成24
     imgs_per_gpu=2,    # retinanet的图片尺寸更大，所以每个gpu只放2张图片而不是ssd的4张(原始设置就是2)，这里可以尝试用4张看看GPU的显存是否够
     workers_per_gpu=2,
     train=dict(
@@ -94,14 +94,14 @@ data = dict(           # repeatdataset不加了，直接只训练12个epoch就�
         test_mode=True))
 # optimizer
 optimizer = dict(type='SGD', lr=0.002, momentum=0.9, weight_decay=0.0001)  # 学习率调小到原来8块GPU的1/4(0.01 to 0.002)
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2)) # 增加了一个梯度截断？
+optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))          # 增加了一个梯度截断？
 # learning policy
 lr_config = dict(
     policy='step',
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    step=[8, 11])
+    step=[8, 12, 20])
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
@@ -112,12 +112,12 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-gpus = 1
-total_epochs = 12
+gpus = 2
+total_epochs = 20   # coco不加repeatdataset训练了12轮，对应voc从12加倍到24轮
 device_ids = range(2)
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/retinanet_voc'
 load_from = None
-resume_from = None
+resume_from = './work_dirs/retinanet_voc/latest.pth'
 workflow = [('train', 1)]

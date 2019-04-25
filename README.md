@@ -160,10 +160,60 @@ Note: using repeatdataset to load dataset 10 times for each epoch, which means b
     + mAP = 0.706 (epoch 20, with step lr = 0.0002), by using lr=2e-4
     + mAP = 0.730 (epoch 24, with step lr = 0.00002), by using lr=2e-5
     + mAP = 0.731 (epoch 26, with step lr = 0.000002), by using lr=2e-6
-      
+
++ training setting 4(RetinaNet): 2 imgs per GPU, 2 workers per GPU, SGD lr=2e-3, momentum=0.9, weight_decay=5e-4
+    + mAP = 0.654 (epoch 4, with warmup lr and base lr=0.002), mAP=0.32 for epoch1
+    + mAP = 0.729 (epoch 8, with step lr = 0.002 from 1-8 epoch)
+    + mAP = 0.796 (epoch 12, with step lr =0.0002 from 9-12 epoch)
+    + mAP = 0.800 (epoch 16, with step lr =0.00002 from 13-16 epoch)
+    + result: bad performance to pottedplant(mAP=0.56) and diningtable(PR=0.015)
+
+<div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/retinanet_training_on_voc_2imgs_per_gpu.jpg"/></div>
+
+```
++-------------+------+-------+--------+-----------+-------+
+| class       | gts  | dets  | recall | precision | ap    |
++-------------+------+-------+--------+-----------+-------+
+| aeroplane   | 285  | 2696  | 0.975  | 0.104     | 0.855 |
+| bicycle     | 337  | 5156  | 0.979  | 0.064     | 0.855 |
+| bird        | 459  | 3816  | 0.956  | 0.117     | 0.840 |
+| boat        | 263  | 7739  | 0.962  | 0.033     | 0.718 |
+| bottle      | 469  | 11599 | 0.925  | 0.038     | 0.709 |
+| bus         | 213  | 3431  | 0.986  | 0.062     | 0.859 |
+| car         | 1201 | 13172 | 0.983  | 0.092     | 0.879 |
+| cat         | 358  | 3356  | 0.989  | 0.106     | 0.896 |
+| chair       | 756  | 21922 | 0.958  | 0.034     | 0.645 |
+| cow         | 244  | 3380  | 1.000  | 0.074     | 0.869 |
+| diningtable | 206  | 13414 | 0.951  | 0.015     | 0.675 |
+| dog         | 489  | 4447  | 0.994  | 0.110     | 0.876 |
+| horse       | 348  | 4104  | 0.986  | 0.084     | 0.869 |
+| motorbike   | 325  | 5124  | 0.982  | 0.063     | 0.845 |
+| person      | 4528 | 38610 | 0.975  | 0.117     | 0.849 |
+| pottedplant | 480  | 11697 | 0.927  | 0.038     | 0.560 |
+| sheep       | 242  | 3476  | 0.975  | 0.069     | 0.807 |
+| sofa        | 239  | 7576  | 0.987  | 0.032     | 0.725 |
+| train       | 282  | 3524  | 0.972  | 0.078     | 0.846 |
+| tvmonitor   | 308  | 6445  | 0.951  | 0.046     | 0.817 |
++-------------+------+-------+--------+-----------+-------+
+| mAP         |      |       |        |           | 0.800 |
++-------------+------+-------+--------+-----------+-------+
+```
+
+    
++ training setting 5(RetinaNet): 4 imgs per GPU, 2 workers per GPU, SGD lr=2e-3, momentum=0.9, weight_decay=5e-4
+    + aim: increase imgs per GPU
+    + mAP = tbd (epoch 4, with warmup lr and base lr=0.002)
+    + mAP = tbd (epoch 8, with step lr = 0.002 from 1-8 epoch)
+    + mAP = tbd (epoch 12,with step lr = 0.0002 from 9-12 epoch)
+    + mAP = tbd (epoch 16,with step lr = 0.00002 from 13-16 epoch)
+```
+training...
+```
+
 ### Todo
 + [x] support eval on coco dataset
 + [x] support eval on voc
 + [x] add MLFPN in the module lib
-+ [ ] add RetinaNet detector
++ [x] add RetinaNet detector
 + [ ] support distributed training
+

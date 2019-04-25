@@ -128,7 +128,7 @@ class StepLrUpdaterHook(LrUpdaterHook):
     """采用阶梯式学习率减缓：每个阶梯减缓gamma倍, 也就是lr*gamma^[1,2,3...]，
     如果gamma取0.1,则每个阶梯减缓1/10,1/100,...
     如果gamma取0.5,则每个接替减缓1/2,1/4...
-    step指定阶梯比如[16,20]代表第16个epoch，第22个epoch
+    step指定阶梯比如[16,20]代表第16个epoch，第22个epoch, lr分别变为原来的1/10,1/100
     """
     def __init__(self, step, gamma=0.1, **kwargs):
         assert isinstance(step, (list, int))

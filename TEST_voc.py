@@ -1,17 +1,16 @@
-"""针对faster rcnn在coco的test: 
-没有用voc数据集是因为：当前虽然有faster rcnn针对voc的模型和cfg，但没有针对voc的weights
-参考对标数据：mmdetection的测试结果都是基于coco_2017_train进行训练，然后基于coco_2017_val进行测试
-1.
-"""
-
 import torch
+
 import mmcv
 
-from mmdet.datasets import build_dataloader
-from mmcv.parallel import MMDataParallel
+from dataset.utils import build_dataloader
+from model.parallel.data_parallel import NNDataParallel
 from utils.checkpoint import load_checkpoint
 from dataset.utils import get_dataset
 from dataset.voc_dataset import VOCDataset
+#from torch.utils.data import DataLoader
+#from dataset.sampler import GroupSampler
+#from model.parallel.collate import collate
+#from functools import partial
 from model.one_stage_detector import OneStageDetector
 from utils.config import Config
 from utils.map import eval_map
@@ -62,8 +61,7 @@ def dataset_result(dataset, cfg, checkpoint_path, out_file):
         model = OneStageDetector(cfg)
         
         load_checkpoint(model, checkpoint_path)
-#        model = model.cuda()
-        model = MMDataParallel(model, device_ids=[0])
+        model = NNDataParallel(model, device_ids=[0])
         data_loader = build_dataloader(
             dataset,
             imgs_per_gpu=1,
@@ -71,6 +69,15 @@ def dataset_result(dataset, cfg, checkpoint_path, out_file):
             num_gpus=1,
             dist=False,
             shuffle=False)
+        
+        # 单个Dataloader用mmdetection的替代
+#        data_loader = DataLoader(dataset,
+#                                 batch_size=cfg.data.imgs_per_gpu * cfg.gpus,
+#                                 num_workers=cfg.data.workers_per_gpu * cfg.gpus,
+#                                 sampler=GroupSampler(dataset, cfg.data.imgs_per_gpu),
+#                                 collate_fn=partial(collate, samples_per_gpu=cfg.data.imgs_per_gpu),
+#                                 pin_memory=False)
+        
         outputs = single_test(model, data_loader, show=False)  # (4870,)=n_imgs (20,)=n_classes (n,5)=n_bboxes
   
     if out_file:  
@@ -126,10 +133,18 @@ if __name__ == '__main__':
 #    out_file = './weights/myssd/weight_4imgspergpu/results_24.pkl'
 
     # for m2det
-    config_path = './config/cfg_m2det512_vgg16_mlfpn_voc.py'
-    checkpoint_path = './weights/myssd/weight_m2det512/epoch_24.pth'
-    out_file = './weights/myssd/weight_m2det512/results_24.pkl'
+#    config_path = './config/cfg_m2det512_vgg16_mlfpn_voc.py'
+#    checkpoint_path = './weights/myssd/weight_m2det512/epoch_24.pth'
+#    out_file = './weights/myssd/weight_m2det512/results_24.pkl'
+#    cfg = Config.fromfile(config_path)
+#    dataset = get_dataset(cfg.data.test, VOCDataset)
+#    dataset_result(dataset, cfg, checkpoint_path, out_file)
+#    voc_eval(out_file, dataset, iou_thr=0.5)
     
+    # for retinanet
+    config_path = './config/cfg_retinanet_r50_fpn_voc.py'
+    checkpoint_path = './weights/myretinanet/epoch_20.pth'
+    out_file = './weights/myretinanet/results_20.pkl'
     cfg = Config.fromfile(config_path)
     dataset = get_dataset(cfg.data.test, VOCDataset)
     dataset_result(dataset, cfg, checkpoint_path, out_file)

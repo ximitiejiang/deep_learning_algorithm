@@ -42,20 +42,25 @@ def load_log(log_path_list):
     return losses, reg_losses, cls_losses, lrs, epochs
 
 if __name__ == "__main__":
+    
     # m2det512
-    log_path_list = ['../work_dirs/m2det512_voc/20190407_181009.log',   # 1-4
-                     '../work_dirs/m2det512_voc/20190408_181146.log',   # 5-8
-                     '../work_dirs/m2det512_voc/20190409_182341.log',   # 9
-                     '../work_dirs/m2det512_voc/20190409_221321.log',   # 10-12
-                     '../work_dirs/m2det512_voc/20190410_175628.log',   # 13-16
-                     '../work_dirs/m2det512_voc/20190411_183847.log',   # 17-20
-                     '../work_dirs/m2det512_voc/20190412_183426.log',   # 21
-                     '../work_dirs/m2det512_voc/20190412_214256.log']   # 22-27
+#    log_path_list = ['../work_dirs/m2det512_voc/20190407_181009.log',   # 1-4
+#                     '../work_dirs/m2det512_voc/20190408_181146.log',   # 5-8
+#                     '../work_dirs/m2det512_voc/20190409_182341.log',   # 9
+#                     '../work_dirs/m2det512_voc/20190409_221321.log',   # 10-12
+#                     '../work_dirs/m2det512_voc/20190410_175628.log',   # 13-16
+#                     '../work_dirs/m2det512_voc/20190411_183847.log',   # 17-20
+#                     '../work_dirs/m2det512_voc/20190412_183426.log',   # 21
+#                     '../work_dirs/m2det512_voc/20190412_214256.log']   # 22-27
     # ssd300_voc_4img_per_GPU
 #    log_path = ['../work_dirs/ssd300_voc/20190404_181044.log']   
     
     # ssd300_2img per GPU
 #    log_path_list = ['../work_dirs/ssd300_voc/20190404_090724.log']
+    
+    # retinanet
+    log_path_list = ['../work_dirs/retinanet_voc/20190424_144247.log',    #1-5
+                     '../work_dirs/retinanet_voc/20190424_203533.log']    #6-20
     
     losses, reg_losses, cls_losses, lrs, epochs = load_log(log_path_list)
     
@@ -69,11 +74,14 @@ if __name__ == "__main__":
     plt.title('lr')
     plt.plot(np.arange(len(lrs)), lrs)
     plt.subplot(323)
-    plt.title('loss_reg')
-    plt.plot(np.arange(len(reg_losses)),reg_losses)
-    plt.subplot(324)
     plt.title('loss_cls')
     plt.plot(np.arange(len(cls_losses)),cls_losses)
-    plt.subplot(325)
+    plt.subplot(324)
     plt.title('epoch')
     plt.plot(np.arange(len(epochs)),epochs)
+    plt.subplot(325)
+    plt.title('loss_reg')
+    plt.plot(np.arange(len(reg_losses)),reg_losses)
+    plt.suptitle("RetinaNet training on VOC (2imgs per GPU)")
+    
+
