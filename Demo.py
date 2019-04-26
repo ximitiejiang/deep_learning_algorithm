@@ -13,7 +13,7 @@ if not path in sys.path:
     sys.path.insert(0, path)
 
     
-from utils.test_class import TestImg, TestVideo
+from utils.tester import TestImg, TestVideo
 
 model_class = OneStageDetector
 dataset_name = 'voc'

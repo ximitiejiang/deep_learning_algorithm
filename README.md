@@ -199,15 +199,49 @@ Note: using repeatdataset to load dataset 10 times for each epoch, which means b
 +-------------+------+-------+--------+-----------+-------+
 ```
 
-    
 + training setting 5(RetinaNet): 4 imgs per GPU, 2 workers per GPU, SGD lr=2e-3, momentum=0.9, weight_decay=5e-4
     + aim: increase imgs per GPU
-    + mAP = tbd (epoch 4, with warmup lr and base lr=0.002)
-    + mAP = tbd (epoch 8, with step lr = 0.002 from 1-8 epoch)
-    + mAP = tbd (epoch 12,with step lr = 0.0002 from 9-12 epoch)
-    + mAP = tbd (epoch 16,with step lr = 0.00002 from 13-16 epoch)
+    + mAP = 0.688 (epoch 4, with warmup lr and base lr=0.002), mAP=0.275 for epoch1
+    + mAP = 0.756 (epoch 8, with step lr = 0.002 from 1-10 epoch)
+    + mAP = 0.794 (epoch 12,with step lr = 0.0002 from 11-16 epoch)
+    + mAP = 0.797 (epoch 16,with step lr = 0.00002 from 17-20 epoch)
+    
+<div align=center><img src="https://github.com/ximitiejiang/simple_ssd_pytorch/blob/master/data/retinanet_training_on_voc_4imgs_per_gpu.jpg"/></div>
+    
 ```
-training...
++-------------+------+-------+--------+-----------+-------+
+| class       | gts  | dets  | recall | precision | ap    |
++-------------+------+-------+--------+-----------+-------+
+| aeroplane   | 285  | 3397  | 0.958  | 0.081     | 0.821 |
+| bicycle     | 337  | 5260  | 0.973  | 0.063     | 0.861 |
+| bird        | 459  | 4081  | 0.961  | 0.110     | 0.859 |
+| boat        | 263  | 8830  | 0.935  | 0.028     | 0.699 |
+| bottle      | 469  | 9325  | 0.945  | 0.048     | 0.716 |
+| bus         | 213  | 4320  | 0.972  | 0.048     | 0.837 |
+| car         | 1201 | 12966 | 0.987  | 0.094     | 0.884 |
+| cat         | 358  | 3291  | 0.989  | 0.108     | 0.895 |
+| chair       | 756  | 20770 | 0.954  | 0.036     | 0.650 |
+| cow         | 244  | 3335  | 0.988  | 0.074     | 0.843 |
+| diningtable | 206  | 14356 | 0.961  | 0.014     | 0.695 |
+| dog         | 489  | 4550  | 0.996  | 0.108     | 0.875 |
+| horse       | 348  | 4893  | 0.983  | 0.071     | 0.855 |
+| motorbike   | 325  | 5946  | 0.991  | 0.055     | 0.840 |
+| person      | 4528 | 42586 | 0.976  | 0.106     | 0.847 |
+| pottedplant | 480  | 10015 | 0.906  | 0.044     | 0.543 |
+| sheep       | 242  | 2785  | 0.963  | 0.085     | 0.819 |
+| sofa        | 239  | 8169  | 0.971  | 0.029     | 0.736 |
+| train       | 282  | 4319  | 0.972  | 0.064     | 0.843 |
+| tvmonitor   | 308  | 5844  | 0.951  | 0.051     | 0.817 |
++-------------+------+-------+--------+-----------+-------+
+| mAP         |      |       |        |           | 0.797 |
++-------------+------+-------+--------+-----------+-------+
+```
+
++ training setting 6(RetinaNet): 2 imgs per GPU, 2 workers per GPU, SGD lr=2e-3, momentum=0.9, weight_decay=5e-4, add img extra augment(photo metric distortion, expand, random_crop)
+    + aim: by adding extra image augmentation to see if any mAP improvement
+    + mAP = tbd
+```
+training
 ```
 
 ### Todo

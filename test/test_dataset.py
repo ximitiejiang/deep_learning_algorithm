@@ -13,7 +13,6 @@ from dataset.voc_dataset import VOCDataset
 from dataset.coco_dataset import CocoDataset
 from torch.utils.data import Dataloader
 
-
 def test_voc_dataset():
     data_root = '../data/VOCdevkit/'  # 指代ssd目录下的data目录
     img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[1, 1, 1], to_rgb=True)

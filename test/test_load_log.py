@@ -58,9 +58,12 @@ if __name__ == "__main__":
     # ssd300_2img per GPU
 #    log_path_list = ['../work_dirs/ssd300_voc/20190404_090724.log']
     
-    # retinanet
-    log_path_list = ['../work_dirs/retinanet_voc/20190424_144247.log',    #1-5
-                     '../work_dirs/retinanet_voc/20190424_203533.log']    #6-20
+    # retinanet-2imgpergpu
+#    log_path_list = ['../work_dirs/retinanet_voc/20190424_144247.log',    #1-5
+#                     '../work_dirs/retinanet_voc/20190424_203533.log']    #6-20
+    
+    # retinanet-2imgpergpu
+    log_path_list = ['../work_dirs/retinanet_voc/20190425_181039.log']    #1-20
     
     losses, reg_losses, cls_losses, lrs, epochs = load_log(log_path_list)
     
@@ -82,6 +85,6 @@ if __name__ == "__main__":
     plt.subplot(325)
     plt.title('loss_reg')
     plt.plot(np.arange(len(reg_losses)),reg_losses)
-    plt.suptitle("RetinaNet training on VOC (2imgs per GPU)")
+    plt.suptitle("RetinaNet training on VOC (4imgs per GPU)")
     
 

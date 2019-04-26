@@ -141,10 +141,19 @@ if __name__ == '__main__':
 #    dataset_result(dataset, cfg, checkpoint_path, out_file)
 #    voc_eval(out_file, dataset, iou_thr=0.5)
     
-    # for retinanet
+    # for retinanet-2imgpergpu
+#    config_path = './config/cfg_retinanet_r50_fpn_voc.py'
+#    checkpoint_path = './weights/myretinanet/2imgpergpu/epoch_20.pth'
+#    out_file = './weights/myretinanet/2imgpergpu/results_20.pkl'
+#    cfg = Config.fromfile(config_path)
+#    dataset = get_dataset(cfg.data.test, VOCDataset)
+#    dataset_result(dataset, cfg, checkpoint_path, out_file)
+#    voc_eval(out_file, dataset, iou_thr=0.5)
+    
+    # for retinanet-4imgpergpu
     config_path = './config/cfg_retinanet_r50_fpn_voc.py'
-    checkpoint_path = './weights/myretinanet/epoch_20.pth'
-    out_file = './weights/myretinanet/results_20.pkl'
+    checkpoint_path = './weights/myretinanet/4imgpergpu/epoch_20.pth'
+    out_file = './weights/myretinanet/4imgpergpu/results_20.pkl'
     cfg = Config.fromfile(config_path)
     dataset = get_dataset(cfg.data.test, VOCDataset)
     dataset_result(dataset, cfg, checkpoint_path, out_file)

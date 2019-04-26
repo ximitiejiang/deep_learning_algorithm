@@ -54,7 +54,7 @@ data_root = './data/VOCdevkit/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)  # 采用的是pytorch的模型，但mean/std还是用的caffe的？？？
 data = dict(           # repeatdataset不加了，在coco训练12epoch，voc上调成24
-    imgs_per_gpu=2,    # retinanet的图片尺寸更大，所以每个gpu只放2张图片而不是ssd的4张(原始设置就是2)，这里可以尝试用4张看看GPU的显存是否够
+    imgs_per_gpu=4,    # retinanet的图片尺寸更大，所以每个gpu只放2张图片而不是ssd的4张(原始设置就是2)，这里可以尝试用4张看看GPU的显存是否够
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
@@ -101,7 +101,7 @@ lr_config = dict(
     warmup='linear',
     warmup_iters=500,
     warmup_ratio=1.0 / 3,
-    step=[8, 12, 20])
+    step=[10, 16, 20])    # [8,12,20] with 2 imgs per gpu, change to [10,16,20] with 4 imgs per gpu
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
@@ -119,5 +119,6 @@ dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/retinanet_voc'
 load_from = None
-resume_from = './work_dirs/retinanet_voc/latest.pth'
+#resume_from = './work_dirs/retinanet_voc/latest.pth'
+resume_from = None
 workflow = [('train', 1)]
