@@ -6,6 +6,10 @@ Created on Tue Mar  5 15:42:09 2019
 @author: ubuntu
 """
 
+import sys,os
+path = os.path.abspath('.')
+if not path in sys.path:
+    sys.path.insert(0, path)        
 import logging
 from torch.utils.data import DataLoader
 import torch.distributed as dist
@@ -13,18 +17,14 @@ from collections import OrderedDict
 import torch
 from functools import partial
 
-from mmcv.parallel import MMDataParallel, collate
-from mmcv.runner import Runner
-
+from utils.runner.runner import Runner
 from dataset.sampler import GroupSampler  # 用于dataloader采样定义
-from utils.config import Config
 from model.one_stage_detector import OneStageDetector
+from model.parallel.data_parallel import NNDataParallel
+from model.parallel.collate import collate
+from utils.config import Config
 from dataset.coco_dataset import CocoDataset
 from dataset.utils import get_dataset
-import sys,os
-path = os.path.abspath('.')
-if not path in sys.path:
-    sys.path.insert(0, path)
     
 def get_dist_info():
     if dist._initialized:
@@ -95,16 +95,18 @@ def train(cfg_path, dataset_class):
         torch.backends.cudnn.benchmark = True
     
     # get logger
+    distributed = False
+    parallel = True
     logger = get_root_logger(cfg.log_level)
     logger.info('Distributed training: {}'.format(distributed))
     logger.info('DataParallel training: {}'.format(parallel))
     # build model & detector
-    model = OneStageDetector(cfg)   # 注意：要增加pretrained的路径定义
+    model = OneStageDetector(cfg)
 #    model = OneStageDetector(cfg)
     if not parallel:
         model = model.cuda()
     else:
-        model = MMDataParallel(model, device_ids = range(cfg.gpus)).cuda()
+        model = NNDataParallel(model, device_ids = range(cfg.gpus)).cuda()
     
     # prepare data & dataloader
     # Runner要求dataloader放在list里: 使workflow里每个flow对应一个dataloader

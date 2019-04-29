@@ -65,7 +65,9 @@ class Tester(object):
             img, 
             scale= cfg.data.test.img_scale, 
             keep_ratio=False)  
-            # ssd要求输入必须300*300，所以keep_ratio必须False，否则可能导致图片变小输出最后一层size计算为负
+            # 测试时没有额外别的预处理，所以只是把图像做一个基本缩放，由于要缩放到制定尺寸以内，假如保证比例则有可能图片尺寸
+            # 区别：ssd要求输入必须300*300，所以keep_ratio必须False而使用resize来调节图片尺寸，否则可能导致图片在rescale的
+            #      retinanet要求输入在1333*800以内，所以keep_ratio通常为True而使用rescale()来调节图片尺寸，让图片上物体能够保持原始尺寸比例
         img = torch.tensor(img).to(self.device).unsqueeze(0) 
         
         # 4. 数据包准备
@@ -194,8 +196,6 @@ class TestDataset(Tester):
         self.model = self.model_class(self.cfg)
         _ = load_checkpoint(self.model, self.weights_path)
         self.model = NNDataParallel(self.model, device_ids=[0])
-        
-#        self.model = self.model.to(self.device)
         self.model.eval()  
     
     def preprocess_data(self, dataset_class):

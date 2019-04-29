@@ -37,7 +37,8 @@ def imresize(img, size, return_scale=False, interpolation='bilinear'):
         return resized_img, w_scale, h_scale
 
 def imrescale(img, scale, return_scale=False, interpolation='bilinear'):
-    """缩放图片：
+    """缩放图片：这是所有图片的强制预处理(包括train/val/test)，
+    缩放比例的获得方式：min(长边要求/长边，短边要求/短边)，也就是放大比例尽可能小保证图像一定在scale方框内
 
     Args:
         img (ndarray): The input image.
