@@ -195,7 +195,7 @@ class VOCDataset(Dataset):
         # image rescale if keep ratio
         self.resize_keep_ratio = resize_keep_ratio
         
-        # 注意这里的对应label是从1开始，所以如果做逆对应就需要-1才能得到对应的真实描述
+        # 注意这里的对应label是从1开始(1-20)，所以如果做逆对应就需要-1才能得到对应的真实描述
         self.cat2label = {cat: i + 1 for i, cat in enumerate(self.CLASSES)}
         
         if 'VOC2007' in self.img_prefix:
@@ -242,7 +242,7 @@ class VOCDataset(Dataset):
         labels_ignore = []
         for obj in root.findall('object'):
             name = obj.find('name').text
-            label = self.cat2label[name]
+            label = self.cat2label[name]    # label range (1-20) 
             difficult = int(obj.find('difficult').text)
             bnd_box = obj.find('bndbox')
             bbox = [

@@ -75,11 +75,20 @@ def coco_classes():
     ]
 
 
+def traffic_sign_classes():
+#    return ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
+#            '11', '12', '13', '14', '15', '16', '17', '18', '19', '20']
+    return ['other', 'parking_lot', 'stop', 'right', 'left-right', 'bus', 'left',
+           'slow', 'car-forard-right', 'person', 'island', 'forward-right', 'bus-forbidden',
+           'motor-forbidden', 'car-forbidden', 'non-car-forbidden', 'horn-forbidden', 
+           'cross-forward-turn','speed40', 'speed30', 'horn']
+
 dataset_aliases = {
     'voc': ['voc', 'pascal_voc', 'voc07', 'voc12'],
     'imagenet_det': ['det', 'imagenet_det', 'ilsvrc_det'],
     'imagenet_vid': ['vid', 'imagenet_vid', 'ilsvrc_vid'],
-    'coco': ['coco', 'mscoco', 'ms_coco']
+    'coco': ['coco', 'mscoco', 'ms_coco'],
+    'traffic_sign': ['traffic_sign', 'trafficsign', 'TrafficSign']
 }
 
 

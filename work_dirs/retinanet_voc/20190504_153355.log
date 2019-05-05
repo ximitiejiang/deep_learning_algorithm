@@ -1,0 +1,4 @@
+2019-05-04 15:33:55,479 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/simple_ssd_pytorch/work_dirs/retinanet_voc
+2019-05-04 15:33:55,480 - INFO - workflow: [('train', 1)], max: 20 epochs
+2019-05-04 15:34:28,442 - INFO - Epoch [1][50/4139]	lr: 0.00080, eta: 15:08:56, time: 0.659, data_time: 0.012, loss_cls: 1.1726, loss_reg: 0.4775, loss: 1.6501
+2019-05-04 15:35:01,246 - INFO - Epoch [1][100/4139]	lr: 0.00093, eta: 15:06:13, time: 0.656, data_time: 0.006, loss_cls: 1.1684, loss_reg: 0.4474, loss: 1.6158

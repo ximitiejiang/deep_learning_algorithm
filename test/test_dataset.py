@@ -13,6 +13,19 @@ from dataset.voc_dataset import VOCDataset
 from dataset.coco_dataset import CocoDataset
 from torch.utils.data import Dataloader
 
+
+from utils.tester import TestDataset
+def test_dataset():
+    
+    config_file = './config/cfg_ssd300_vgg16_voc.py'
+    weights_path = './weights/myssd/weight_4imgspergpu/epoch_24.pth'
+    out_file = './weights/myssd/weight_4imgspergpu/results_24.pkl'
+    model_class = OneStageDetector
+    
+    test_dataset = TestDataset(config_file, model_class, weights_path, dataset_name='voc', device = 'cuda:0', out_file=out_file)
+    test_dataset.run(VOCDataset)
+
+
 def test_voc_dataset():
     data_root = '../data/VOCdevkit/'  # 指代ssd目录下的data目录
     img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], std=[1, 1, 1], to_rgb=True)

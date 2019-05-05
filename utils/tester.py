@@ -9,8 +9,9 @@ Created on Sun Mar  3 08:26:28 2019
 import torch
 import cv2
 import numpy as np
-
+import csv
 import mmcv
+from tqdm import tqdm
 
 from model.checkpoint import load_checkpoint
 from utils.config import Config
@@ -59,7 +60,7 @@ class Tester(object):
     def preprocess_data(self, cfg, img, transformer=None):
         ori_shape = img.shape
         if transformer is None:
-            transformer = ImageTransform(**cfg.img_norm_cfg)
+            transformer = ImageTransform(**cfg.img_norm_cfg, size_divisor=cfg.data.test.size_divisor)   # 原来只用了img_norm_cfg，自己增加了size_divisor
             
         img, img_shape, pad_shape, scale_factor = transformer(
             img, 
@@ -89,20 +90,20 @@ class Tester(object):
                     for i, bbox in enumerate(result)]    # [(m1,), (m2,)...]
         labels = np.concatenate(labels)  # (m,)
         bboxes = np.vstack(result)       # (m,5)
-        scores = bboxes[:,-1]
+        scores = bboxes[:,-1]            # (m,)
         
-        all_results = [bboxes]
-        all_results.append(labels)
-        all_results.append(scores)
+        single_results = [bboxes]
+        single_results.append(labels)
+        single_results.append(scores)
         
         if show: # 使用show变量区分是使用vis_bbox还是使用opencv_vis_bbox，用opencv_vis_bbox处理视频和cam
             vis_bbox(
-                ori_img.copy(), *all_results, score_thr=0.3, class_names=self.class_names, saveto=saveto)
+                ori_img.copy(), *single_results, score_thr=0.3, class_names=self.class_names, saveto=saveto)
             # opencv版本的显示效果不太好，用matplotlib版本的显示文字较好
 #            opencv_vis_bbox(
-#                img.copy(), *all_results, score_thr=0.2, class_names=self.class_names, saveto=saveto)
+#                img.copy(), *single_results, score_thr=0.2, class_names=self.class_names, saveto=saveto)
 
-        return all_results
+        return single_results   # list [ array, array, array]
             
     def run(self, img_path):
         raise NotImplementedError('run() function not implemented!')
@@ -135,6 +136,63 @@ class TestImg(Tester):
         else:
             raise TypeError("path type should be str for one img or list for multiple imgs.")
         
+
+class TestImgResultGenerator(Tester):
+    """用于测试一组图片，并把测试结果写入csv文件"""
+    def __init__(self, config_file, model_class, weights_path, 
+                 dataset_name='voc', device = 'cuda:0'):
+        super().__init__(config_file, model_class, weights_path, 
+                 dataset_name, device = 'cuda:0')
+    
+    def result2submit(self, single_result, single_path):
+        """单张图片结果转换: 筛选置信度最高的结果作为提交结果
+        single_result(list):    [bboxes/scores_array, labels_array, scores_array], 
+                                with size of [(m,5), (m,), (m,)]
+        single_path(str):       str of single img path
+        """
+        submit=[]
+        submit.append(single_path.split('/')[-1])        # path to name
+        result = np.concatenate([single_result[0], 
+                                 single_result[1].reshape(-1,1)], axis=1)   # (m, 6)
+        if len(result[0]) == 0:
+            return 
+        max_id = np.argmax(result[:,4], axis=0)  # 0-3列为bbox,4列为scores, 5列为scores
+        max_out = result[max_id]   # (1,6)
+        submit.extend([int(max_out[0]),int(max_out[1]),
+                       int(max_out[2]),int(max_out[1]),
+                       int(max_out[2]),int(max_out[3]),
+                       int(max_out[0]),int(max_out[3]), 
+                       int(max_out[5]),float(max_out[4])])
+            
+        return submit
+    
+    def run(self, img_path, show=False, save=False, writeto=None):
+        """ 
+        Args: img_path(list of str): list of all the img path, also can be one img path in a list, like [str]
+        """
+        assert isinstance(img_path, list), 'the img path should be list of paths.'
+        all_results = [['filename','X1','Y1','X2','Y2','X3','Y3','X4','Y4','type']]
+        for i, p in tqdm(enumerate(img_path)):
+            assert isinstance(p, str), "img_path content should be str."
+            ori_img = cv2.imread(p)
+            data = self.preprocess_data(self.cfg, ori_img)
+            if save:
+                result_name = os.path.join(p[:-4] + '_result.jpg')
+            else:
+                result_name = None
+            results = self.run_single(ori_img, data, show=show, saveto=result_name)
+            submit = self.result2submit(results, p)
+            all_results.append(submit)
+        
+        if writeto is not None:
+            # firstly clear all the lines in the csv file
+            # then write result to csv file
+            assert os.path.exists(writeto), 'the target writeto file does not exist.'
+            with open(writeto, 'w', newline='') as f:
+                writer = csv.writer(f)
+                # 单行写入用writer.writerow([]), 多行写入用writer.writerows([[],[],...])
+                writer.writerows(all_results)
+            
 
 class TestVideo(Tester):
     """用于视频或者摄像头的检测"""
@@ -183,8 +241,6 @@ class TestDataset(Tester):
         self.weights_path = weights_path
         self.out_file = out_file
         
-        
-    
     def init_cfg_model(self):
         """准备cfg,model
         """

@@ -18,7 +18,7 @@ model = dict(
         num_outs=5),
     bbox_head=dict(
         type='RetinaHead',
-        num_classes=21,   # voc using 21, coco using 81
+        num_classes=22,   # traffic sign = 22(总计21类0-20，加背景就是22类),  voc using 21, coco using 81
         in_channels=256,
         stacked_convs=4,
         feat_channels=256,
@@ -49,8 +49,8 @@ test_cfg = dict(
     nms=dict(type='nms', iou_thr=0.5),
     max_per_img=100)
 # dataset settings
-dataset_type = 'VOCDataset'
-data_root = './data/VOCdevkit/'
+dataset_type = 'TrafficSign'    # 改成trafficsign
+data_root = './data/traffic_sign/'  # 改成trafficsign
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)  # 采用的是pytorch的模型，但mean/std还是用的caffe的？？？
 data = dict(           # repeatdataset不加了，在coco训练12epoch，voc上调成24
@@ -58,39 +58,31 @@ data = dict(           # repeatdataset不加了，在coco训练12epoch，voc上�
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file=[
-            data_root + 'VOC2007/ImageSets/Main/trainval.txt',
-            data_root + 'VOC2012/ImageSets/Main/trainval.txt'],
-        img_prefix=[data_root + 'VOC2007/', data_root + 'VOC2012/'],
+        ann_file=data_root + 'train_label_fix.csv',
+        img_prefix=data_root + 'Train_fix/',
         img_scale=(1333, 800),
         img_norm_cfg=img_norm_cfg,
         size_divisor=32,
-        flip_ratio=0.5,
-        with_mask=False,
-        with_crowd=False,
-        with_label=True),
+        with_label=True,
+        extra_aug=None),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'VOC2007/ImageSets/Main/test.txt',
-        img_prefix=data_root + 'VOC2007/',
+        ann_file=data_root + 'train_label_fix.csv',
+        img_prefix=data_root + 'Train_fix/',
         img_scale=(1333, 800),
         img_norm_cfg=img_norm_cfg,
-        size_divisor=32,
-        flip_ratio=0,
-        with_mask=False,
-        with_crowd=False,
-        with_label=True),
+        size_divisor=None,
+        with_label=True,
+        extra_aug=None),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'VOC2007/ImageSets/Main/test.txt',
-        img_prefix=data_root + 'VOC2007/',
+        ann_file=data_root + 'train_label_fix.csv',
+        img_prefix=data_root + 'Test_fix/',
         img_scale=(1333, 800),
         img_norm_cfg=img_norm_cfg,
         size_divisor=32,
-        flip_ratio=0,
-        with_mask=False,
-        with_crowd=False,
         with_label=False,
+        extra_aug=None,
         test_mode=True))
 # optimizer
 optimizer = dict(type='SGD', lr=0.002, momentum=0.9, weight_decay=0.0001)  # 学习率调小到原来8块GPU的1/4(0.01 to 0.002)
@@ -112,12 +104,12 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-gpus = 1
+gpus = 2
 total_epochs = 20   # coco不加repeatdataset训练了12轮，对应voc从12加倍到24轮
 device_ids = range(2)
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/retinanet_voc'
+work_dir = './work_dirs/retinanet_trafficsign'
 load_from = None
 #resume_from = './work_dirs/retinanet_voc/latest.pth'
 resume_from = None
