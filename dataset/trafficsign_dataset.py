@@ -78,6 +78,7 @@ class TrafficSign(Dataset):
     6:左侧行驶, 7:慢行, 8:机动车直行右转, 9:注意行人, 10:环岛形式,
     11:直行右转, 12:禁止大客车, 13:禁止摩托车, 14:禁止机动车, 15:禁止非机动车,
     16:禁止鸣喇叭, 17:立交直行转弯, 18:限速40公里, 19:限速30公里, 20:鸣喇叭}
+    
     """
     
 #    CLASSES = ('other', 'parking_lot', 'stop', 'right', 'left-right', 'bus', 
@@ -101,7 +102,8 @@ class TrafficSign(Dataset):
                  with_label=True, 
                  extra_aug=None,
                  resize_keep_ratio=True,
-                 test_mode=False):
+                 test_mode=False,
+                 split_percent=None):
         
         self.ann_file = ann_file
         self.img_prefix = img_prefix
@@ -113,6 +115,8 @@ class TrafficSign(Dataset):
         self.flip_ratio = flip_ratio
         self.resize_keep_ratio = resize_keep_ratio
         self.test_mode = test_mode
+        
+        self.split_percent = split_percent
         
         self.img_names = []
         self.gt_bboxes = []
@@ -155,10 +159,13 @@ class TrafficSign(Dataset):
                                            filename=filename,
                                            width=3200,
                                            height=1800))
-                        
+        # 去除异常数据: 但注意如果变更数据集该部分需要去掉或者修改
+        self._delete_abnormal()
+                
         self.gt_bboxes = np.array(self.gt_bboxes).astype(np.float32)  # (n, 1, 8)
         self.gt_labels = np.array(self.gt_labels).astype(np.int64)    # (n,1)
         self.with_bboxes = np.array(self.with_bboxes).astype(np.int64)
+        
         # build transformer
         if extra_aug is not None:
             self.extra_aug = RandomFSCropTransform(**extra_aug)  # extra_aug用dict输入dict(req_size = [1333,800])
@@ -170,7 +177,25 @@ class TrafficSign(Dataset):
         # set group flag for the sampler
         if not self.test_mode:
             self._set_group_flag()
-            
+    
+    def _delete_abnormal(self):
+        """通过预分析检查数据，并把异常数据去除
+        error_list有标注但bbox的w/h有0或尺寸异常: 处理办法是删除对应位置的信息
+        abnormal_list有标注但bbox中没有交通标志: 处理办法是对该gt_label=0 (训练集中本来没有0类，但测试集中有可能有)
+        """
+        error_list = [7666, 8375, 8455]  # error表示bbox不正常(w,h=0或比例不对)，删除
+        abnormal_list = []               # abnormal表示数据中没有标志，bbox标注错误
+        
+        error_list = sorted(error_list)
+        abnormal_list = sorted(abnormal_list)
+        
+        for i, error in enumerate(error_list):
+            self.img_names.pop(error - i)      # 每删除一个，对应的位置号就会前移一位，所以要减i做补偿
+            self.gt_bboxes.pop(error - i)
+            self.gt_labels.pop(error - i)
+        for ab in abnormal_list:
+            self.gt_labels[ab] = 0
+        
     def _set_group_flag(self):
         """Set flag according to image aspect ratio.
 
@@ -249,7 +274,7 @@ class TrafficSign(Dataset):
         return data
         
     def __getitem__(self, idx):
-        return self._prepare_data(idx)  # can be changed to _prepare_data(idx) for debug
+        return self.prepare_data(idx)  # can be changed to _prepare_data(idx) for debug
     
     def __len__(self):
         return len(self.img_names)

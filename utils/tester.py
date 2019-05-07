@@ -144,25 +144,60 @@ class TestImgResultGenerator(Tester):
         super().__init__(config_file, model_class, weights_path, 
                  dataset_name, device = 'cuda:0')
     
-    def result2submit(self, single_result, single_path):
+    def run_single(self, ori_img, data, show=True, saveto=None):
+        """对单张图片计算结果
+        注意：由于之前标签class都是从1开始(在数据集的class2label里)，multiclass_nms()里边生成labels时再减一个1平衡
+        但这里针对traffic sign数据集，labels从0到20，所以这里手动增加一个1,才能得到正确的label预测
+        """ 
+        with torch.no_grad():
+            result = self.model(**data, return_loss=False, rescale=True)  # (20,)->(n,5)or(0,5)->(xmin,ymin,xmax,ymax,score)         
+        # 提取labels
+        labels = [np.full(bbox.shape[0], i, dtype=np.int32) 
+                    for i, bbox in enumerate(result)]    # [(m1,), (m2,)...]
+        labels = np.concatenate(labels)  # (m,)
+        bboxes = np.vstack(result)       # (m,5)
+        scores = bboxes[:,-1]            # (m,)
+        
+        single_results = [bboxes]
+        single_results.append(labels)
+        single_results.append(scores)
+                     
+        if len(single_results[0])==0:    # 如果结果为空，说明没有预测类，此时令标签=0(其他)
+            single_results[0] = np.zeros((1,5))
+            single_results[1] = np.zeros((1,))
+            single_results[2] = np.zeros((1,))
+        else:
+            single_results[1] = single_results[1] + 1  # label预测手动+1
+        if show: # 使用show变量区分是使用vis_bbox还是使用opencv_vis_bbox，用opencv_vis_bbox处理视频和cam
+            vis_bbox(
+                ori_img.copy(), *single_results, score_thr=0.3, class_names=self.class_names, saveto=saveto)
+            # opencv版本的显示效果不太好，用matplotlib版本的显示文字较好
+#            opencv_vis_bbox(
+#                img.copy(), *single_results, score_thr=0.2, class_names=self.class_names, saveto=saveto)
+
+        return single_results   # list [ array, array, array]
+    
+    def result2submit(self, single_results, single_path):
         """单张图片结果转换: 筛选置信度最高的结果作为提交结果
-        single_result(list):    [bboxes/scores_array, labels_array, scores_array], 
+        
+        single_results(list):    [bboxes/scores_array, labels_array, scores_array], 
                                 with size of [(m,5), (m,), (m,)]
         single_path(str):       str of single img path
+        submit(list):           [filename, x1,y1,x2,y2,x3,y3,x4,y4,score,]
         """
         submit=[]
         submit.append(single_path.split('/')[-1])        # path to name
-        result = np.concatenate([single_result[0], 
-                                 single_result[1].reshape(-1,1)], axis=1)   # (m, 6)
-        if len(result[0]) == 0:
-            return 
+
+        result = np.concatenate([single_results[0], 
+                                 single_results[1].reshape(-1,1)], axis=1)   # (m, 6)
+        
         max_id = np.argmax(result[:,4], axis=0)  # 0-3列为bbox,4列为scores, 5列为scores
         max_out = result[max_id]   # (1,6)
         submit.extend([int(max_out[0]),int(max_out[1]),
                        int(max_out[2]),int(max_out[1]),
                        int(max_out[2]),int(max_out[3]),
                        int(max_out[0]),int(max_out[3]), 
-                       int(max_out[5]),float(max_out[4])])
+                       int(max_out[5])])  
             
         return submit
     
@@ -181,6 +216,7 @@ class TestImgResultGenerator(Tester):
             else:
                 result_name = None
             results = self.run_single(ori_img, data, show=show, saveto=result_name)
+
             submit = self.result2submit(results, p)
             all_results.append(submit)
         

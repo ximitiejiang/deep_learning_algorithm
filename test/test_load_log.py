@@ -65,9 +65,12 @@ if __name__ == "__main__":
     # retinanet-2imgpergpu
 #    log_path_list = ['../work_dirs/retinanet_voc/20190425_181039.log']    #1-20
     
-    # retinanet-traffic sign
-    log_path_list = ['../work_dirs/retinanet_trafficsign/20190504_185144.log']    #1-20
+    # retinanet-traffic sign with retinanet-resnet50
+#    log_path_list = ['../work_dirs/retinanet_trafficsign/20190504_185144.log']    #1-20
+    log_path_list = ['../work_dirs/retinanet_trafficsign/20190505_183153.log']
     
+    # retinanet-traffic sign with retinanet-resnext101
+#    log_path_list = ['../work_dirs/retinanet_trafficsign/20190506_174559.log']  #1-20
     
     losses, reg_losses, cls_losses, lrs, epochs = load_log(log_path_list)
     

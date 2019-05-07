@@ -15,5 +15,6 @@ from .fpn_neck import FPN
 from .mlfpn_neck import MLFPN
 from .m2detvgg import M2detVGG
 from .resnet import ResNet
+from .resnext import ResNeXt
 from .parallel.data_parallel import NNDataParallel
 from .parallel.data_container import DataContainer

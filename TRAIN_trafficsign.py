@@ -141,14 +141,15 @@ if __name__ == '__main__':
     # ssd512
 #    cfg_path = 'config/cfg_ssd512_vgg16_voc.py' 
     
-    # ssd512 + mlfpn
-#    cfg_path = 'config/cfg_m2det512_vgg16_mlfpn_voc.py'
-    
     # retinanet 
 #    cfg_path = 'config/cfg_retinanet_r50_fpn_voc.py'
 #    train(cfg_path, VOCDataset)
     
-    # traffic sign
-    cfg_path = 'config/cfg_retinanet_r50_fpn_trafficsign.py'
+    # traffic sign: retinanet with resnet50
+#    cfg_path = 'config/cfg_retinanet_r50_fpn_trafficsign.py'
+#    train(cfg_path, TrafficSign)
+    
+    # traffic sign: retinanet with resnext101
+    cfg_path = 'config/cfg_retinanet_x101_64x4d_fpn_trafficsign.py'
     train(cfg_path, TrafficSign)
    

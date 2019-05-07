@@ -45,7 +45,7 @@ if __name__ == "__main__":
         types, [a,b,c,d,e,f] = dataset.summarize(show=True)
         
         class_names = dataset.CLASSES  # class name (string) from '0' to '20'
-        data = dataset[1595]   
+        data = dataset[8455]   
         # [198,1222, 1683, 2683, 11164,] bbox位置不对，
         # [18284,11464,] 看不到有标签，
         print("h=%d, w=%d"% (data['img_meta']['ori_shape'][0], data['img_meta']['ori_shape'][1]))
