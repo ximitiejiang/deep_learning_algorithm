@@ -91,6 +91,21 @@ def kmeans(boxes, k, dist=np.median):
 
     return clusters
 
+def cal_bbox_kmean(dset_obj):
+    """集成这个函数到pre_dataset_analyse()函数中"""
+    bboxes=[]
+    img_h
+    img_w
+    xmin
+    ymin
+    xmax
+    ymax
+    
+    bbox = 
+    bboxes.append(box)
+    
+    out = kmeans(data, k=5)
+
 if __name__ == '__main__':
-    pass
+    
     
