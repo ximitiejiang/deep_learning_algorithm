@@ -18,9 +18,18 @@ from tqdm import tqdm
 一张图片，缩小到(1333,800),相应的gt_bbox也缩小到
 所以对小物体的预测，主要取决于浅层anchor的大小，
 分析过程：
-1. 假设retinanet针对voc数据集，在没有别的变换情况下，输出的bbox的分布主要是中等尺寸(1024-9216)和大尺寸的bbox(>9216), 小尺寸bbox(<1024)非常少
-    此时retinanet的base anchors是足够覆盖voc的中等尺寸和大尺寸anchor
-2. 假设retinanet针对coco数据集
+1. 如果voc数据集基于RetinaNet的基础变换到(1333,800)相当于把voc图片放大，使bbox面积加大，
+此时输出的bbox的分布主要是中等尺寸(1024-9216)和大尺寸的bbox(>9216)，而小尺寸bbox(<1024)非常少。
+此时retinanet的浅层base anchors基本满足需求，且由于小尺寸样本不多，在测试时也不会对精度造成大的影响
+
+2. 如果coco数据集基于RetinaNet的基础变换到(1033,800)虽然也相当于把coco图片放大，bbox面积加大，
+但由于coco本身有很多小物体，所以输出bbox的分布有很大比例的小尺寸bbox(<1024)
+从而再采用
+
+3. anchor的尺寸由3个参数决定：
+    + base_size=(8,16,32,64,128)这个参数作为一个基础参数，是base anchor的参考尺寸，取值采用感受野大小，也是anchor的最小尺寸目的就是至少覆盖感受野，再小就连感受野都覆盖不住了。
+    + anchor_ratio=(0.5,1,2)这个参数一般不变，目的是能够捕捉了h/w比例不一的物体
+    + anchor_scale=()这个参数用于在base_size基础上放大，这也是最影响anchor尺寸的因子
 """
 
 """这是retinanet最浅层0层的base_anchors, 最小面积945，最大面积2485"""
