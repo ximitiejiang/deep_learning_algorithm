@@ -808,14 +808,3 @@
 2019-05-07 07:17:24,964 - INFO - Epoch [8][4950/5064]	lr: 0.00200, eta: 20:19:46, time: 1.204, data_time: 0.007, loss_cls: 0.0516, loss_reg: 0.0103, loss: 0.0619
 2019-05-07 07:18:25,145 - INFO - Epoch [8][5000/5064]	lr: 0.00200, eta: 20:18:46, time: 1.204, data_time: 0.007, loss_cls: 0.0704, loss_reg: 0.0111, loss: 0.0816
 2019-05-07 07:19:25,393 - INFO - Epoch [8][5050/5064]	lr: 0.00200, eta: 20:17:46, time: 1.205, data_time: 0.007, loss_cls: 0.0749, loss_reg: 0.0105, loss: 0.0853
-2019-05-07 07:20:44,449 - INFO - Epoch [9][50/5064]	lr: 0.00200, eta: 20:16:06, time: 1.229, data_time: 0.024, loss_cls: 0.0422, loss_reg: 0.0094, loss: 0.0515
-2019-05-07 07:21:44,522 - INFO - Epoch [9][100/5064]	lr: 0.00200, eta: 20:15:06, time: 1.201, data_time: 0.007, loss_cls: 0.0906, loss_reg: 0.0084, loss: 0.0990
-2019-05-07 07:22:44,994 - INFO - Epoch [9][150/5064]	lr: 0.00200, eta: 20:14:06, time: 1.209, data_time: 0.007, loss_cls: 0.0544, loss_reg: 0.0113, loss: 0.0657
-2019-05-07 07:23:45,123 - INFO - Epoch [9][200/5064]	lr: 0.00200, eta: 20:13:06, time: 1.203, data_time: 0.008, loss_cls: 0.0579, loss_reg: 0.0124, loss: 0.0703
-2019-05-07 07:24:45,175 - INFO - Epoch [9][250/5064]	lr: 0.00200, eta: 20:12:06, time: 1.201, data_time: 0.007, loss_cls: 0.0647, loss_reg: 0.0108, loss: 0.0755
-2019-05-07 07:25:45,114 - INFO - Epoch [9][300/5064]	lr: 0.00200, eta: 20:11:06, time: 1.199, data_time: 0.007, loss_cls: 0.0682, loss_reg: 0.0114, loss: 0.0796
-2019-05-07 07:26:45,295 - INFO - Epoch [9][350/5064]	lr: 0.00200, eta: 20:10:06, time: 1.204, data_time: 0.007, loss_cls: 0.0387, loss_reg: 0.0108, loss: 0.0495
-2019-05-07 07:27:45,315 - INFO - Epoch [9][400/5064]	lr: 0.00200, eta: 20:09:06, time: 1.200, data_time: 0.007, loss_cls: 0.0391, loss_reg: 0.0079, loss: 0.0470
-2019-05-07 07:28:45,848 - INFO - Epoch [9][450/5064]	lr: 0.00200, eta: 20:08:06, time: 1.211, data_time: 0.007, loss_cls: 0.0550, loss_reg: 0.0091, loss: 0.0642
-2019-05-07 07:29:45,938 - INFO - Epoch [9][500/5064]	lr: 0.00200, eta: 20:07:06, time: 1.202, data_time: 0.007, loss_cls: 0.0622, loss_reg: 0.0098, loss: 0.0719
-2019-05-07 07:30:46,148 - INFO - Epoch [9][550/5064]	lr: 0.00200, eta: 20:06:06, time: 1.204, data_time: 0.008, loss_cls: 0.0473, loss_reg: 0.0087, loss: 0.0560

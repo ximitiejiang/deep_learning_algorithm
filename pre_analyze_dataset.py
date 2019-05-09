@@ -14,6 +14,85 @@ import numpy as np
 from dataset.utils import vis_bbox
 from tqdm import tqdm
 
+"""
+一张图片，缩小到(1333,800),相应的gt_bbox也缩小到
+所以对小物体的预测，主要取决于浅层anchor的大小，
+分析过程：
+1. 假设retinanet针对voc数据集，在没有别的变换情况下，输出的bbox的分布主要是中等尺寸(1024-9216)和大尺寸的bbox(>9216), 小尺寸bbox(<1024)非常少
+    此时retinanet的base anchors是足够覆盖voc的中等尺寸和大尺寸anchor
+2. 假设retinanet针对coco数据集
+"""
+
+"""这是retinanet最浅层0层的base_anchors, 最小面积945，最大面积2485"""
+ba0 = np.array([[-19.,  -7.,  26.,  14.],
+                [-25., -10.,  32.,  17.],
+                [-32., -14.,  39.,  21.],
+                [-12., -12.,  19.,  19.],
+                [-16., -16.,  23.,  23.],
+                [-21., -21.,  28.,  28.],
+                [ -7., -19.,  14.,  26.],
+                [-10., -25.,  17.,  32.],
+                [-14., -32.,  21.,  39.]])
+"""retinanet第1层base_anchors, 最小面积3969，最大面积10,201"""
+ba1 = np.array([[-37., -15.,  52.,  30.],
+                [-49., -21.,  64.,  36.],
+                [-64., -28.,  79.,  43.],
+                [-24., -24.,  39.,  39.],
+                [-32., -32.,  47.,  47.],
+                [-43., -43.,  58.,  58.],
+                [-15., -37.,  30.,  52.],
+                [-21., -49.,  36.,  64.],
+                [-28., -64.,  43.,  79.]])
+"""retinanet第2层base_anchors, 最小面积16,109，最大面积41,209"""
+ba2 = np.array([[ -75.,  -29.,  106.,   60.],
+                [ -98.,  -41.,  129.,   72.],
+                [-128.,  -56.,  159.,   87.],
+                [ -48.,  -48.,   79.,   79.],
+                [ -65.,  -65.,   96.,   96.],
+                [ -86.,  -86.,  117.,  117.],
+                [ -29.,  -75.,   60.,  106.],
+                [ -41.,  -98.,   72.,  129.],
+                [ -56., -128.,   87.,  159.]])
+"""retinanet第3层base_anchors, 最小面积65,025，最大面积164,451"""
+ba3 = np.array([[-149.,  -59.,  212.,  122.],
+                [-196.,  -82.,  259.,  145.],
+                [-255., -112.,  318.,  175.],
+                [ -96.,  -96.,  159.,  159.],
+                [-129., -129.,  192.,  192.],
+                [-171., -171.,  234.,  234.],
+                [ -59., -149.,  122.,  212.],
+                [ -82., -196.,  145.,  259.],
+                [-112., -255.,  175.,  318.]])
+"""retinanet第4层base_anchors, 最小面积261,003，最大面积658,377"""
+ba4 = np.array([[-298., -117.,  425.,  244.],
+                [-392., -164.,  519.,  291.],
+                [-511., -223.,  638.,  350.],
+                [-192., -192.,  319.,  319.],
+                [-259., -259.,  386.,  386.],
+                [-342., -342.,  469.,  469.],
+                [-117., -298.,  244.,  425.],
+                [-164., -392.,  291.,  519.],
+                [-223., -511.,  350.,  638.]])
+
+
+def show_bbox(bboxes):
+    """输入array"""
+#    x = np.arange(-5.0, 5.0, 0.02)
+#    y1 = np.sin(x)
+#
+#    plt.figure(1)
+#    plt.subplot(211)
+#    plt.plot(x, y1)
+    wh = [((bb[3]-bb[1]), (bb[2]-bb[0])) for bb in bboxes]
+    areas = [(bb[3]-bb[1])*(bb[2]-bb[0]) for bb in bboxes]
+    print('(w,h) = ', wh)
+    print('areas = ', areas, 'min area = ', min(areas), 'max area = ', max(areas))
+    
+    plt.plot([0,8,8,0,0],[0,0,8,8,0])
+    for bbox in bboxes:
+        plt.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
+                 [bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]])
+
 class AnalyzeDataset():
     """用于对数据集进行预分析: 
     1.如果只是检查img/bbox/label，则checkonly=True；如果要分析数据集结构，则False    
@@ -49,29 +128,41 @@ class AnalyzeDataset():
                     self.img_names.append(info['filename'])
             
             elif self.name == 'traffic_sign':
-                self.gt_labels = self.dataset.gt_labels
-                self.gt_bboxes = self.dataset.gt_bboxes
-                self.img_names = self.dataset.img_names
+                # traffic sign没有直接使用ann file里边的数据，是因为要统计的是经过基本变换送入model的img/bbox的参数，而不是原始数据集参数
+                # img/bbox在每种训练设置下的统计结果都不一样
+#                self.gt_labels = self.dataset.gt_labels
+#                self.gt_bboxes = self.dataset.gt_bboxes
+#                self.img_names = self.dataset.img_names
+                self.gt_labels = []
+                self.gt_bboxes = []
+                self.img_names = []
+                for id, info in tqdm(enumerate(self.img_infos)):
+                    data = self.dataset[id]
+                    self.gt_labels.append(data['gt_labels'].data.numpy())
+                    self.gt_bboxes.append(data['gt_bboxes'].data.numpy())
+                    self.img_names.append(info['filename'])
                         
     def imgcheck(self, idx):
         """用于初步检查数据集的好坏，以及图片和bbox/label的显示"""
         # 注意：这一步会预处理img/bboxes: 有几条是影响显示的需要做逆运算(norm/chw/rgb)
+        # 同时由于数据集在处理gt label时，是把class对应到(1-n)的数组，从1开始也就意味着右移了，所以显示class时要左移
         # 其他几条不影响显示不做逆变换(img缩放/bbox缩放)
         data = self.dataset[idx]    
         class_names = self.dataset.CLASSES
+        mean = self.img_norm_cfg['mean']
+        std = self.img_norm_cfg['std']
         filename = self.img_infos[idx]['filename']
+        # 输出图像名称和图像基本信息
         print("img name: %s"% filename)
         print("img meta: %s"% data['img_meta'].data)
         # 图像逆变换
-        mean = self.img_norm_cfg['mean']
-        std = self.img_norm_cfg['std']
-        img = data['img'].data.numpy()   # chw, normalized(not 0-1)
+        img = data['img'].data.numpy()   # tensor to numpy
         img = img.transpose(1,2,0)       # chw to hwc
-        img = (img * std) + mean         # denormalize
+        img = (img * std) + mean         # denormalize to (0-255)
         img = img[...,[2,1,0]]           # rgb to bgr
-        
+        # 显示
         vis_bbox(img, data['gt_bboxes'].data.numpy(), 
-                 labels=data['gt_labels'].data.numpy()-1,  # 由于数据集在处理gt label时，是把class对应到(1-n)的数组，从1开始也就意味着右移了，所以显示class时要左移
+                 labels=data['gt_labels'].data.numpy()-1,  # 显示时标签对照回来需要左移一位
                  class_names=class_names, 
                  instance_colors=None, alpha=1., 
                  linewidth=1.5, ax=None, saveto=None)
@@ -102,8 +193,8 @@ class AnalyzeDataset():
     
     def bbox_size(self, show=False):
         """对所有bbox位置进行分析，希望能够缩小图片尺寸
-           结论：发现bbox遍布整个图片，无法缩小图片尺寸
         """
+        # TODO: 面积分布需要进一步优化，最好按照面积大小统计分布图，单纯统计3个等级太粗了
         if self.checkonly:
             print('Can not analyse dataset on checkonly mode, you need change checkonly mode to False.')
             return
@@ -190,28 +281,34 @@ class AnalyzeDataset():
                 plt.bar(bar_x, bar_y)
             return gts_dict
     
+    def bbox_kmean(self, k=6):
+        pass
     
 if __name__ == '__main__':
-    """
-    """
     
-    dset = 'voc'
+    dset = 'trafficsign'
     
     if dset == 'trafficsign':
-        ann_file = './data/traffic_sign/train_label_fix.csv'
-        img_prefix = './data/traffic_sign/Train_fix'
-        img_scale = (1333,800)
+        dataset_type = 'TrafficSign'    # 改成trafficsign
+        data_root = './data/traffic_sign/'  # 改成trafficsign
         img_norm_cfg = dict(mean=[123.675, 116.28, 103.53], 
-                        std=[58.395, 57.12, 57.375], 
-                        to_rgb=True)
-        dataset = TrafficSign(ann_file, img_prefix, img_scale, img_norm_cfg)
-        ana = AnalyzeDataset('traffic_sign', dataset)
-        # bbox位置分析：统计每个bbox中心点所在图片的位置，发现分散到图片的每个位置，没有固定规律，也没办法裁剪出一个固定小图出来
-        _ = ana.cluster_bbox(show=True)       
-        # 每种类别个数分析：统计了每种类别的个数，发现没有类别不平衡问题, 20类标识每一类的样本数差别不太大
-        gts_dict = ana.types_bin(show=True)
-        # bbox的尺寸，面积分析：
-        _, _ = ana.bbox_size(show=True)
+                            std=[58.395, 57.12, 57.375], 
+                            to_rgb=True)
+        trainset_cfg=dict(
+                    type=dataset_type,
+                    ann_file=data_root + 'train_label_fix.csv',
+                    img_prefix=data_root + 'Train_fix/',
+                    img_scale=(1333, 800),
+                    img_norm_cfg=img_norm_cfg,
+                    size_divisor=32,
+                    with_label=True,
+                    extra_aug=None)
+        dataset = get_dataset(trainset_cfg, TrafficSign)
+        ana = AnalyzeDataset('traffic_sign', dataset, checkonly=False)
+        ana.imgcheck(2)
+#        ana.cluster_bbox(show=True)       
+        ana.types_bin(show=True)
+        ana.bbox_size(show=True)
     
     if dset == 'voc':
         dataset_type = 'VOCDataset'

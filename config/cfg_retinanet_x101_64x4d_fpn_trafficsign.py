@@ -113,6 +113,6 @@ dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/retinanet_trafficsign'
 load_from = None
-#resume_from = './work_dirs/retinanet_voc/latest.pth'
-resume_from = None
+resume_from = './work_dirs/retinanet_trafficsign/latest.pth'
+#resume_from = None
 workflow = [('train', 1)]

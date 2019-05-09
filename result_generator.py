@@ -39,8 +39,8 @@ def main():
 #    writetofile = './data/traffic_sign/submit_retinanet_0506.csv'             # 修改输出文件名
     
     config_file = './config/cfg_retinanet_x101_64x4d_fpn_trafficsign.py'      # 修改配置文件
-    weights_path = './weights/mytrafficsign/retinanet_resnext/epoch_8.pth'    # 修改模型参数
-    writetofile = './data/traffic_sign/submit_retinanet_0507.csv'             # 修改输出文件名
+    weights_path = './weights/mytrafficsign/retinanet_resnext/epoch_15.pth'    # 修改模型参数
+    writetofile = './data/traffic_sign/submit_retinanet_0508.csv'             # 修改输出文件名
            
     test_img = TestImgResultGenerator(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
     # 不显示结果图片，不保存结果图片，写入结果数据
