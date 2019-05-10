@@ -18,22 +18,23 @@ from tqdm import tqdm
 一张图片，缩小到(1333,800),相应的gt_bbox也缩小到
 所以对小物体的预测，主要取决于浅层anchor的大小，
 分析过程：
-1. 如果voc数据集基于RetinaNet的基础变换到(1333,800)相当于把voc图片放大，使bbox面积加大，
-此时输出的bbox的分布主要是中等尺寸(1024-9216)和大尺寸的bbox(>9216)，而小尺寸bbox(<1024)非常少。
-此时retinanet的浅层base anchors基本满足需求，且由于小尺寸样本不多，在测试时也不会对精度造成大的影响
-
-2. 如果coco数据集基于RetinaNet的基础变换到(1033,800)虽然也相当于把coco图片放大，bbox面积加大，
-但由于coco本身有很多小物体，所以输出bbox的分布有很大比例的小尺寸bbox(<1024)
-从而再采用
-
-3. anchor的尺寸由3个参数决定：
+1. anchor的尺寸由3个参数决定：
     + base_size=(8,16,32,64,128)这个参数作为一个基础参数，是base anchor的参考尺寸，取值采用感受野大小，也是anchor的最小尺寸目的就是至少覆盖感受野，再小就连感受野都覆盖不住了。
     + anchor_ratio=(0.5,1,2)这个参数一般不变，目的是能够捕捉了h/w比例不一的物体
     + anchor_scale=()这个参数用于在base_size基础上放大，这也是最影响anchor尺寸的因子
+
+2. 小物体，中物体，大物体的区分：基于coco数据集的划分方式，面积<32*32为小物体，面积>96*96为打物体，中间的就是中物体
+    + 简单点就是面积在1000-9000之间的中物体，两头就是小物体和大物体
+
+2. 分析voc数据集如果送入RetinaNet，其anchor是否满足要求：
+   可查看voc数据集在retinanet的transform基础上bbox的分布情况(voc_dataset_summary.png)，发现bbox主要分布在大于9216(96*96)的区间，属于大物体类型数据集
+   大物体区间(>96*96)：bbox最大到800,000(900*900)，而anchor最大到658,377，差不多可以满足大部分要求
+   中物体区间(>32*32)：bbox个数较少，且被0层/1层的anchor完美覆盖，
+   小物体区间(<32*32)：transform后没有bbox落在小物体区间，所以虽然anchor无法覆盖，但对精度影响不大
 """
 
-"""这是retinanet最浅层0层的base_anchors, 最小面积945，最大面积2485"""
-ba0 = np.array([[-19.,  -7.,  26.,  14.],
+"""retinanet anchor: anchor_base = [?], anchor_scales = [?], anchor_ratios = [0.5, 1., 2.]"""
+re_ba0 = np.array([[-19.,  -7.,  26.,  14.],  # """这是retinanet最浅层0层的base_anchors, 最小面积945，最大面积2485"""
                 [-25., -10.,  32.,  17.],
                 [-32., -14.,  39.,  21.],
                 [-12., -12.,  19.,  19.],
@@ -42,8 +43,7 @@ ba0 = np.array([[-19.,  -7.,  26.,  14.],
                 [ -7., -19.,  14.,  26.],
                 [-10., -25.,  17.,  32.],
                 [-14., -32.,  21.,  39.]])
-"""retinanet第1层base_anchors, 最小面积3969，最大面积10,201"""
-ba1 = np.array([[-37., -15.,  52.,  30.],
+re_ba1 = np.array([[-37., -15.,  52.,  30.],  # """retinanet第1层base_anchors, 最小面积3969，最大面积10,201"""
                 [-49., -21.,  64.,  36.],
                 [-64., -28.,  79.,  43.],
                 [-24., -24.,  39.,  39.],
@@ -52,8 +52,7 @@ ba1 = np.array([[-37., -15.,  52.,  30.],
                 [-15., -37.,  30.,  52.],
                 [-21., -49.,  36.,  64.],
                 [-28., -64.,  43.,  79.]])
-"""retinanet第2层base_anchors, 最小面积16,109，最大面积41,209"""
-ba2 = np.array([[ -75.,  -29.,  106.,   60.],
+re_ba2 = np.array([[ -75.,  -29.,  106.,   60.],   # """retinanet第2层base_anchors, 最小面积16,109，最大面积41,209"""
                 [ -98.,  -41.,  129.,   72.],
                 [-128.,  -56.,  159.,   87.],
                 [ -48.,  -48.,   79.,   79.],
@@ -62,8 +61,7 @@ ba2 = np.array([[ -75.,  -29.,  106.,   60.],
                 [ -29.,  -75.,   60.,  106.],
                 [ -41.,  -98.,   72.,  129.],
                 [ -56., -128.,   87.,  159.]])
-"""retinanet第3层base_anchors, 最小面积65,025，最大面积164,451"""
-ba3 = np.array([[-149.,  -59.,  212.,  122.],
+re_ba3 = np.array([[-149.,  -59.,  212.,  122.],  # """retinanet第3层base_anchors, 最小面积65,025，最大面积164,451"""
                 [-196.,  -82.,  259.,  145.],
                 [-255., -112.,  318.,  175.],
                 [ -96.,  -96.,  159.,  159.],
@@ -72,8 +70,7 @@ ba3 = np.array([[-149.,  -59.,  212.,  122.],
                 [ -59., -149.,  122.,  212.],
                 [ -82., -196.,  145.,  259.],
                 [-112., -255.,  175.,  318.]])
-"""retinanet第4层base_anchors, 最小面积261,003，最大面积658,377"""
-ba4 = np.array([[-298., -117.,  425.,  244.],
+re_ba4 = np.array([[-298., -117.,  425.,  244.],  # """retinanet第4层base_anchors, 最小面积261,003，最大面积658,377"""
                 [-392., -164.,  519.,  291.],
                 [-511., -223.,  638.,  350.],
                 [-192., -192.,  319.,  319.],
@@ -82,6 +79,23 @@ ba4 = np.array([[-298., -117.,  425.,  244.],
                 [-117., -298.,  244.,  425.],
                 [-164., -392.,  291.,  519.],
                 [-223., -511.,  350.,  638.]])
+# ----------------------------------------------------------------------
+"""cascade rcnn anchor: anchor_base = [4,8,16,32,64], anchor_scales = [8], anchor_ratios = [0.5, 1., 2.]"""
+cr_ba0 = np.array([[-21.,  -9.,  24.,  12.],
+                   [-14., -14.,  17.,  17.],
+                   [ -9., -21.,  12.,  24.]])
+cr_ba1 = np.array([[-41., -19.,  48.,  26.],
+                   [-28., -28.,  35.,  35.],
+                   [-19., -41.,  26.,  48.]])
+cr_ba2 = np.array([[-83., -37.,  98.,  52.],
+                   [-56., -56.,  71.,  71.],
+                   [-37., -83.,  52.,  98.]])
+cr_ba3 = np.array([[-165.,  -75.,  196.,  106.],
+                   [-112., -112.,  143.,  143.],
+                   [ -75., -165.,  106.,  196.]])
+cr_ba4 = np.array([[-330., -149.,  393.,  212.],
+                   [-224., -224.,  287.,  287.],
+                   [-149., -330.,  212.,  393.]])
 
 
 def show_bbox(bboxes):
@@ -102,6 +116,12 @@ def show_bbox(bboxes):
         plt.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
                  [bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]])
 
+class AnalyzeBbox():
+    def __init__():
+        pass
+    def show():
+        pass
+
 class AnalyzeDataset():
     """用于对数据集进行预分析: 
     1.如果只是检查img/bbox/label，则checkonly=True；如果要分析数据集结构，则False    
@@ -116,7 +136,7 @@ class AnalyzeDataset():
         self.dataset = dset_obj
         self.checkonly = checkonly
         
-        if self.name == 'voc':
+        if self.name == 'voc':  # voc是concatedataset需要单独处理
             self.img_norm_cfg = self.dataset.datasets[0].img_norm_cfg   # dict
             self.img_infos = self.dataset.datasets[0].img_infos + \
                                 self.dataset.datasets[1].img_infos
@@ -126,11 +146,14 @@ class AnalyzeDataset():
             
             
         if not checkonly:
+            
+            self.ana_range = 1000    # debug: 可定义分析的数据集范围(避免分析整个数据集导致太慢)
+            
             if self.name == 'voc' or self.name == 'coco':
                 self.gt_labels = []
                 self.gt_bboxes = []
                 self.img_names = []
-                for id, info in tqdm(enumerate(self.img_infos)):  # 这是voc12(11540)的训练集, 也可以用voc07 (5011)的来查看
+                for id, info in tqdm(enumerate(self.img_infos[:self.ana_range])):  # 这是voc12(11540)的训练集, 也可以用voc07 (5011)的来查看
                     data = self.dataset[id]
                     self.gt_labels.append(data['gt_labels'].data.numpy())
                     self.gt_bboxes.append(data['gt_bboxes'].data.numpy())
@@ -145,7 +168,7 @@ class AnalyzeDataset():
                 self.gt_labels = []
                 self.gt_bboxes = []
                 self.img_names = []
-                for id, info in tqdm(enumerate(self.img_infos)):
+                for id, info in tqdm(enumerate(self.img_infos[:self.ana_range])):   # 这里可以控制数据集分析的个数，开始先分析1000个以内，避免跑很长时间
                     data = self.dataset[id]
                     self.gt_labels.append(data['gt_labels'].data.numpy())
                     self.gt_bboxes.append(data['gt_bboxes'].data.numpy())
@@ -182,8 +205,8 @@ class AnalyzeDataset():
            结论：发现bbox遍布整个图片，无法缩小图片尺寸
         """
         if self.checkonly:
-            print('Can not analyse dataset on checkonly mode, you need change checkonly mode to False.')
-            return
+            raise ValueError('Can not analyse dataset on checkonly mode, you need change checkonly mode to False.')
+
         else:
             coord_ctr = []
             if self.name == 'traffic_sign':
@@ -194,32 +217,29 @@ class AnalyzeDataset():
                     coord_ctr.append([x_ctr, y_ctr])
             coord_ctr = np.array(coord_ctr)
             if show:
+                title = 'Dataset: ' + self.name + '(after ImgTransform) ' + 'with range: ' + str(self.ana_range)  # 显示数据集类型
                 plt.figure()
+                plt.suptitle(title)
+                
                 plt.subplot(1,1,1)
                 plt.title("cluster for all the bboxes central point")
                 plt.scatter(coord_ctr[:,0], coord_ctr[:,1])
             return coord_ctr
     
     def bbox_size(self, show=False):
-        """对所有bbox位置进行分析，希望能够缩小图片尺寸
+        """对所有bbox的w/h，面积范围，面积分布 一起进行分析
         """
-        # TODO: 面积分布需要进一步优化，最好按照面积大小统计分布图，单纯统计3个等级太粗了
         if self.checkonly:
-            print('Can not analyse dataset on checkonly mode, you need change checkonly mode to False.')
-            return
+            raise ValueError('Can not analyse dataset on checkonly mode, you need change checkonly mode to False.')
+
         else:
             sizes = []
             areas = []
             abnormal = []
             for id, bboxes in enumerate(self.gt_bboxes):
                 for bbox in bboxes:
-    
-                    if self.name == 'traffic_sign':
-                        w = bboxes[0][2] - bboxes[0][0]
-                        h = bboxes[0][5] - bboxes[0][1]
-                    else:
-                        w = bbox[2] - bbox[0]
-                        h = bbox[3] - bbox[1]
+                    w = bbox[2] - bbox[0]
+                    h = bbox[3] - bbox[1]
     
                     if w == 0 or h == 0:
                         abnormal.append((id, self.img_names[id]))
@@ -233,6 +253,7 @@ class AnalyzeDataset():
             sizes = np.array(sizes)
             
             areas = np.array(areas)
+            areas_100_100 = areas[areas<100*100]
             bin_values = [32*32, 96*96]   # based on coco criteria
             none = len(areas[areas==0])
             small = len(areas[areas<=bin_values[0]]) - none
@@ -240,20 +261,27 @@ class AnalyzeDataset():
             medium = len(areas[(areas>bin_values[0]) & (areas<=bin_values[1])])
             
             if show:
+                title = 'Dataset: ' + self.name + '(after ImgTransform) ' + 'with range: ' + str(self.ana_range)  # 显示数据集类型
                 plt.figure()
-                plt.subplot(131)
+                plt.suptitle(title)
+                plt.subplot(221)
                 plt.title("bboxes width and height")
                 plt.xlim((0,max(sizes[:,0])+1))  # w
                 plt.ylim((0,max(sizes[:,1])+1))  # h
                 plt.scatter(sizes[:,0], sizes[:,1])
                 
-                plt.subplot(132)
+                plt.subplot(222)
                 plt.title("bbox area summary(0-32*32, 32*32-96*96, 96*96-)")
                 plt.bar([1,2,3], [small, medium, big])
                 
-                plt.subplot(133)
-                plt.title("bbox area summary")
-                plt.scatter(np.arange(len(areas)), areas)
+                plt.subplot(223)
+                plt.title("bbox area bins for all")
+                nums, bins, _ = plt.hist(x=areas, bins=20)
+                
+                plt.subplot(224)
+                plt.title("bbox area bins(only for area<100*100)")
+                nums, bins, _ = plt.hist(x=areas_100_100, bins=50)
+                
                 
     #            for id,name in abnormal:
     #                data = self.dataset[id]
@@ -267,8 +295,7 @@ class AnalyzeDataset():
            类别从0到20总共21类
         """
         if self.checkonly:
-            print('Can not analyse dataset on checkonly mode, you need change checkonly mode to False.')
-            return
+            raise ValueError('Can not analyse dataset on checkonly mode, you need change checkonly mode to False.')
         else:
             gts_dict = {0:0} 
             for gts in self.gt_labels:
@@ -285,7 +312,9 @@ class AnalyzeDataset():
                 bar_x = gts_dict.keys()
                 bar_y = gts_dict.values()
     #            bar_values = [gts_dict[gt] for gt in range(21)]
+                title = 'Dataset: ' + self.name + '(after ImgTransform) ' + 'with range: ' + str(self.ana_range)  # 显示数据集类型
                 plt.figure()
+                plt.suptitle(title)
                 plt.title("nums for each classes")
                 plt.bar(bar_x, bar_y)
             return gts_dict
@@ -314,10 +343,10 @@ if __name__ == '__main__':
                     extra_aug=None)
         dataset = get_dataset(trainset_cfg, TrafficSign)
         ana = AnalyzeDataset('traffic_sign', dataset, checkonly=False)
-        ana.imgcheck(2)
 #        ana.cluster_bbox(show=True)       
         ana.types_bin(show=True)
         ana.bbox_size(show=True)
+#        ana.imgcheck(2)
     
     if dset == 'voc':
         dataset_type = 'VOCDataset'
@@ -340,11 +369,10 @@ if __name__ == '__main__':
             with_label=True)
         
         dataset = get_dataset(trainset_cfg, VOCDataset)
-        ana = AnalyzeDataset('voc', dataset, checkonly=True)  # 如果只是显示图片，则checkonly=True；如果要分析数据集结构，则False
-        ana.imgcheck(120)
-        
+        ana = AnalyzeDataset('voc', dataset, checkonly=False)  # 如果只是显示图片，则checkonly=True；如果要分析数据集结构，则False       
         ana.types_bin(show=True)
         ana.bbox_size(show=True)
+#        ana.imgcheck(120)
 
     if dset == 'coco':
         dataset_type = 'CocoDataset'
@@ -364,9 +392,8 @@ if __name__ == '__main__':
             resize_keep_ratio=False)
         
         dataset = get_dataset(trainset_cfg, CocoDataset)
-        ana = AnalyzeDataset('coco', dataset, checkonly=True)
-        ana.imgcheck(21)
-        
+        ana = AnalyzeDataset('coco', dataset, checkonly=False)
         ana.types_bin(show=True)
         ana.bbox_size(show=True)
+#        ana.imgcheck(21)
             
