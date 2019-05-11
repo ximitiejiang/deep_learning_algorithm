@@ -26,7 +26,7 @@ from tqdm import tqdm
 2. 小物体，中物体，大物体的区分：基于coco数据集的划分方式，面积<32*32为小物体，面积>96*96为打物体，中间的就是中物体
     + 简单点就是面积在1000-9000之间的中物体，两头就是小物体和大物体
 
-2. 分析voc数据集如果送入RetinaNet，其anchor是否满足要求：
+2. 分析voc数据集bbox的分布情况：(基于scale到(1333,800))
    可查看voc数据集在retinanet的transform基础上bbox的分布情况(voc_dataset_summary.png)，发现bbox主要分布在大于9216(96*96)的区间，属于大物体类型数据集
    大物体区间(>96*96)：bbox最大到800,000(900*900)，而anchor最大到658,377，差不多可以满足大部分要求
    中物体区间(>32*32)：bbox个数较少，且被0层/1层的anchor完美覆盖，
@@ -34,7 +34,7 @@ from tqdm import tqdm
 """
 
 """retinanet anchor: anchor_base = [?], anchor_scales = [?], anchor_ratios = [0.5, 1., 2.]"""
-re_ba0 = np.array([[-19.,  -7.,  26.,  14.],  # """这是retinanet最浅层0层的base_anchors, 最小面积945，最大面积2485"""
+re_ba0 = np.array([[-19.,  -7.,  26.,  14.],  # 面积945 - 2485
                 [-25., -10.,  32.,  17.],
                 [-32., -14.,  39.,  21.],
                 [-12., -12.,  19.,  19.],
@@ -43,7 +43,7 @@ re_ba0 = np.array([[-19.,  -7.,  26.,  14.],  # """这是retinanet最浅层0层�
                 [ -7., -19.,  14.,  26.],
                 [-10., -25.,  17.,  32.],
                 [-14., -32.,  21.,  39.]])
-re_ba1 = np.array([[-37., -15.,  52.,  30.],  # """retinanet第1层base_anchors, 最小面积3969，最大面积10,201"""
+re_ba1 = np.array([[-37., -15.,  52.,  30.],  # 面积3969 - 10,201
                 [-49., -21.,  64.,  36.],
                 [-64., -28.,  79.,  43.],
                 [-24., -24.,  39.,  39.],
@@ -52,7 +52,7 @@ re_ba1 = np.array([[-37., -15.,  52.,  30.],  # """retinanet第1层base_anchors,
                 [-15., -37.,  30.,  52.],
                 [-21., -49.,  36.,  64.],
                 [-28., -64.,  43.,  79.]])
-re_ba2 = np.array([[ -75.,  -29.,  106.,   60.],   # """retinanet第2层base_anchors, 最小面积16,109，最大面积41,209"""
+re_ba2 = np.array([[ -75.,  -29.,  106.,   60.],   # 面积16,109 - 41,209
                 [ -98.,  -41.,  129.,   72.],
                 [-128.,  -56.,  159.,   87.],
                 [ -48.,  -48.,   79.,   79.],
@@ -61,7 +61,7 @@ re_ba2 = np.array([[ -75.,  -29.,  106.,   60.],   # """retinanet第2层base_anc
                 [ -29.,  -75.,   60.,  106.],
                 [ -41.,  -98.,   72.,  129.],
                 [ -56., -128.,   87.,  159.]])
-re_ba3 = np.array([[-149.,  -59.,  212.,  122.],  # """retinanet第3层base_anchors, 最小面积65,025，最大面积164,451"""
+re_ba3 = np.array([[-149.,  -59.,  212.,  122.],  # 面积65,025 - 164,451
                 [-196.,  -82.,  259.,  145.],
                 [-255., -112.,  318.,  175.],
                 [ -96.,  -96.,  159.,  159.],
@@ -70,7 +70,7 @@ re_ba3 = np.array([[-149.,  -59.,  212.,  122.],  # """retinanet第3层base_anch
                 [ -59., -149.,  122.,  212.],
                 [ -82., -196.,  145.,  259.],
                 [-112., -255.,  175.,  318.]])
-re_ba4 = np.array([[-298., -117.,  425.,  244.],  # """retinanet第4层base_anchors, 最小面积261,003，最大面积658,377"""
+re_ba4 = np.array([[-298., -117.,  425.,  244.],  # 面积261,003 - 658,377
                 [-392., -164.,  519.,  291.],
                 [-511., -223.,  638.,  350.],
                 [-192., -192.,  319.,  319.],
@@ -79,48 +79,75 @@ re_ba4 = np.array([[-298., -117.,  425.,  244.],  # """retinanet第4层base_anch
                 [-117., -298.,  244.,  425.],
                 [-164., -392.,  291.,  519.],
                 [-223., -511.,  350.,  638.]])
-# ----------------------------------------------------------------------
+retinanet_ba_list = [re_ba0, re_ba1, re_ba2, re_ba3, re_ba4]  # [arry1, array2, ...]
+# ----------------------------------------------------------------------------
 """cascade rcnn anchor: anchor_base = [4,8,16,32,64], anchor_scales = [8], anchor_ratios = [0.5, 1., 2.]"""
-cr_ba0 = np.array([[-21.,  -9.,  24.,  12.],
+cr_ba0 = np.array([[-21.,  -9.,  24.,  12.],       # 面积945 - 961
                    [-14., -14.,  17.,  17.],
-                   [ -9., -21.,  12.,  24.]])
-cr_ba1 = np.array([[-41., -19.,  48.,  26.],
+                   [ -9., -21.,  12.,  24.]])    
+cr_ba1 = np.array([[-41., -19.,  48.,  26.],       # 面积3969 - 4005
                    [-28., -28.,  35.,  35.],
                    [-19., -41.,  26.,  48.]])
-cr_ba2 = np.array([[-83., -37.,  98.,  52.],
+cr_ba2 = np.array([[-83., -37.,  98.,  52.],       # 面积16109 - 16129
                    [-56., -56.,  71.,  71.],
                    [-37., -83.,  52.,  98.]])
-cr_ba3 = np.array([[-165.,  -75.,  196.,  106.],
+cr_ba3 = np.array([[-165.,  -75.,  196.,  106.],   # 面积65025 - 65341
                    [-112., -112.,  143.,  143.],
                    [ -75., -165.,  106.,  196.]])
-cr_ba4 = np.array([[-330., -149.,  393.,  212.],
+cr_ba4 = np.array([[-330., -149.,  393.,  212.],   # 面积261003 - 261121
                    [-224., -224.,  287.,  287.],
                    [-149., -330.,  212.,  393.]])
-
+cascadercnn_ba_list = [cr_ba0, cr_ba1, cr_ba2, cr_ba3, cr_ba4]
+#-----------------------------------------------------------------------------
 
 def show_bbox(bboxes):
     """输入array"""
-#    x = np.arange(-5.0, 5.0, 0.02)
-#    y1 = np.sin(x)
-#
-#    plt.figure(1)
-#    plt.subplot(211)
-#    plt.plot(x, y1)
+    assert isinstance(bboxes, np.ndarray), 'bboxes should be ndarray.'  
     wh = [((bb[3]-bb[1]), (bb[2]-bb[0])) for bb in bboxes]
     areas = [(bb[3]-bb[1])*(bb[2]-bb[0]) for bb in bboxes]
     print('(w,h) = ', wh)
     print('areas = ', areas, 'min area = ', min(areas), 'max area = ', max(areas))
     
-    plt.plot([0,8,8,0,0],[0,0,8,8,0])
     for bbox in bboxes:
         plt.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
                  [bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]])
+# debug
+#show_bbox(cascadercnn_ba_list[4])
+
+
+
 
 class AnalyzeBbox():
-    def __init__():
-        pass
-    def show():
-        pass
+    def __init__(self, bbox_list):
+#        self.ana = AnalyzeDataset(dset_name, dset_obj, checkonly=True)
+        assert isinstance(bbox_list, list), 'bbox_list should be a list of array'
+        self.bbox_list = bbox_list
+        
+    
+    def bbox_summary(self):
+        for level, bboxes in enumerate(self.bbox_list):
+            wh = [((bb[3]-bb[1]), (bb[2]-bb[0])) for bb in bboxes]
+            areas = [(bb[3]-bb[1])*(bb[2]-bb[0]) for bb in bboxes]
+            print('level %d: \n'%level)
+            print('areas = ', areas, 'min area = ', min(areas), 'max area = ', max(areas))
+    
+    def bboxshow_all(self):
+        ax = plt.figure()
+        for level, bboxes in enumerate(self.bbox_list):
+            self.bboxshow_single(bboxes, ax=ax)
+        
+    
+    def bboxshow_single(self, bboxes, ax=None, img=None):
+        """显示一组bbox array"""
+        assert isinstance(bboxes, np.ndarray), 'bboxes should be ndarray.'    
+#        plt.plot([0,8,8,0,0],[0,0,8,8,0])  # 绘制base size box
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, 1)
+        for bbox in bboxes:
+            ax.plt.plot([bbox[0],bbox[2],bbox[2],bbox[0],bbox[0]],
+                        [bbox[1],bbox[1],bbox[3],bbox[3],bbox[1]])
+
 
 class AnalyzeDataset():
     """用于对数据集进行预分析: 
@@ -324,7 +351,7 @@ class AnalyzeDataset():
     
 if __name__ == '__main__':
     
-    dset = 'trafficsign'
+    dset = 'bbox'  # voc / coco / trafficsign / bbox
     
     if dset == 'trafficsign':
         dataset_type = 'TrafficSign'    # 改成trafficsign
@@ -396,4 +423,10 @@ if __name__ == '__main__':
         ana.types_bin(show=True)
         ana.bbox_size(show=True)
 #        ana.imgcheck(21)
+    
+    if dset == 'bbox':
+        anb = AnalyzeBbox(cascadercnn_ba_list)
+        anb.bbox_summary()
+        anb.bboxshow_single()
+        anb.bboxshow_all()
             
