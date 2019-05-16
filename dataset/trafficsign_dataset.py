@@ -13,8 +13,9 @@ import csv
 from torch.utils.data import Dataset
 from dataset.utils import vis_bbox
 import matplotlib.pyplot as plt
-from dataset.transforms import (ImageTransform, BboxTransform, Numpy2Tensor) 
-from dataset.random_fscrop_transform import RandomFSCropTransform
+from dataset.transforms import (ImageTransform, BboxTransform, Numpy2Tensor)
+from dataset.extra_aug import ExtraAugmentation 
+#from dataset.random_fscrop_transform import RandomFSCropTransform
 from model.parallel.data_container import DataContainer as DC
 
 def to_tensor(data):
@@ -168,7 +169,7 @@ class TrafficSign(Dataset):
         
         # build transformer
         if extra_aug is not None:
-            self.extra_aug = RandomFSCropTransform(**extra_aug)  # extra_aug用dict输入dict(req_size = [1333,800])
+            self.extra_aug = ExtraAugmentation(**extra_aug)  # extra_aug用dict输入dict(req_size = [1333,800])
         else:
             self.extra_aug = None
         self.img_transform = ImageTransform(size_divisor=self.size_divisor, **self.img_norm_cfg)

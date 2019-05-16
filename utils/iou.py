@@ -30,8 +30,8 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False):
     if rows * cols == 0:
         return bboxes1.new(rows, 1) if is_aligned else bboxes1.new(rows, cols)
 
-    if is_aligned:
-        lt = torch.max(bboxes1[:, :2], bboxes2[:, :2])  # [rows, 2]
+    if is_aligned:  # 如果两组bbox是维度一样就是aligned，则不需要广播
+        lt = torch.max(bboxes1[:, :2], bboxes2[:, :2])  # [rows, 2]   
         rb = torch.min(bboxes1[:, 2:], bboxes2[:, 2:])  # [rows, 2]
 
         wh = (rb - lt + 1).clamp(min=0)  # [rows, 2]
@@ -45,7 +45,7 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False):
             ious = overlap / (area1 + area2 - overlap)
         else:
             ious = overlap / area1
-    else:
+    else:   # 如果维度没有aligned，则需要广播机制
         lt = torch.max(bboxes1[:, None, :2], bboxes2[:, :2])  # [rows, cols, 2]
         rb = torch.min(bboxes1[:, None, 2:], bboxes2[:, 2:])  # [rows, cols, 2]
 

@@ -179,7 +179,7 @@ class AnalyzeDataset():
             self.img_scale = self.dataset.img_scales
                        
         if not checkonly:
-            self.ana_range = 3000    # debug: 可定义分析的数据集范围(避免分析整个数据集导致太慢)
+            self.ana_range = 1000    # debug: 可定义分析的数据集范围(避免分析整个数据集导致太慢)
         
             self.gt_labels = []
             self.gt_bboxes = []
@@ -377,7 +377,7 @@ class AnalyzeDataset():
     
 if __name__ == '__main__':
     
-    dset = 'coco'  # voc / coco / trafficsign / bbox
+    dset = 'trafficsign'  # voc / coco / trafficsign / bbox
     
     if dset == 'trafficsign':
         dataset_type = 'TrafficSign'    # 改成trafficsign
@@ -389,7 +389,8 @@ if __name__ == '__main__':
                     type=dataset_type,
                     ann_file=data_root + 'train_label_fix.csv',
                     img_prefix=data_root + 'Train_fix/',
-                    img_scale=(1333, 800),
+#                    img_scale=(1333, 800),      # 把图片缩小
+                    img_scale=(3200, 1800),      # 把图片保持尺寸
                     img_norm_cfg=img_norm_cfg,
                     size_divisor=32,
                     with_label=True,
