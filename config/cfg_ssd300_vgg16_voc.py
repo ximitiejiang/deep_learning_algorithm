@@ -126,12 +126,12 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-gpus = 2      # 增加该句，从arg里边移过来因为build_dataloader函数需要
+gpus = 1      # 增加该句，从arg里边移过来因为build_dataloader函数需要
 total_epochs = 24
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
 work_dir = './work_dirs/ssd300_voc'
 load_from = None
-#resume_from = None
-resume_from = './weights/myssd/weight_4imgspergpu/epoch_21.pth'
+resume_from = None
+#resume_from = './weights/myssd/weight_4imgspergpu/epoch_21.pth'
 workflow = [('train', 1)]
