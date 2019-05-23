@@ -81,8 +81,12 @@ class Tester(object):
         data = dict(img=[img], img_meta=[img_meta])
         return data
     
-    def run_single(self, ori_img, data, show=True, saveto=None):
-        """对单张图片计算结果""" 
+    def run_single(self, ori_img, data, show=True, saveto=None, bboxes=None):
+        """对单张图片计算结果
+        Args:
+            data
+            bboxes(m,4): 可以单独输入bboxes用来绘制额外的bboxes
+        """ 
         with torch.no_grad():
             result = self.model(**data, return_loss=False, rescale=True)  # (20,)->(n,5)or(0,5)->(xmin,ymin,xmax,ymax,score)         
         # 提取labels
@@ -107,7 +111,7 @@ class Tester(object):
             
     def run(self, img_path):
         raise NotImplementedError('run() function not implemented!')
-        
+                
 
 class TestImg(Tester):
     """用于图片的检测，可输入单张图片，也可输入多张图片list"""
@@ -116,6 +120,42 @@ class TestImg(Tester):
                  dataset_name='voc', device = 'cuda:0'):
         super().__init__(config_file, model_class, weights_path, 
                  dataset_name, device = 'cuda:0')
+    
+    def run_single(self, ori_img, data, show=True, saveto=None, bboxes=None):
+        """对单张图片计算结果
+        Args:
+            data
+            bboxes(m,4): 可以单独输入bboxes用来绘制额外的bboxes
+        """ 
+        with torch.no_grad():
+            result = self.model(**data, return_loss=False, rescale=True)  # (20,)->(n,5)or(0,5)->(xmin,ymin,xmax,ymax,score)         
+        # 提取labels
+        labels = [np.full(bbox.shape[0], i, dtype=np.int32) 
+                    for i, bbox in enumerate(result)]    # [(m1,), (m2,)...]
+        labels = np.concatenate(labels)  # (m,)
+        bboxes = np.vstack(result)       # (m,5)
+        scores = bboxes[:,-1]            # (m,)
+        
+        # 增加对外部输入bbox的支持，比如显示其他状态的bbox在img上面
+        if bboxes is not None:
+            assert isinstance(bboxes, np.array), 'the bboxes should be ndarray.'
+            if bboxes.shape[1] == 4:
+                new_bboxes = np.zeros((bboxes.shape[0],5))
+                new_bboxes[:bboxes.shape[0], :bboxes.shape[1]] = bboxes
+                single_results = [bboxes]
+        else:
+            single_results = [bboxes]
+        single_results.append(labels)
+        single_results.append(scores)
+        
+        if show: # 使用show变量区分是使用vis_bbox还是使用opencv_vis_bbox，用opencv_vis_bbox处理视频和cam
+            vis_bbox(
+                ori_img.copy(), *single_results, score_thr=0.3, class_names=self.class_names, saveto=saveto)
+            # opencv版本的显示效果不太好，用matplotlib版本的显示文字较好
+#            opencv_vis_bbox(
+#                img.copy(), *single_results, score_thr=0.2, class_names=self.class_names, saveto=saveto)
+
+        return single_results   # list [ array, array, array]
     
     def run(self, img_path):
         if isinstance(img_path, str):
@@ -135,7 +175,7 @@ class TestImg(Tester):
                 _ = self.run_single(ori_img, data, show=True, saveto=result_name)
         else:
             raise TypeError("path type should be str for one img or list for multiple imgs.")
-        
+      
 
 class TestImgResultGenerator(Tester):
     """用于测试一组图片，并把测试结果写入csv文件"""

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sun Mar  3 08:26:28 2019
+Created on Thu May 23 18:11:01 2019
 
 @author: ubuntu
 """
@@ -15,6 +15,8 @@ if not path in sys.path:
 
     
 from utils.tester import TestImg, TestVideo, TestDataset
+from utils.process_checker import Support
+import cv2
 
 model_class = OneStageDetector
 dataset_name = 'voc'
@@ -44,15 +46,7 @@ if testimg:
     test_img = TestImg(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
     test_img.run(img_path)
 
-elif testcam:
-    test_video = TestVideo(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
-    test_video.run(source=0)
+bboxes = Support.loadvar('./work_dirs/temp/mlvl_bboxes.txt')
+scores = Support.loadvar('./work_dirs/temp/mlvl_scores.txt')
 
-elif testvideo:
-    test_video = TestVideo(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
-    test_video.run(source=video_path)
-    
-elif testdataset:
-    test_dataset = TestDataset(config_file, model_class, weights_path, dataset_name='voc', device = 'cuda:0', out_file=out_file)
-    test_dataset.run(VOCDataset)
-    
+

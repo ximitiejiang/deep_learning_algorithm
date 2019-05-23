@@ -20,6 +20,10 @@ from .weight_init import xavier_init
 from .losses import weighted_smoothl1
 from utils.registry_build import registered
 
+from utils.process_checker import check_bbox
+
+GLOBAL_DEBUG = True
+
 @registered.register_module
 class SSDHead(nn.Module):
 
@@ -272,7 +276,8 @@ class SSDHead(nn.Module):
                                                scale_factor, cfg, rescale)
             result_list.append(proposals)
         return result_list
-
+    
+    @check_bbox
     def get_bboxes_single(self,
                           cls_scores,
                           bbox_preds,
@@ -281,7 +286,8 @@ class SSDHead(nn.Module):
                           scale_factor,
                           cfg,
                           rescale=False):
-        """针对ssd的get bboxes用于把ssd head网络输出score化，delta2bbox化，然后统一做score过滤(0.02)和nms过滤(0.45)
+        """针对ssd的get bboxes用于把ssd head网络输出score化，delta2bbox化，
+           然后统一做score过滤(0.02)和nms过滤(0.45)
             cls_scores(6,)  (h,w,21*4) or (h,w,21*6)
             bbox_preds(6,)
         Returns:
@@ -322,6 +328,14 @@ class SSDHead(nn.Module):
         if self.use_sigmoid_cls:
             padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)
             mlvl_scores = torch.cat([padding, mlvl_scores], dim=1)
+        
+        # debug: 在测试阶段的bbox只是把所有anchor做了delta2bbox操作然后回复scale
+        global GLOBAL_DEBUG
+        if GLOBAL_DEBUG:
+            from utils.process_checker import Support
+            Support.save2pkl(mlvl_bboxes, path="./work_dirs/temp/mlvl_bboxes.txt")
+            Support.save2pkl(mlvl_scores, path="./work_dirs/temp/mlvl_scores.txt")
+            
         det_bboxes, det_labels = multiclass_nms(
             mlvl_bboxes, mlvl_scores, cfg.score_thr, cfg.nms, cfg.max_per_img) # multiclass_nms分别做score(0.02)过滤和nms过滤(0.45)
         return det_bboxes, det_labels
