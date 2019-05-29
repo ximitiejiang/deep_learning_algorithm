@@ -92,7 +92,7 @@ class OneStageDetector(nn.Module):
         x = self.extract_feat(img)
         outs = self.bbox_head(x)
         bbox_inputs = outs + (img_meta, self.test_cfg, rescale)
-        bbox_list = self.bbox_head.get_bboxes(*bbox_inputs)
+        bbox_list = self.bbox_head.get_bboxes(*bbox_inputs)  # (21,)(2,)分别是bboxes()和labels()
         bbox_results = [
             self.bbox2result(det_bboxes, det_labels, self.bbox_head.num_classes)  # bbox2result只是简单转化为numpy
             for det_bboxes, det_labels in bbox_list

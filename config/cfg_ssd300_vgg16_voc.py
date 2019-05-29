@@ -27,7 +27,7 @@ cudnn_benchmark = True
 train_cfg = dict(
     assigner=dict(
         type='MaxIoUAssigner',
-        pos_iou_thr=0.5,
+        pos_iou_thr=0.5,                 # 训练时以大于0.5iou为正样本标准，
         neg_iou_thr=0.5,
         min_pos_iou=0.,
         ignore_iof_thr=-1,
@@ -38,7 +38,7 @@ train_cfg = dict(
     neg_pos_ratio=3,
     debug=False)
 test_cfg = dict(
-    nms=dict(type='nms', iou_thr=0.45),
+    nms=dict(type='nms', iou_thr=0.5),  # nms的iou_thr越小，则去除bbox更多
     min_bbox_size=0,
     score_thr=0.02,
     max_per_img=200)

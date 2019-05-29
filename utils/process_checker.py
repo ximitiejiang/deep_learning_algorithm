@@ -18,41 +18,6 @@ class Deco():
 """
 
 from abc import ABCMeta, abstractmethod
-import pickle
-import torch
-
-# %% 一些辅助函数
-class Support():
-    def __init__(self):
-        pass
-    
-    @staticmethod
-    def save2pkl(var, path):
-        """用于保存过程中变量，并且转换成cpu，numpy格式"""
-        var = var.cpu()
-        if isinstance(var, torch.Tensor):
-            var = var.numpy()
-        f = open(path, 'wb')
-        pickle.dump(var, f)
-        f.close()
-    
-    @staticmethod
-    def loadvar(path):
-        f = open(path, 'rb')
-        var = pickle.load(f)
-        f.close()
-        return var
-    
-    @staticmethod
-    def plotbbox(bboxes):
-        """用于保存过程中图片或bbox的显示图片"""
-        pass
-    
-    @staticmethod
-    def draw_hist(data):
-        
-        
-    
     
 # %% 方案1：采用装饰器类作为基类
 class CheckDeco():
@@ -89,8 +54,3 @@ def check_bbox(func):
     return wrapper
 
 
-
-if __name__ == "__main__":
-    bboxes = Support.loadvar('../work_dirs/temp/mlvl_bboxes.txt')
-    scores = Support.loadvar('../work_dirs/temp/mlvl_scores.txt')
-    

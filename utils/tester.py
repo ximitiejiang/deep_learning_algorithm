@@ -121,7 +121,7 @@ class TestImg(Tester):
         super().__init__(config_file, model_class, weights_path, 
                  dataset_name, device = 'cuda:0')
     
-    def run_single(self, ori_img, data, show=True, saveto=None, bboxes=None):
+    def run_single(self, ori_img, data, show=True, saveto=None):
         """对单张图片计算结果
         Args:
             data
@@ -129,22 +129,15 @@ class TestImg(Tester):
         """ 
         with torch.no_grad():
             result = self.model(**data, return_loss=False, rescale=True)  # (20,)->(n,5)or(0,5)->(xmin,ymin,xmax,ymax,score)         
+
+        bboxes = np.vstack(result)       # (m,5)
+        single_results = [bboxes]
         # 提取labels
         labels = [np.full(bbox.shape[0], i, dtype=np.int32) 
                     for i, bbox in enumerate(result)]    # [(m1,), (m2,)...]
         labels = np.concatenate(labels)  # (m,)
-        bboxes = np.vstack(result)       # (m,5)
         scores = bboxes[:,-1]            # (m,)
         
-        # 增加对外部输入bbox的支持，比如显示其他状态的bbox在img上面
-        if bboxes is not None:
-            assert isinstance(bboxes, np.array), 'the bboxes should be ndarray.'
-            if bboxes.shape[1] == 4:
-                new_bboxes = np.zeros((bboxes.shape[0],5))
-                new_bboxes[:bboxes.shape[0], :bboxes.shape[1]] = bboxes
-                single_results = [bboxes]
-        else:
-            single_results = [bboxes]
         single_results.append(labels)
         single_results.append(scores)
         
@@ -175,7 +168,25 @@ class TestImg(Tester):
                 _ = self.run_single(ori_img, data, show=True, saveto=result_name)
         else:
             raise TypeError("path type should be str for one img or list for multiple imgs.")
-      
+    
+    @staticmethod
+    def inside_imshow(img_path, bboxes=None, scale_factor=None, scores=None):
+        """显示内部的bbox在原始图片上的效果，输入的bboxes为5列(xmin,ymin,xmax,ymax, score)
+        """
+        if isinstance(img_path, str):
+            ori_img = cv2.imread(img_path)
+        if bboxes is None:
+            bboxes = np.zeros((4,))
+        else:
+            scores = bboxes[:, 4]
+            bboxes = bboxes[:,:4]
+
+        # 如果是scale状态的bbox，则需要除以scale变回原图尺寸，但如果是multiclass_nms则已经是恢复scale过了。
+        if scale_factor is not None:
+            assert isinstance(scale_factor, np.ndarray), 'scale_factor should be ndarray(4,)'
+            bboxes /= scale_factor   # 把bbox放大回原图尺寸(这里是假定图像在test阶段只做了scale一个transform，没有其他影响尺寸的transform)
+        vis_bbox(ori_img.copy(), bboxes, scores=scores, instance_colors=None, alpha=1., linewidth=0.5)
+        
 
 class TestImgResultGenerator(Tester):
     """用于测试一组图片，并把测试结果写入csv文件"""

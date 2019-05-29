@@ -1,6 +1,9 @@
+from utils.global_var import gl
+
 import torch
 from utils.nms import nms_wrapper
 import numpy as np
+from utils.support import IO
 
 def multiclass_nms(multi_bboxes, multi_scores, score_thr, nms_cfg, max_num=-1):
     """NMS for multi-class bboxes.
@@ -25,19 +28,30 @@ def multiclass_nms(multi_bboxes, multi_scores, score_thr, nms_cfg, max_num=-1):
     nms_op = getattr(nms_wrapper, nms_type)   # 提取nms操作类型
     
     for i in range(1, num_classes):
-        cls_inds = multi_scores[:, i] > score_thr  # cls_inds(8732), 代表每个循环的这个类，对应了几个bbox
+        cls_inds = multi_scores[:, i] > score_thr  # 以类做循环，筛选出每个类中大于score_thr的样本，cls_inds(8732)
         if not cls_inds.any():
             continue
         # get bboxes and scores of this class
         if multi_bboxes.shape[1] == 4:
-            _bboxes = multi_bboxes[cls_inds, :]
+            _bboxes = multi_bboxes[cls_inds, :]    # 经过score>0.02筛选，从8732到300+
         else:
             _bboxes = multi_bboxes[cls_inds, i * 4:(i + 1) * 4]
         _scores = multi_scores[cls_inds, i]
-        cls_dets = torch.cat([_bboxes, _scores[:, None]], dim=1)
+        
+        # debug function: after score_thr
+        if gl.get_value("DEBUG_NMS_SCORE_THR"):
+            data = torch.cat([_bboxes, _scores[:, None]], dim=1)
+            IO.save2pkl_checkidx([data], idx=i, path='./work_dirs/temp/after_score_thr.pkl')
+            
+        cls_dets = torch.cat([_bboxes, _scores[:, None]], dim=1)  # bbox, score组合(n,5)
         cls_dets, _ = nms_op(cls_dets, **nms_cfg_)
         cls_labels = multi_bboxes.new_full(
             (cls_dets.shape[0], ), i - 1, dtype=torch.long)
+        
+        # debug function: after nms
+        if gl.get_value("DEBUG_NMS_NMS_THR"):    
+            IO.save2pkl_checkidx([cls_dets], idx=i, path='./work_dirs/temp/after_nms_thr.pkl')
+        
         bboxes.append(cls_dets)
         labels.append(cls_labels)
     if bboxes:

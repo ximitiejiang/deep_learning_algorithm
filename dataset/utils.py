@@ -162,7 +162,11 @@ def vis_bbox(img, bboxes, labels=None, scores=None, score_thr=0, class_names=Non
         color_list.append(color)
     color_list.pop(-1) # 去除白色，用于文字颜色
     random_colors = np.stack(color_list, axis=0)  # (7,3)
-    random_colors = np.tile(random_colors, (12,1))[:len(class_names),:]  # (84,3) -> (20,3)or(80,3)
+    if class_names is None:
+        color_len =1
+    else:
+        color_len = len(class_names)
+    random_colors = np.tile(random_colors, (12,1))[:color_len,:]  # (84,3) -> (20,3)or(80,3)
     
     if instance_colors is None:
         instance_colors = random_colors
@@ -170,7 +174,7 @@ def vis_bbox(img, bboxes, labels=None, scores=None, score_thr=0, class_names=Non
 #        instance_colors[:, 0] = 255
     else:
         assert len(instance_colors) == 3, 'instance_colors should be a list [n1,n2,n3].'
-        instance_colors = np.tile(instance_colors, (len(class_names), 1))
+        instance_colors = np.tile(instance_colors, (color_len, 1))
 #    instance_colors = np.array(instance_colors)
 
     for i, bb in enumerate(bboxes):        # xyxy to xywh

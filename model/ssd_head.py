@@ -5,6 +5,7 @@ Created on Tue Mar  5 15:37:59 2019
 
 @author: ubuntu
 """
+GLOBAL_DEBUG = True
 
 import numpy as np
 import torch
@@ -20,9 +21,6 @@ from .weight_init import xavier_init
 from .losses import weighted_smoothl1
 from utils.registry_build import registered
 
-from utils.process_checker import check_bbox
-
-GLOBAL_DEBUG = True
 
 @registered.register_module
 class SSDHead(nn.Module):
@@ -277,7 +275,6 @@ class SSDHead(nn.Module):
             result_list.append(proposals)
         return result_list
     
-    @check_bbox
     def get_bboxes_single(self,
                           cls_scores,
                           bbox_preds,
@@ -330,11 +327,10 @@ class SSDHead(nn.Module):
             mlvl_scores = torch.cat([padding, mlvl_scores], dim=1)
         
         # debug: 在测试阶段的bbox只是把所有anchor做了delta2bbox操作然后回复scale
-        global GLOBAL_DEBUG
-        if GLOBAL_DEBUG:
-            from utils.process_checker import Support
-            Support.save2pkl(mlvl_bboxes, path="./work_dirs/temp/mlvl_bboxes.txt")
-            Support.save2pkl(mlvl_scores, path="./work_dirs/temp/mlvl_scores.txt")
+#        global GLOBAL_DEBUG
+#        if GLOBAL_DEBUG:
+#            from utils.support import IO
+#            IO.save2pkl([mlvl_bboxes,mlvl_scores], path="./work_dirs/temp/ssd_test.pkl")
             
         det_bboxes, det_labels = multiclass_nms(
             mlvl_bboxes, mlvl_scores, cfg.score_thr, cfg.nms, cfg.max_per_img) # multiclass_nms分别做score(0.02)过滤和nms过滤(0.45)
