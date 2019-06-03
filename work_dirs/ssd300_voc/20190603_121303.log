@@ -1,0 +1,3 @@
+2019-06-03 12:13:03,178 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/simple_ssd_pytorch/work_dirs/ssd300_voc
+2019-06-03 12:13:03,179 - INFO - workflow: [('train', 1)], max: 24 epochs
+2019-06-03 12:13:16,190 - INFO - Epoch [1][50/41378]	lr: 0.00008, eta: 2 days, 23:46:28, time: 0.260, data_time: 0.007, loss_cls: 15.1135, loss_reg: 3.0009, loss: 18.1144

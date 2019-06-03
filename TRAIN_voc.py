@@ -26,13 +26,18 @@ from dataset.voc_dataset import VOCDataset
 from dataset.utils import get_dataset
     
 def get_dist_info():
-    if dist._initialized:
+    if torch.__version__ < '1.0':     
+        initialized = dist._initialized    # pytorch 0.4.1
+    else:
+        initialized = dist.is_initialized()  # pytorch 1.0
+    if initialized:
         rank = dist.get_rank()
         world_size = dist.get_world_size()
     else:
         rank = 0
         world_size = 1
     return rank, world_size
+
 
 def get_root_logger(log_level=logging.INFO):
     logger = logging.getLogger()

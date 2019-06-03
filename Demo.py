@@ -38,7 +38,7 @@ out_file = './weights/myssd/weight_4imgspergpu/results_24.pkl'
 #out_file = './weights/myretinanet/4imgpergpu/results_16.pkl'
 
 
-testimg, testcam, testvideo, testdataset = (1,0,0,0)  # choose test mode: 1 means on, 0 means off
+testimg, testcam, testvideo, testdataset = (0,1,0,0)  # choose test mode: 1 means on, 0 means off
 
 if testimg:        
     test_img = TestImg(config_file, model_class, weights_path, dataset_name, device = 'cuda:0')
