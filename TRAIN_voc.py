@@ -140,7 +140,7 @@ def train(cfg_path, dataset_class):
     
 if __name__ == '__main__':
     # ssd300
-    cfg_path = 'config/cfg_ssd300_vgg16_voc.py'
+#    cfg_path = 'config/cfg_ssd300_vgg16_voc.py'
     
     # ssd512
 #    cfg_path = 'config/cfg_ssd512_vgg16_voc.py' 
@@ -149,7 +149,7 @@ if __name__ == '__main__':
 #    cfg_path = 'config/cfg_m2det512_vgg16_mlfpn_voc.py'
     
     # retinanet 
-#    cfg_path = 'config/cfg_retinanet_r50_fpn_voc.py'
+    cfg_path = 'config/cfg_retinanet_r50_fpn_voc.py'
     
     train(cfg_path, VOCDataset)
     

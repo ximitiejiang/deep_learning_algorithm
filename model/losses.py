@@ -35,8 +35,10 @@ def sigmoid_focal_loss(pred,
                        gamma=2.0,
                        alpha=0.25,
                        reduction='elementwise_mean'):
+    """带sigmoid的focal loss实现：
+    """
     pred_sigmoid = pred.sigmoid()
-    pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
+    pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)  # pt = (1-p)*
     weight = (alpha * target + (1 - alpha) * (1 - target)) * weight
     weight = weight * pt.pow(gamma)
     return F.binary_cross_entropy_with_logits(
