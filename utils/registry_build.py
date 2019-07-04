@@ -35,7 +35,6 @@ class Registry():
         if module_name in self._module_dict:
             raise KeyError('{} is already registered in registered dict'.format(module_name))
         self._module_dict[module_name] = cls
-        
         return cls  # 装饰器返回该类
 
 registered = Registry()  # 实例化注册器
