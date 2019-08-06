@@ -80,7 +80,7 @@ def load_checkpoint(model,
                     map_location=None,
                     strict=False,
                     logger=None):
-    """Load checkpoint from a file or URI.
+    """加载预训练模型参数Load checkpoint from a file or URI.
 
     Args:
         model (Module): Module to load checkpoint.
@@ -101,7 +101,7 @@ def load_checkpoint(model,
                 torchvision.models.__path__):
             if not ispkg:
                 _zoo = import_module('torchvision.models.{}'.format(name))
-                _urls = getattr(_zoo, 'model_urls')
+                _urls = getattr(_zoo, 'model_urls')  # pytorch1.1在这里报错，提示没有attribute "model_urls"
                 model_urls.update(_urls)
         model_name = filename[11:]
         checkpoint = model_zoo.load_url(model_urls[model_name])
