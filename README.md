@@ -8,6 +8,12 @@ Originally i want to implement a simplifier SSD detector in this repo, but now i
 
 the ssd detector implementation is simplified from [mmdetection](https://github.com/open-mmlab/mmdetection)
 
+### v1.0 version updates
+original v0.1 version use pytorch 0.4.1, and v1.0 is based on pytorch 1.1 or above
+1. load_checkpoint(): model_zoo was duplicated by pytorch, changed to torchvision
+2. 
+
+
 ### Features
 curently it support VGG16 backbone, the pretrained weights is from caffe on [here](https://s3.ap-northeast-2.amazonaws.com/open-mmlab/pretrain/third_party/vgg16_caffe-292e1171.pth).
 besides this, other features include:

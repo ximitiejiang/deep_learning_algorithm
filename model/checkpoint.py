@@ -7,7 +7,9 @@ from importlib import import_module
 import mmcv
 import torch
 from torch.utils import model_zoo
-
+import torchvision
+import warnings
+import os
 
 open_mmlab_model_urls = {
     'vgg16_caffe': 'https://s3.ap-northeast-2.amazonaws.com/open-mmlab/pretrain/third_party/vgg16_caffe-292e1171.pth',  # noqa: E501
@@ -74,6 +76,43 @@ def load_state_dict(module, state_dict, strict=False, logger=None):
         else:
             print(err_msg)
 
+def get_dist_info():
+    import torch.distributed as dist
+    if torch.__version__ < '1.0':
+        initialized = dist._initialized
+    else:
+        initialized = dist.is_initialized()
+    if initialized:
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
+    else:
+        rank = 0
+        world_size = 1
+    return rank, world_size
+
+def load_url_dist(url):
+    """ In distributed setting, this function only download checkpoint at
+    local rank 0 """
+    rank, world_size = get_dist_info()
+    rank = int(os.environ.get('LOCAL_RANK', rank))
+    if rank == 0:
+        checkpoint = model_zoo.load_url(url)
+    if world_size > 1:
+        torch.distributed.barrier()
+        if rank > 0:
+            checkpoint = model_zoo.load_url(url)
+    return checkpoint
+
+def get_torchvision_models():
+    model_urls = dict()
+    for _, name, ispkg in pkgutil.walk_packages(torchvision.models.__path__):
+        if ispkg:
+            continue
+        _zoo = import_module('torchvision.models.{}'.format(name))
+        if hasattr(_zoo, 'model_urls'):
+            _urls = getattr(_zoo, 'model_urls')
+            model_urls.update(_urls)
+    return model_urls
 
 def load_checkpoint(model,
                     filename,
@@ -94,22 +133,23 @@ def load_checkpoint(model,
         dict or OrderedDict: The loaded checkpoint.
     """
     # load checkpoint from modelzoo or file or url
-    if filename.startswith('modelzoo://'):
-        import torchvision
-        model_urls = dict()
-        for _, name, ispkg in pkgutil.walk_packages(
-                torchvision.models.__path__):
-            if not ispkg:
-                _zoo = import_module('torchvision.models.{}'.format(name))
-                _urls = getattr(_zoo, 'model_urls')  # pytorch1.1在这里报错，提示没有attribute "model_urls"
-                model_urls.update(_urls)
+    if filename.startswith('modelzoo://'):  # pytorch原有的modelzoo已经废弃，改为从torchvision中获得model_urls
+        warnings.warn('The URL scheme of "modelzoo://" is deprecated, please '
+                      'use "torchvision://" instead')
+        model_urls = get_torchvision_models()
         model_name = filename[11:]
-        checkpoint = model_zoo.load_url(model_urls[model_name])
+        checkpoint = load_url_dist(model_urls[model_name])
+        
+    elif filename.startswith('torchvision://'):  #
+        model_urls = get_torchvision_models()
+        model_name = filename[14:]
+        checkpoint = load_url_dist(model_urls[model_name])
+        
     elif filename.startswith('open-mmlab://'):
         model_name = filename[13:]
-        checkpoint = model_zoo.load_url(open_mmlab_model_urls[model_name])
+        checkpoint = load_url_dist(open_mmlab_model_urls[model_name])
     elif filename.startswith(('http://', 'https://')):
-        checkpoint = model_zoo.load_url(filename)
+        checkpoint = load_url_dist(filename)
     else:
         if not osp.isfile(filename):
             raise IOError('{} is not a checkpoint file'.format(filename))
