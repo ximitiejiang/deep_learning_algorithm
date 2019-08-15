@@ -40,11 +40,14 @@ def get_dist_info():
 
 
 def get_root_logger(log_level=logging.INFO):
+    # 先创建logger
     logger = logging.getLogger()
     if not logger.hasHandlers():
+        # 进行logging基本设置format/level
         logging.basicConfig(
             format='%(asctime)s - %(levelname)s - %(message)s',
             level=log_level)
+        
     rank, _ = get_dist_info()
     if rank != 0:
         logger.setLevel('ERROR')
@@ -89,7 +92,7 @@ def train(cfg_path, dataset_class):
     """
     # 初始化2个默认选项
     distributed = False
-    parallel = True
+    parallel = False
     
     # get cfg
     cfg = Config.fromfile(cfg_path)
@@ -104,7 +107,8 @@ def train(cfg_path, dataset_class):
     logger = get_root_logger(cfg.log_level)
     logger.info('Distributed training: {}'.format(distributed))
     logger.info('DataParallel training: {}'.format(parallel))
-    # build model & detector
+    
+    # %% build model & detector
     model = OneStageDetector(cfg)
 #    model = OneStageDetector(cfg)
     if not parallel:
@@ -124,8 +128,13 @@ def train(cfg_path, dataset_class):
                             collate_fn=partial(collate, samples_per_gpu=cfg.data.imgs_per_gpu),
                             pin_memory=False)] 
     
+    # %% 用runner进行训练
     # define runner and running type(1.resume, 2.load, 3.train/test)
-    runner = Runner(model, batch_processor, cfg.optimizer, cfg.work_dir, cfg.log_level)
+    runner = Runner(model, 
+                    batch_processor, 
+                    cfg.optimizer, 
+                    cfg.work_dir, 
+                    cfg.log_level)
     runner.register_training_hooks(cfg.lr_config,
                                    cfg.optimizer_config,
                                    cfg.checkpoint_config,
@@ -140,7 +149,7 @@ def train(cfg_path, dataset_class):
     
 if __name__ == '__main__':
     # ssd300
-#    cfg_path = 'config/cfg_ssd300_vgg16_voc.py'
+    cfg_path = 'config/cfg_ssd300_vgg16_voc.py'
     
     # ssd512
 #    cfg_path = 'config/cfg_ssd512_vgg16_voc.py' 
@@ -149,7 +158,7 @@ if __name__ == '__main__':
 #    cfg_path = 'config/cfg_m2det512_vgg16_mlfpn_voc.py'
     
     # retinanet 
-    cfg_path = 'config/cfg_retinanet_r50_fpn_voc.py'
+#    cfg_path = 'config/cfg_retinanet_r50_fpn_voc.py'
     
     train(cfg_path, VOCDataset)
     

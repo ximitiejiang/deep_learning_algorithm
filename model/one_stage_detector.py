@@ -21,8 +21,6 @@ class OneStageDetector(nn.Module):
     """
     def __init__(self, cfg):
         super(OneStageDetector, self).__init__()
-#        self.backbone = SSDVGG(**cfg.model.backbone)        
-#        self.bbox_head = SSDHead(**cfg.model.bbox_head)
         self.cfg = cfg
         
         self.backbone = build_module(cfg.model.backbone, registered)
