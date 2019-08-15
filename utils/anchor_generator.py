@@ -58,12 +58,12 @@ class AnchorGenerator(object):
         shift_y = torch.arange(0, feat_h, device=device) * stride
         shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
         shifts = torch.stack([shift_xx, shift_yy, shift_xx, shift_yy], dim=-1)
-        shifts = shifts.type_as(base_anchors)
+        shifts = shifts.type_as(base_anchors) # (k, 4)
         # first feat_w elements correspond to the first row of shifts
         # add A anchors (1, A, 4) to K shifts (K, 1, 4) to get
         # shifted anchors (K, A, 4), reshape to (K*A, 4)
 
-        all_anchors = base_anchors[None, :, :] + shifts[:, None, :]
+        all_anchors = base_anchors[None, :, :] + shifts[:, None, :] #(m,4)+(k,4)->(1,m,4)+(k,1,4)->(k,m,4)
         all_anchors = all_anchors.view(-1, 4)
         # first A rows correspond to A anchors of (0, 0) in feature map,
         # then (0, 1), (0, 2), ...

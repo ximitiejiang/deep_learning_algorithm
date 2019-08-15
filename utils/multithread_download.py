@@ -67,5 +67,5 @@ def download_file(url, num_thread = 5):
     print('%s finished download with %f seconds' % (file_name, end-start))
  
 if __name__ == '__main__':
-    url = "https://anaconda.org/conda-forge/opencv/4.1.0/download/linux-64/opencv-4.1.0-py37h79d2e43_0.tar.bz2"
+    url = "http://www.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/semantic_contours/benchmark.tgz"
     download_file(url, num_thread=5)
