@@ -7,24 +7,32 @@ Created on Tue Jun 11 17:54:50 2019
 """
 import pickle
 import numpy as np
-from dataset.base_dataset import BaseDataset
-##########################################
-# Dataset Interface:                     #
-#   self.datas, self.labels              #
-#   self.feat_names, self.label_names    #
-#   self.classes                         #
-#   self.num_classes, self.num_features  #
-##########################################
+from torch.utils.data import Dataset
 
-class Cifar10Dataset(BaseDataset):
+
+class BasePytorchDataset(Dataset):
+    
+    def __init__(self):
+        pass
+    
+    def __getitem__(self, idx):
+        raise NotImplementedError
+
+    def __len__(self):
+        raise NotImplementedError
+    
+
+class Cifar10Dataset(BasePytorchDataset):
     """原版数据集地址http://www.cs.toronto.edu/~kriz/cifar.html
     单张图片为RGB 32x32的小图，总计60,000张，其中50,000张训练集，10,000张测试集
     cifar10: 10个类别，每个类别6000张
     cifar100: 100个类别，每个类别600张
+    该数据集没有索引，所以只能一次性加载到内存
     """
-    def __init__(self, root_path='../dataset/source/cifar10/', data_type='train',
-                 norm=None, label_transform_dict=None, one_hot=None, 
-                 binary=None, shuffle=None):
+    def __init__(self, root_path='../dataset/source/cifar10/', 
+                 data_type='train', img_transform=None, label_transform=None):
+        self.img_transform = img_transform
+        self.label_transform = label_transform
         
         train_path = [root_path + 'data_batch_1',
                       root_path + 'data_batch_2',
@@ -41,11 +49,10 @@ class Cifar10Dataset(BaseDataset):
             raise ValueError('wrong data type, only support train/test.')
         self.meta_path = root_path + 'batches.meta'    
         
-        super().__init__(norm=norm, 
-                         label_transform_dict=label_transform_dict, 
-                         one_hot=one_hot,
-                         binary=binary,
-                         shuffle=shuffle) # 先准备self.path再init中调用get_dataset()
+        dataset = self.get_dataset()
+        self.imgs = dataset['data']
+        self.labels = dataset['target']
+        self.CLASSES = dataset['target_names']
     
     def get_dataset(self):
         datas = []
@@ -72,6 +79,19 @@ class Cifar10Dataset(BaseDataset):
         dataset['target'] = cat_labels
         dataset['target_names'] = label_names
         return dataset
+    
+    def __getitem__(self, idx):
+        img = self.imgs[idx]
+        label = self.labels[idx]
+        if self.img_transform is not None:
+            img = self.img_transform(img)
+        if self.label_transform is not None:
+            label = self.label_transform(label)
+        
+        return img, label
+    
+    def __len__(self):
+        return len(self.imgs)
 
 
 class Cifar100Dataset(Cifar10Dataset):
@@ -95,9 +115,8 @@ class Cifar100Dataset(Cifar10Dataset):
             raise ValueError('wrong data type, only support train/test.')
         self.meta_path = [root_path + 'meta']    
         
-        super().__init__(norm=norm, 
-                         label_transform_dict=label_transform_dict, 
-                         one_hot=one_hot,
-                         binary=binary,
-                         shuffle=shuffle) # 先准备self.path再init中调用get_dataset()
+        dataset = self.get_dataset()
+        self.imgs = dataset['data']
+        self.labels = dataset['target']
+        self.CLASSES = dataset['target_names']
         

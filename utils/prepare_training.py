@@ -114,17 +114,18 @@ def get_model(model_cfg):
             'vgg16' : SSDVGG16,
             'ssdhead' : SSDHead}
     
-    if model_cfg.get('type', None) is None:   # 不包含type，说明是根cfg
-        if model_cfg.get('model', None) is None:  # 既不包含type, 也不包含model，则继续找backbone,必为classifier
-            model_name = model_cfg.backbone.get('type')
-            model_class = models[model_name]
-            params = model_cfg.backbone.params
-            return model_class(**params)
-        else:
-            model_name = model_cfg.model['type']
-            model_class = models[model_name]
-            return model_class(model_cfg)        # 不包含type, 但包含model，必为detector, 传入cfg
-    else:   # 否则就是直接创建model
+    if model_cfg.get('type', None) is None and model_cfg.task=='detector':   # 不包含type的detector
+        model_name = model_cfg.model['type']
+        model_class = models[model_name]
+        return model_class(model_cfg)        # 不包含type的classifier
+
+    elif model_cfg.get('type', None) is None and model_cfg.task=='classifier':         
+        model_name = model_cfg.model.get('type')
+        model_class = models[model_name]
+        params = model_cfg.model.params
+        return model_class(**params)
+            
+    elif model_cfg.get('type', None) is not None:   # 否则就是直接创建model
         model_name = model_cfg['type']
         model_class = models[model_name]
         params = model_cfg.params    

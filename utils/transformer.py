@@ -8,8 +8,10 @@ Created on Mon Jul  8 18:16:38 2019
 import numpy as np
 import cv2
 
+
+# %% 特征相关变换
 def standardize(X):
-    """ 标准化到标准正态分布N(0,1): x-mean / std, 每列特征分别做标准化 
+    """ 特征矩阵标准化到标准正态分布N(0,1): x-mean / std, 每列特征分别做标准化 
     注意：当前standardize跟normalize的说法有混淆的情况，比如batchnorm做的是standardize，但却叫norm
     """
     X_std = X
@@ -22,7 +24,7 @@ def standardize(X):
     return X_std
 
 def normalize(X):
-    """归一化到[0-1]之间：x / 255"""
+    """特征矩阵归一化到[0-1]之间：x / 255"""
     return X / 255
 
 
@@ -61,8 +63,9 @@ def onehot_to_label(one_hot_labels):
     return labels
 
 
+# %% 图像相关变换
 def imresize(img, size, interpolation='bilinear', return_scale=False):
-    """把图片img尺寸变换成指定尺寸
+    """把图片img尺寸变换成指定尺寸，中间会造成宽高比例变化。
     img输入为(h,w,c)这种标准格式
     size输入为(h,w)
     """
@@ -82,6 +85,80 @@ def imresize(img, size, interpolation='bilinear', return_scale=False):
         h_scale = size[0] / h
         w_scale = size[1] / w
         return resized_img, w_scale, h_scale
+
+
+def imnormalize(img, mean, std):
+    """图片的标准化到标准正态分布N(0,1): 每个通道c独立进行标准化操作
+    mean (3,)
+    std (3,)
+    返回img(b, c, h, w)
+    """
+    return (img - mean) / std    # (b,c,h,w)
+
+
+def imdenormalize(img, mean, std):
+    """图片的逆标准化: 每个通道c独立进行操作"""
+    return img * std + mean
+
+
+def bgr2rgb(img):
+    return img[..., [2, 1, 0]]
+
+
+def rgb2bgr(img):
+    return img[..., [2, 1, 0]]
+
+
+def get_dataset_norm_params(dataset):
+    """计算数据集的均值和标准差
+    输入图片需基于chw，rgb格式。
+    实例：参考mmcv中cifar10的数据mean = [0.4914, 0.4822, 0.4465], std = [0.2023, 0.1994, 0.2010]
+    以上是先归一化到[0-1]之后再求得均值和方差，本方法所求结果跟该mmcv在std上稍有差异，待澄清。
+    """
+    all_means = []
+    all_stds = []
+    for img, _ in dataset: # chw, rgb
+        means = np.mean(img, axis=(1,2)).reshape(1,-1)  #(1,3)
+        stds = np.std(img, axis=(1,2)).reshape(1,-1)
+        all_means.append(means)
+        all_stds.append(stds)
+    
+    all_means = np.concatenate(all_means, axis=0)
+    all_stds = np.concatenate(all_stds, axis=0)
+    
+    mean = np.mean(all_means, axis=0)
+    std = np.std(all_stds, axis=0)
+    return mean, std
+    
+    
+# %% 变换类
+class ImgTransform():
+    def __init__(self, mean, std, to_rgb, to_tensor, to_chw, 
+                 scale, flip, keep_ratio):
+        self.mean = mean
+        self.std = std
+        self.to_rgb = to_rgb
+        self.to_tensor = to_tensor
+        self.to_chw = to_chw            # 定义转换到chw
+        self.scale = scale              # 定义缩放比例
+        self.flip = flip                # 定义水平翻转
+        self.keep_ratio = keep_ratio    # 定义保持缩放比例
+        
+    def __call__(self, img):
+        if mean is not None:
+            img = imnormalize()
+            
+        
+        if self.to_chw:
+            img = img.transpose(2, 0, 1) # h,w,c to c,h,w
+    
+
+class BBoxTransform():
+    pass
+
+
+class LabelTransform():
+    pass
 
 
 if __name__ == "__main__":

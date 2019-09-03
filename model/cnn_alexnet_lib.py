@@ -5,7 +5,6 @@ Created on Tue Aug  6 20:35:36 2019
 
 @author: ubuntu
 """
-import torch
 import torch.nn as nn
 
 class AlexNet(nn.Module):

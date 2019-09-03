@@ -10,8 +10,8 @@ log_level = 'INFO'               # 用于定义输出内容：INFO为基础输�
 gpus = 0
 task = 'classifier'              # 用于定义任务类型：classifier, detector
 
-model = dict(
-        type='alexnet8',          # 主模型(model)和子模型(backbone,neck,head)
+model = dict(                    # model是必须要有的参数，用来表示主检测器集成模型或者单分类器模型
+        type='alexnet8',          
         params=dict(
                 n_classes=10))
 
