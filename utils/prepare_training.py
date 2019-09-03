@@ -100,10 +100,10 @@ def get_dataloader(dataset, dataloader_cfg):
         
 
 # %%
-from core.cnn_detector_lib import OneStageDetector
-from core.cnn_alexnet_lib import AlexNet8
-from core.cnn_ssdvgg16_lib import SSDVGG16
-from core.cnn_head_lib import SSDHead
+from model.cnn_detector_lib import OneStageDetector
+from model.cnn_alexnet_lib import AlexNet8
+from model.cnn_ssdvgg16_lib import SSDVGG16
+from model.cnn_head_lib import SSDHead
 
 def get_model(model_cfg):
     """创建模型：如果创建集成模型(detector)，则需要传入根cfg，如果创建单模型，则需要传入该模型cfg_model
@@ -145,10 +145,6 @@ def get_optimizer(optimizer_cfg, model):
     for name, value in model_params.items():
         params.setdefault(name, value)
     return opt_class(**params)
-
-
-
-# %%
 
     
 
