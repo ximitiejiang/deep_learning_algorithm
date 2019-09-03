@@ -6,6 +6,7 @@ Created on Mon Jul  8 18:16:38 2019
 @author: ubuntu
 """
 import numpy as np
+import torch
 import cv2
 
 
@@ -87,6 +88,15 @@ def imresize(img, size, interpolation='bilinear', return_scale=False):
         return resized_img, w_scale, h_scale
 
 
+def imflip(img, flip_type='h'):
+    """图片翻转：h为水平，v为竖直
+    """
+    if flip_type=='h':
+        return np.flip(img, axis=1)  # 水平翻转
+    else:
+        return np.flip(img, axis=0)  # 竖直翻转
+
+
 def imnormalize(img, mean, std):
     """图片的标准化到标准正态分布N(0,1): 每个通道c独立进行标准化操作
     mean (3,)
@@ -134,7 +144,7 @@ def get_dataset_norm_params(dataset):
 # %% 变换类
 class ImgTransform():
     def __init__(self, mean, std, to_rgb, to_tensor, to_chw, 
-                 scale, flip, keep_ratio):
+                 flip, scale, keep_ratio):
         self.mean = mean
         self.std = std
         self.to_rgb = to_rgb
@@ -145,12 +155,23 @@ class ImgTransform():
         self.keep_ratio = keep_ratio    # 定义保持缩放比例
         
     def __call__(self, img):
-        if mean is not None:
-            img = imnormalize()
-            
-        
+        if self.mean is not None:
+            img = imnormalize(img, self.mean, self.std)
+        if self.to_rgb:
+            img = bgr2rgb(img)
+        if self.scale is not None and self.keep_scale:
+            new_size = img.shape * self.scale            # 
+            img = imresize(img, new_size)
+        elif self.scale is not None and not self.keep_scale:
+            # TODO
+            img = imresize(img, )
+        if self.flip:
+            img = imflip(img)
+        if self.to_tensor:
+            img = torch.tensor(img)
         if self.to_chw:
             img = img.transpose(2, 0, 1) # h,w,c to c,h,w
+        return img
     
 
 class BBoxTransform():

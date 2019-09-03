@@ -15,6 +15,17 @@ model = dict(                    # model是必须要有的参数，用来表示�
         params=dict(
                 n_classes=10))
 
+img_transform = dict(
+        mean=[0.49139968 0.48215841 0.44653091], 
+        std=[0.06052839 0.06112497 0.06764512], 
+        to_rgb=False, 
+        to_tensor=True, 
+        to_chw=False, 
+        flip=None, 
+        scale=None, 
+        keep_ratio=None
+        )
+
 dataset = dict(
         type='cifar10',
         repeat=0,
@@ -26,6 +37,7 @@ dataset = dict(
                 one_hot=None, 
                 binary=None, 
                 shuffle=None))
+
 
 imgs_per_core = 4                  # 如果是gpu, 则core代表gpu，否则core代表cpu
 workers_per_core = 2

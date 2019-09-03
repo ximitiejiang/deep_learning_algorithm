@@ -87,7 +87,6 @@ class Cifar10Dataset(BasePytorchDataset):
             img = self.img_transform(img)
         if self.label_transform is not None:
             label = self.label_transform(label)
-        
         return img, label
     
     def __len__(self):
