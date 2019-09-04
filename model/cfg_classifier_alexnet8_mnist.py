@@ -15,40 +15,50 @@ model = dict(                    # model是必须要有的参数，用来表示�
         params=dict(
                 n_classes=10))
 
-img_transform = dict(
-        mean=[0.49139968 0.48215841 0.44653091], 
-        std=[0.06052839 0.06112497 0.06764512], 
-        to_rgb=False, 
-        to_tensor=True, 
-        to_chw=False, 
-        flip=None, 
-        scale=None, 
-        keep_ratio=None
-        )
+transform = dict(
+        img_params=dict(
+                mean=[125.30691805, 122.95039414, 113.86538318],
+                std=[15.4347406, 15.58686813, 17.2495053],
+                to_rgb=True,    # rgb to bgr
+                to_tensor=True, # numpy to tensor 
+                to_chw=True,    # hwc to chw
+                flip=None,
+                scale=None,
+                keep_ratio=None),
+        bbox_params=None)
 
-dataset = dict(
+trainset = dict(
         type='cifar10',
         repeat=0,
         params=dict(
                 root_path='../dataset/source/cifar10/', 
-                data_type='train',
-                norm=None, 
-                label_transform_dict=None, 
-                one_hot=None, 
-                binary=None, 
-                shuffle=None))
+                data_type='train'))
+testset = dict(
+        params=dict(
+                root_path='../dataset/source/cifar10/', 
+                data_type='test'))
 
+imgs_per_core = 2                  # 如果是gpu, 则core代表gpu，否则core代表cpu
+workers_per_core = 1
 
-imgs_per_core = 4                  # 如果是gpu, 则core代表gpu，否则core代表cpu
-workers_per_core = 2
-
-dataloader = dict(
+trainloader = dict(
+        params=dict(
+                shuffle=True,
+                batch_size=gpus * imgs_per_core if gpus>0 else imgs_per_core,
+                num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
+                pin_memory=False,   # 数据送入GPU进行加速(默认False)
+                drop_last=False,
+                collate_fn=None, # 'multi_collate'
+                sampler=None))
+testloader = dict(        
         params=dict(
                 shuffle=False,
                 batch_size=gpus * imgs_per_core if gpus>0 else imgs_per_core,
                 num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
                 pin_memory=False,   # 数据送入GPU进行加速(默认False)
-                drop_last=False))   # 最后一个batch
+                drop_last=False,
+                collate_fn=None, # 'multi_collate'
+                sampler=None))   # 最后一个batch
 # 待增加学习率调整模块
 optimizer = dict(
         type='sgd',

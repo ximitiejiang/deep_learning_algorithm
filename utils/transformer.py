@@ -68,7 +68,7 @@ def onehot_to_label(one_hot_labels):
 def imresize(img, size, interpolation='bilinear', return_scale=False):
     """把图片img尺寸变换成指定尺寸，中间会造成宽高比例变化。
     img输入为(h,w,c)这种标准格式
-    size输入为(h,w)
+    size输入为(w,h), 注意这里图片尺寸是用w,h而不是h,w(计算机内部一般都用h,w，但描述图片尺寸惯例却是用w,h)
     """
     interp_codes = {
     'nearest': cv2.INTER_NEAREST,
@@ -83,10 +83,36 @@ def imresize(img, size, interpolation='bilinear', return_scale=False):
     if not return_scale:
         return resized_img
     else:
-        h_scale = size[0] / h
-        w_scale = size[1] / w
+        h_scale = size[1] / h
+        w_scale = size[0] / w
         return resized_img, w_scale, h_scale
 
+
+def imrescale(img, scales, interpolation='bilinear', return_scale=False):
+    """基于imresize的imrescale，默认的保持比例，用于对图像进行等比例缩放到指定外框的最大尺寸
+    注意：一个习惯差异是，计算机内部一般都用h,w，但描述图片尺寸惯例却是用w,h
+    比如要求的scales=(1333,800)即w不超过1333，h不超过800
+    img: 图片输入格式(h,w,c)
+    scales: 比例输入格式(scale_value)或(w, h)
+    """
+    h, w = img.shape[:2]
+    if isinstance(scales, (float, int)): # 如果输入单个数值
+        scale_factor = scales
+    elif isinstance(scales, tuple): # 如果输入h,w范围
+        max_long_edge = max(scales)
+        max_short_edge = min(scales)
+        long_edge = max(h, w)
+        short_edge = min(h, w)
+        scale_factor = min(max_long_edge / long_edge, max_short_edge / short_edge)
+    
+    new_size = (int(w * scale_factor+0.5), int(h * scale_factor+0.5))  # 注意必须是w,h输入
+    new_img = imresize(img, new_size, interpolation=interpolation)
+    
+    if return_scale:
+        return new_img, scale_factor
+    else:
+        return new_img
+    
 
 def imflip(img, flip_type='h'):
     """图片翻转：h为水平，v为竖直
@@ -99,11 +125,12 @@ def imflip(img, flip_type='h'):
 
 def imnormalize(img, mean, std):
     """图片的标准化到标准正态分布N(0,1): 每个通道c独立进行标准化操作
+    注意：如果是bgr图则mean为(3,)，但如果是gray图则mean为(1,)
     mean (3,)
     std (3,)
-    返回img(b, c, h, w)
+    返回img(h,w,c)
     """
-    return (img - mean) / std    # (b,c,h,w)
+    return (img - mean) / std    # (h,w,3)-(3,)/(3,)=(h,w,3)
 
 
 def imdenormalize(img, mean, std):
@@ -143,6 +170,8 @@ def get_dataset_norm_params(dataset):
     
 # %% 变换类
 class ImgTransform():
+    """常规数据集都是hwc, bgr输出，所以在pytorch中至少需要to_rgb, to_chw, to_tensor
+    """
     def __init__(self, mean, std, to_rgb, to_tensor, to_chw, 
                  flip, scale, keep_ratio):
         self.mean = mean
@@ -155,31 +184,37 @@ class ImgTransform():
         self.keep_ratio = keep_ratio    # 定义保持缩放比例
         
     def __call__(self, img):
+        """img输入：hwc, bgr"""
+        # 默认值
+        scale_factor = 1
+        # 所有变换
         if self.mean is not None:
             img = imnormalize(img, self.mean, self.std)
         if self.to_rgb:
             img = bgr2rgb(img)
-        if self.scale is not None and self.keep_scale:
-            new_size = img.shape * self.scale            # 
-            img = imresize(img, new_size)
-        elif self.scale is not None and not self.keep_scale:
-            # TODO
-            img = imresize(img, )
+        if self.scale is not None and self.keep_scale: # 如果是固定比例缩放
+            img, scale_factor = imrescale(img, self.scale, return_scale=True)
+        elif self.scale is not None and not self.keep_scale: #　如果不固定比例缩放
+            img, w_scale, h_scale = imresize(img, self.scale, return_scale=True)
+            scale_factor = np.array([w_scale, h_scale, w_scale, h_scale], dtype=np.float32) #
         if self.flip:
             img = imflip(img)
-        if self.to_tensor:
-            img = torch.tensor(img)
         if self.to_chw:
             img = img.transpose(2, 0, 1) # h,w,c to c,h,w
-        return img
+        ori_shape = img.shape
+        
+        if self.to_tensor:
+            img = torch.tensor(img)
+        return img, ori_shape, scale_factor
     
 
-class BBoxTransform():
-    pass
+class BboxTransform():
+    """Bbox变换类"""
+    def __init__(self):
+        pass
+    def __call__(self):
+        pass
 
-
-class LabelTransform():
-    pass
 
 
 if __name__ == "__main__":

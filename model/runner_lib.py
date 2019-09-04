@@ -28,8 +28,10 @@ class BatchDetector(BatchProcessor):
 class BatchClassifier(BatchProcessor):
     def __call__(self, model, data, training):
         img, label = data
+        img = img.float()
+        label = label.float()
         # 计算输出
-        y_pred = model(img)
+        y_pred = model(img)  #
         loss = F.cross_entropy(y_pred, label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
         acc1 = accuracy(y_pred, label, topk=1)
         acc5 = accuracy(y_pred, label, topk=5)
@@ -55,6 +57,8 @@ def accuracy(y_pred, label, topk=1):
     label()
     """
     with torch.no_grad():
+        
+        correct = y_pred
         result=[]
         
         
@@ -77,8 +81,10 @@ class Runner():
         #batch处理
         self.batch_processor = get_batch_processor(cfg)
         #创建数据集
-        dataset = get_dataset(cfg.dataset)
-        self.dataloader = get_dataloader(dataset, cfg.dataloader)
+        dataset = get_dataset(cfg.trainset, cfg.transform)
+        img, label = dataset[0]
+        #创建数据加载器
+        self.dataloader = get_dataloader(dataset, cfg.trainloader)
         # 创建模型
         self.model = get_model(cfg)
         # 优化器：必须在model送入cuda之前创建

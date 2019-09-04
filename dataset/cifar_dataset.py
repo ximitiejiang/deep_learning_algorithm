@@ -7,6 +7,7 @@ Created on Tue Jun 11 17:54:50 2019
 """
 import pickle
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 
 
@@ -22,17 +23,19 @@ class BasePytorchDataset(Dataset):
         raise NotImplementedError
     
 
-class Cifar10Dataset(BasePytorchDataset):
+class Cifar10Dataset(Dataset):
     """原版数据集地址http://www.cs.toronto.edu/~kriz/cifar.html
     单张图片为RGB 32x32的小图，总计60,000张，其中50,000张训练集，10,000张测试集
     cifar10: 10个类别，每个类别6000张
     cifar100: 100个类别，每个类别600张
     该数据集没有索引，所以只能一次性加载到内存
+    输出：n,h,w,c (bgr格式), 所有图片源数据都统一用这种格式(包括voc/coco)
     """
     def __init__(self, root_path='../dataset/source/cifar10/', 
-                 data_type='train', img_transform=None, label_transform=None):
+                 data_type='train', img_transform=None, bbox_transform=None):
+        super().__init__()
         self.img_transform = img_transform
-        self.label_transform = label_transform
+        self.bbox_transform = bbox_transform
         
         train_path = [root_path + 'data_batch_1',
                       root_path + 'data_batch_2',
@@ -72,7 +75,7 @@ class Cifar10Dataset(BasePytorchDataset):
         cat_datas = np.concatenate(datas, axis=0)  # (n, 3072)->(50000,3072)
         cat_labels = np.concatenate(labels)        # (n,)->(50000,)
         # 分别提取R/G/B组成(C,H,W):         
-        cat_datas = cat_datas.reshape(-1, 3, 32, 32)  # (b, c, h, w) 其中c为rgb
+        cat_datas = cat_datas.reshape(-1, 3, 32, 32).transpose(0,2,3,1)[...,[2,1,0]]  # (b,c,h,w)->(b,h,w,c), rgb->bgr
         # 按sklearn格式返回数据        
         dataset = {}
         dataset['data'] = cat_datas
@@ -83,10 +86,13 @@ class Cifar10Dataset(BasePytorchDataset):
     def __getitem__(self, idx):
         img = self.imgs[idx]
         label = self.labels[idx]
+        
+        label = torch.tensor(label)
+        
         if self.img_transform is not None:
-            img = self.img_transform(img)
-        if self.label_transform is not None:
-            label = self.label_transform(label)
+            data = self.img_transform(img)  # transform输出data (img, ori_shape, scale_factor)
+        # TODO: 先只试试img返回
+        img, ori_shape, scale = data
         return img, label
     
     def __len__(self):
