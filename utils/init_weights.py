@@ -1,6 +1,21 @@
 import torch.nn as nn
+from utils.checkpoint import load_checkpoint
 
-
+def init_weights(model, pretrained=None):
+    """通用的模型初始化函数"""
+    if isinstance(pretrained, str):
+        load_checkpoint(model, pretrained, strict=False)
+    
+    elif pretrained is None:
+        for m in model.modules():
+            if isinstance(m, nn.Conv2d):
+                kaiming_init(m)
+            elif isinstance(m, nn.BatchNorm2d):
+                constant_init(m, 1)
+            elif isinstance(m, nn.Linear):
+                normal_init(m, std=0.01)
+    else:
+        raise TypeError('pretrained must be a str or None')
 
 def constant_init(module, val, bias=0):
     """用常数初始化："""

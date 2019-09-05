@@ -23,7 +23,7 @@ class BasePytorchDataset(Dataset):
         raise NotImplementedError
     
 
-class Cifar10Dataset(Dataset):
+class Cifar10Dataset(BasePytorchDataset):
     """原版数据集地址http://www.cs.toronto.edu/~kriz/cifar.html
     单张图片为RGB 32x32的小图，总计60,000张，其中50,000张训练集，10,000张测试集
     cifar10: 10个类别，每个类别6000张
@@ -31,10 +31,11 @@ class Cifar10Dataset(Dataset):
     该数据集没有索引，所以只能一次性加载到内存
     输出：n,h,w,c (bgr格式), 所有图片源数据都统一用这种格式(包括voc/coco)
     """
-    def __init__(self, root_path='../dataset/source/cifar10/', 
-                 data_type='train', img_transform=None, bbox_transform=None):
+    def __init__(self, root_path='/home/ubuntu/MyDatasets/cifar-10-batches-py/', 
+                 data_type='train', img_transform=None, label_transform=None, bbox_transform=None):
         super().__init__()
         self.img_transform = img_transform
+        self.label_transform = label_transform
         self.bbox_transform = bbox_transform
         
         train_path = [root_path + 'data_batch_1',
@@ -74,7 +75,7 @@ class Cifar10Dataset(Dataset):
             labels.append(label)
         cat_datas = np.concatenate(datas, axis=0)  # (n, 3072)->(50000,3072)
         cat_labels = np.concatenate(labels)        # (n,)->(50000,)
-        # 分别提取R/G/B组成(C,H,W):         
+        # 分别提取R/G/B组成(C,H,W): 原始顺序参考官网说明         
         cat_datas = cat_datas.reshape(-1, 3, 32, 32).transpose(0,2,3,1)[...,[2,1,0]]  # (b,c,h,w)->(b,h,w,c), rgb->bgr
         # 按sklearn格式返回数据        
         dataset = {}
@@ -87,12 +88,14 @@ class Cifar10Dataset(Dataset):
         img = self.imgs[idx]
         label = self.labels[idx]
         
-        label = torch.tensor(label)
+        if self.label_transform is not None:
+            label = self.label_transform(label)
         
         if self.img_transform is not None:
-            data = self.img_transform(img)  # transform输出data (img, ori_shape, scale_factor)
-        # TODO: 先只试试img返回
-        img, ori_shape, scale = data
+            img = self.img_transform(img)  # transform输出img(img, ori_shape, scale_factor), label
+            # TODO: 先试试只img返回
+            if isinstance(img, tuple):
+                img, ori_shape, scale = img
         return img, label
     
     def __len__(self):

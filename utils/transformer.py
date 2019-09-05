@@ -65,6 +65,7 @@ def onehot_to_label(one_hot_labels):
 
 
 # %% 图像相关变换
+
 def imresize(img, size, interpolation='bilinear', return_scale=False):
     """把图片img尺寸变换成指定尺寸，中间会造成宽高比例变化。
     img输入为(h,w,c)这种标准格式
@@ -148,15 +149,17 @@ def rgb2bgr(img):
 
 def get_dataset_norm_params(dataset):
     """计算数据集的均值和标准差
-    输入图片需基于chw，rgb格式。
+    输入图片需基于hwc，bgr格式。
+    输出: mean, std 也是基于bgr顺序的3个通道的值(3,) (3,)
+        
     实例：参考mmcv中cifar10的数据mean = [0.4914, 0.4822, 0.4465], std = [0.2023, 0.1994, 0.2010]
     以上是先归一化到[0-1]之后再求得均值和方差，本方法所求结果跟该mmcv在std上稍有差异，待澄清。
     """
     all_means = []
     all_stds = []
-    for img, _ in dataset: # chw, rgb
-        means = np.mean(img, axis=(1,2)).reshape(1,-1)  #(1,3)
-        stds = np.std(img, axis=(1,2)).reshape(1,-1)
+    for img, _ in dataset: # hwc, bgr
+        means = np.mean(img, axis=(0,1)).reshape(1,-1)  #(1,3)
+        stds = np.std(img, axis=(0,1)).reshape(1,-1)
         all_means.append(means)
         all_stds.append(stds)
     
@@ -164,7 +167,7 @@ def get_dataset_norm_params(dataset):
     all_stds = np.concatenate(all_stds, axis=0)
     
     mean = np.mean(all_means, axis=0)
-    std = np.std(all_stds, axis=0)
+    std = np.mean(all_stds, axis=0)   # 注意这里是求所有图片的平均std, 而不是std的std
     return mean, std
     
     
@@ -172,8 +175,8 @@ def get_dataset_norm_params(dataset):
 class ImgTransform():
     """常规数据集都是hwc, bgr输出，所以在pytorch中至少需要to_rgb, to_chw, to_tensor
     """
-    def __init__(self, mean, std, to_rgb, to_tensor, to_chw, 
-                 flip, scale, keep_ratio):
+    def __init__(self, mean=None, std=None, to_rgb=None, to_tensor=None, 
+                 to_chw=None, flip=None, scale=None, keep_ratio=None):
         self.mean = mean
         self.std = std
         self.to_rgb = to_rgb
@@ -205,7 +208,25 @@ class ImgTransform():
         
         if self.to_tensor:
             img = torch.tensor(img)
-        return img, ori_shape, scale_factor
+        return (img, ori_shape, scale_factor)
+
+
+class LabelTransform():
+
+    def __init__(self, to_tensor=None, to_onehot=None):
+        self.to_tensor = to_tensor
+        self.to_onehot = to_onehot
+    
+    def __call__(self, label):
+        if self.one_hot:
+            label = np.array(label)
+            label = label_to_onehot(label)
+            
+        if self.to_tensor:
+            label = torch.tensor(label)
+            
+        return label
+
     
 
 class BboxTransform():
@@ -215,6 +236,17 @@ class BboxTransform():
     def __call__(self):
         pass
 
+
+def img_inv_transform(img, mean, std, show=True):
+    """图片逆变换显示"""
+    img = img * std + mean      # denormalize
+    img = img.numpy()           # tensor to numpy
+    img = img.transpose(1,2,0)  # chw to hwc
+    img = img[..., [2,1,0]]     # rgb to bgr
+    if show:
+        cv2.imshow('raw img', img)
+    return img
+        
 
 
 if __name__ == "__main__":

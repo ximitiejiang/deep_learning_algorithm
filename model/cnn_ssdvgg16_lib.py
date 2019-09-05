@@ -8,8 +8,8 @@ Created on Sat Aug 10 22:54:44 2019
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils.handle_checkpoint import load_checkpoint
-from utils.weight_init import kaiming_init, constant_init, normal_init, xavier_init
+from utils.checkpoint import load_checkpoint
+from utils.init_weights import kaiming_init, constant_init, normal_init, xavier_init
 
 # %% 最简版ssd vgg16
 

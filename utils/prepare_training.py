@@ -10,7 +10,8 @@ from addict import Dict
 from importlib import import_module
 import logging
 import torch
-from torch.utils.data import DataLoader
+
+from utils.tools import get_time_str
 
 # %%
 def get_config(config_path="cfg_ssd_voc.py"):
@@ -30,15 +31,26 @@ def get_config(config_path="cfg_ssd_voc.py"):
 
 
 # %%
-def get_logger(log_level=logging.INFO):
+def get_logger(logger_cfg):
     """创建logger"""
     # 先定义format/level
-    format = "%(asctime)s - %(levelname)s - %(message)s"
-    logging.basicConfig(format=format, level=log_level)
+    format = "%(asctime)s - %(levelname)s - %(message)s"  # 用于logger的输出前缀
+    logging.basicConfig(format=format)
     # 再创建logger
     logger = logging.getLogger()
+    logger.setLevel(logger_cfg.log_level) # 必须手动设置一次level,否则logger是默认类型(可通过logger.level查看)
+    log_dir = logger_cfg.get('log_dir', None)
+    if log_dir is not None:
+        filename = '{}.log'.format(get_time_str())
+        log_file = os.path.join(log_dir, filename)
+        # 创建文件句柄
+        file_handler = logging.FileHandler(log_file, 'w')
+        file_handler.setFormatter(
+                logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        file_handler.setLevel(logger_cfg.log_level)
+        # 添加文件句柄
+        logger.addHandler(file_handler)
     return logger
-
 
 
 # %%
@@ -113,7 +125,7 @@ def get_dataloader(dataset, dataloader_cfg):
     """生成pytorch版本的dataloader，在cfg中只提供基础参数，而那些需要自定义函数的则需要另外传入。
     相关参数包括:
     Dataloader(dataset, batch_size, shuffle=False, sampler=None, batch_sampler=None,
-               num_workers=0, collate_fn=None, pin_memory=False, drop_last=False,
+               num_workers=0, collate_fn=default_collate, pin_memory=False, drop_last=False,
                timeout=0, worker_init_fn=None)    
     
     参考：https://www.jianshu.com/p/bb90bff9f6e5
@@ -137,7 +149,7 @@ def get_dataloader(dataset, dataloader_cfg):
     collate_fn_dict = {'multi_collate':multi_collate}
     sampler_fn_dict = {}
     sampler = None
-    collate_fn = None
+    collate_fn = default_collate   # 注意不能让collate_fn的默认参数为None,否则会导致不可调用的报错
     
     params = dataloader_cfg.get('params', None)
     c_name = params.pop('collate_fn')
@@ -148,7 +160,8 @@ def get_dataloader(dataset, dataloader_cfg):
     if s_name is not None:    # 创建自定义sampler
         sampler = sampler_fn_dict[s_name]
     
-    return torch.utils.data.DataLoader(dataset, **params)
+    return torch.utils.data.DataLoader(dataset, **params, 
+                                       sampler=sampler, collate_fn=collate_fn)
         
 
 # %%
@@ -199,22 +212,21 @@ def get_optimizer(optimizer_cfg, model):
         params.setdefault(name, value)
     return opt_class(**params)
 
-    
 
 # %%
-if __name__ == "__main__":
+def get_loss_fn(loss_cfg):
+    loss_fn_dict = {
+            'cross_entropy': torch.nn.CrossEntropyLoss,
+            'smooth_l1': torch.nn.SmoothL1Loss}
     
-    # 验证cfg: 但注意相对路径写法，需要相对于main
-    cfg_path = "../example/cfg_ssd512_vgg16_voc.py"
-    cfg = get_config(cfg_path)
-    
-    # 验证logger
-    logger = get_logger(logging.INFO)
-    logger.debug("debug")
-    logger.info("info")
-    
-    # 验证数据集
-    dataset = get_dataset()
-    
+    loss_name = loss_cfg.get('type')
+    loss_class = loss_fn_dict[loss_name]
+    params = loss_cfg.get('params')
+    if params is not None:
+        return loss_class(**params)
+    else:
+        return loss_class()
+
+
 
 

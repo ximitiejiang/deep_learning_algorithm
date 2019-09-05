@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from utils.module_factory import registry
-from utils.weight_init import xavier_init
+from utils.init_weights import xavier_init
 
 
 @registry.register_module    
