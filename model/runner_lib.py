@@ -39,7 +39,7 @@ class BatchClassifier(BatchProcessor):
         loss = loss_fn(y_pred, label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
         acc1 = accuracy(y_pred, label, topk=1)
         # 更新反向传播
-        loss.backward()                  # 用数值backward()还是用loss_fn来backward()        
+        loss.backward()                  # 用数值loss进行backward()      
         outputs = dict(loss=loss, acc1=acc1)
         return outputs
 
@@ -55,7 +55,7 @@ def get_batch_processor(cfg):
 
 
 class Runner():
-    """创建一个runner类，用于服务pytorch中的模型训练和验证。
+    """创建一个runner类，用于服务pytorch中的模型训练和验证: 支持cpu/单gpu/多gpu并行训练/分布式训练
     Runner类用于操作一个主模型，该主模型可以是单个分类模型，也可以是一个集成检测模型。
     所操作的主模型需要继承自pytorch的nn.module，且包含forward函数进行前向计算。
     如果主模型是一个集成检测模型，则要求该主模型所包含的所有下级模型也要继承
@@ -155,7 +155,7 @@ class Runner():
         for i, data in enumerate(self.dataloader):
             pass
     
-    def preddict(self):
+    def predict(self):
         pass
     
 
@@ -164,9 +164,6 @@ class TFRunner(Runner):
     """用于支持tensorflow的模型训练"""
     pass
     
-class CFRunner(Runner):
-    """用于支持caffe的模型训练"""
-    pass
 
 class MXRunner(Runner):
     """用于支持mxnet的模型训练"""

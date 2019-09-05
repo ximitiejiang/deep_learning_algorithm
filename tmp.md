@@ -80,6 +80,19 @@
     - batch data送入device
 
 
+### 关于如何设置DataLoader
+
+1. 对常规数据集，输出img, label，直接使用pytorch默认DataLoader就可以
+2. 对数据集中需要输出除了img/label之外额外参数的，比如bbox, scale, shape，则需要
+   自定义collate_fn对数据进行堆叠。
+   
+3. pytorch默认的collate_fn设置不是None而是default_collate_fn，所以即使不用collate_fn
+   选项，也不要去把collate_fn设置为None，这会导致collate_fn找不到可用的函数导致错误。
+   (从这个角度说，pytorch的官方英文文档有问题，注明DataLoader的collate_fn默认=None，
+   但实际上collate_fn的默认=default_collate_fn。)
+   
+
+
 ### 关于如何提升精度的tricks
 
 1. 没有BN可以训练，但增加卷积之后激活之前的batchnorm2d()层，以及全连接之后激活之前的batchnorm1d()层，

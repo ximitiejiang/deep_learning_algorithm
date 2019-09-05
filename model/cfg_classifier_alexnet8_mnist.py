@@ -6,11 +6,23 @@ Created on Mon Sep  2 11:30:35 2019
 @author: ubuntu
 """
 
-gpus = 1
-task = 'classifier'              # 用于定义任务类型：classifier, detector
+task = 'classifier'              # 用于定义任务类型：classifier, detector, regressor
+gpus = 1                         
 n_epochs = 5
-imgs_per_core = 32               # 如果是gpu, 则core代表gpu，否则core代表cpu
+imgs_per_core = 32               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
 workers_per_core = 2
+save_checkpoint_interval = 1     # 每多少个epoch保存一次epoch
+work_dir = '/home/ubuntu/mytrain/'
+load_from = None
+resume_from = None
+lr = 0.01
+
+lr_update = dict(
+                policy='step',
+                warmup='linear',
+                warmup_iters=500,
+                warmup_ratio=1.0 / 3,
+                step=[16, 20])
 
 logger = dict(
         log_level='INFO',
@@ -70,7 +82,7 @@ testloader = dict(
 optimizer = dict(
         type='sgd',
         params=dict(
-                lr=0.01, 
+                lr=lr, 
                 momentum=0.9, 
                 weight_decay=5e-4))
 
