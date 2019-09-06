@@ -11,13 +11,36 @@ import torch
 import torchvision
 from torch.utils import model_zoo
 import os
+from collections import OrderedDict
+
+from utils.tools import exist_or_mkdir
+
+def save_checkpoint(path_with_name, model, optimizer, meta):
+    """保存模型：无论之前是什么模型，一律保存成cpu模型，便与统一处理
+    """
+    # 为确保能保存不报错，无论目录是否存在都创建目录并保存。 
+    # 如果是DataParalle model，则去掉外壳module
+    if hasattr(model, 'module'):
+        model = model.module
+    # 保存元数据和模型状态字典
+    checkpoint = {
+        'meta': meta,
+        'state_dict': weights_to_cpu(model.state_dict())}
+    # 保存优化器状态字典
+    checkpoint['optimizer'] = optimizer.state_dict()
+    torch.save(checkpoint, filename)  
+    
+    
+def weights_to_cpu(state_dict):
+    """把模型参数转换成cpu版本
+    """
+    state_dict_cpu = OrderedDict()
+    for key, value in state_dict.items():
+        state_dict_cpu[key] = value.cpu()
+    return state_dict_cpu
 
 
-def save_checkpoint(checkpoint):
-    torch.save(checkpoint)
-
-
-def load_checkpoint(model, filename, map_location=None):
+def load_checkpoint(model, checkpoint_path, map_location=None):
     """加载模型参数：
     inputs
         filename: 可以是torchvision://的形式，则从/.torch/models文件夹加载，如果不存在则从pytorch官网下载
@@ -28,14 +51,14 @@ def load_checkpoint(model, filename, map_location=None):
         checkpoint 也就是OrderedDict类型数据
     """
     # 
-    if filename.startswith("torchvision://"):
+    if checkpoint_path.startswith("torchvision://"):
         model_urls = get_torchvision_models()  # 获得所有模型地址: dict形式
-        model_name = filename[14:]             # 获得模型地址：也就是去除字符"torchvision://"
+        model_name = checkpoint_path[14:]             # 获得模型地址：也就是去除字符"torchvision://"
         checkpoint = model_zoo.load_url(model_urls[model_name])  # 从model_zoo获得模型预训练参数：下载或者本地加载
     else:
-        if not os.path.isfile(filename):
+        if not os.path.isfile(checkpoint_path):
             raise IOError("%s is not a checkpoint file."%filename)
-        checkpoint = torch.load(filename, map_location=map_location)  # 从本地路径加载
+        checkpoint = torch.load(checkpoint_path, map_location=map_location)  # 从本地路径加载
     return checkpoint
 
 

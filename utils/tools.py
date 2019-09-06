@@ -6,6 +6,8 @@ Created on Thu Sep  5 14:43:44 2019
 @author: ubuntu
 """
 import torch
+import os
+import six
 
 def accuracy(y_pred, label, topk=1):
     """pytorch tensor版本的精度计算：由于都是未概率化的数据，
@@ -25,3 +27,19 @@ import time
 def get_time_str():
     """计算系统时间并生成字符串"""
     return time.strftime('%Y%m%d_%H%M%S', time.localtime())
+
+
+def exist_or_mkdir(dir_name, mode=0o777):
+    """检查目录是否存在，如果不存在则创建: 可创建嵌套文件夹
+    """
+    dir_name = os.path.expanduser(dir_name)
+    if six.PY3:
+        os.makedirs(dir_name, mode=mode, exist_ok=True)
+    else:
+        if not os.path.isdir(dir_name):
+            os.makedirs(dir_name, mode=mode)
+            
+            
+if __name__ == "__main__":
+    path = '../MyDatasets/aa'
+    exist_or_mkdir(path)

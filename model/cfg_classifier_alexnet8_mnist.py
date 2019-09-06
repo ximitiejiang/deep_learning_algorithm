@@ -15,7 +15,7 @@ Created on Mon Sep  2 11:30:35 2019
 """
 
 task = 'classifier'              # 用于定义任务类型：classifier, detector, regressor
-gpus = 1
+gpus = 0
 parallel = False
 distribute = False                       
 n_epochs = 5
@@ -30,10 +30,11 @@ lr = 0.01
 lr_processor = dict(
         type='step',
         params = dict(
-                warmup='linear',
+                step=[2, 4],
+                gamma=0.1,
+                warmup_type='linear',
                 warmup_iters=500,
-                warmup_ratio=1.0 / 3,
-                step=[2, 4]))
+                warmup_ratio=1./3))
 
 logger = dict(
                 log_level='INFO',
@@ -64,11 +65,11 @@ trainset = dict(
         type='cifar10',
         repeat=0,
         params=dict(
-                root_path='../dataset/source/cifar-10-batches-py/', 
+                root_path='/home/ubuntu/MyDatasets/cifar-10-batches-py/', 
                 data_type='train'))
 testset = dict(
         params=dict(
-                root_path='../dataset/source/cifar-10-batches-py/', 
+                root_path='/home/ubuntu/MyDatasets/cifar-10-batches-py/', 
                 data_type='test'))
 
 trainloader = dict(

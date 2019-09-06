@@ -184,9 +184,6 @@ def get_model(model_cfg):
         model_name = model_cfg.model['type']
         model_class = models[model_name]
         model = model_class(model_cfg)        # 不包含type的classifier
-        # 在根模型识别是否并行训练
-        if model_cfg.parallel and torch.cuda.device_count() > 1:
-            model = nn.DataParallel(model)
         return model
 
     elif model_cfg.get('type', None) is None and model_cfg.task=='classifier':         
@@ -297,7 +294,7 @@ class LrProcessor():
         current_iter = self.runner.current_iter   # (1->n)
         current_epoch = self.runner.current_epoch # (1->n)
         if current_epoch == 1:
-            warmup_lr_group = self.get_warmup_lr_group()
+            warmup_lr_group = self.get_warmup_lr_group(current_iter)
             if current_iter <= self.warmup_iters:      # 如果没有超过热身次数，则设置为warmup_lr
                 self._set_lr(warmup_lr_group)
             elif current_iter == self.warmup_iters+1:  # 如果初次超过热身次数，则设置学习率为常规学习率
@@ -327,6 +324,7 @@ class StepLrProcessor(LrProcessor):
     大于epoch22则为lr*gamma^2也就是1/100 * lr...因此相当于每个step下降0.1倍。
     """
     def __init__(self, step=None, gamma=0.1, **kwargs):
+        super().__init__(**kwargs)
         self.step = step
         self.gamma = gamma
         
@@ -347,7 +345,8 @@ def get_lr_processor(runner, lr_processor_cfg):
     lr_processor_name = lr_processor_cfg.type
     lr_processor_class = lr_processors[lr_processor_name]
     params = lr_processor_cfg.params
-    return lr_processor_class(runner, **params)
+    params.setdefault('runner', runner)
+    return lr_processor_class(**params)
     
     
         

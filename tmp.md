@@ -80,6 +80,14 @@
     - batch data送入device
 
 
+### 关于pytorch中几种不同类型模型的差异
+
+1. model
+2. model = model.to(device)
+3. model = model.cuda()
+3. model = nn.DataParallel(model)
+
+
 ### 关于如何设置DataLoader
 
 1. 对常规数据集，输出img, label，直接使用pytorch默认DataLoader就可以
