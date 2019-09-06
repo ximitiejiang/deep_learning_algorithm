@@ -8,8 +8,8 @@ Created on Mon Sep  2 16:46:38 2019
 import torch
 
 from utils.prepare_training import get_config, get_logger, get_dataset, get_dataloader 
-from utils.prepare_training import get_model, get_optimizer, get_loss_fn
-from utils.visualization import vis_loss_acc
+from utils.prepare_training import get_model, get_optimizer, get_lr_processor, get_loss_fn
+from utils.visualization import visualization
 from utils.tools import accuracy
     
 
@@ -90,6 +90,8 @@ class Runner():
             self.loss_fn_reg = get_loss_fn(self.cfg.loss_reg)
         # 优化器：必须在model送入cuda之前创建
         self.optimizer = get_optimizer(self.cfg.optimizer, self.model)
+        # 学习率调整器
+        self.lr_processor = get_lr_processor(self, self.cfg.lr_processor)
         # 恢复训练：加载模型参数+训练参数
         if self.cfg.resume_from:
             self.resume_training()
@@ -103,15 +105,32 @@ class Runner():
         else:
             self.logger.info('Training will start in CPU!')
         
+        # 一些共享变量
+        self.base_lr = self.cfg.lr
         self.buffer = {'loss': [],
-                       'acc': []}
-        
+                       'acc': [],
+                       'lr':[]}
+    
+    def current_lr(self):
+        """获取当前学习率: 其中optimizer.param_groups有可能包含多个groups(但在我的应用中只有一个group)
+        也就是为一个单元素list, 取出就是一个dict.
+        即param_groups[0].keys()就包括'params', 'lr', 'momentum','dampening','weight_decay'
+        返回：
+            current_lr(list): [value0, value1,..], 本模型基本都是1个value，除非optimizer初始化传入多组lr
+        """
+        return [group['lr'] for group in self.optimizer.param_groups]  # 取出每个group的lr返回list，大多数情况下，只有一个group
+    
     def train(self):
         """用于模型在训练集上训练"""
         self.model.train() # module的通用方法，可自动把training标志位设置为True
         n_epoch = 1
+        self.lr_processor.set_base_lr_group()  # 设置初始学习率(直接从optimizer读取到：所以save model时必须保存optimizer) 
         while n_epoch <= self.cfg.n_epochs:
+            self.current_epoch = n_epoch   # 1->n
+            self.lr_processor.set_regular_lr_group()  # 设置常规学习率(计算出来并填入optimizer)
             for n_iter, data_batch in enumerate(self.dataloader):
+                self.current_iter = n_iter + 1 # 1->n
+                self.lr_processor.set_warmup_lr_group() # 设置热身学习率(计算出来并填入optimizer)
                 # 前向计算
                 outputs = self.batch_processor(self.model, data_batch, 
                                                self.loss_fn_clf,
@@ -121,18 +140,19 @@ class Runner():
                 self.optimizer.zero_grad()       # 每个batch的梯度清零
                 # 显示text
                 if n_iter%self.cfg.logger.interval == 0:
-                    log_str = 'Epoch [{}][{}/{}]\tloss: {:.4f}\tacc: {:.4f}'.format(
+                    lr_str = ','.join(['{:.4f}'.format(lr) for lr in self.current_lr()]) # 用逗号串联学习率得到一个字符串
+                    log_str = 'Epoch [{}][{}/{}]\tloss: {:.4f}\tacc: {:.4f}\tlr: {}'.format(
                             n_epoch, n_iter, len(self.dataloader),
-                            outputs['loss'], outputs['acc1'])
+                            outputs['loss'], outputs['acc1'], lr_str)
+
                     self.logger.info(log_str)
-#                print(log_str)
                 # 存放结果
                 self.buffer['loss'].append(outputs['loss'])
                 self.buffer['acc'].append(outputs['acc1'])
+                self.buffer['lr'].append(self.current_lr()[0])
             n_epoch += 1
             # 绘图
-        vis_loss_acc(self.buffer, title='train')
-        self.buffer = None
+        visualization(self.buffer, title='train')
                 
     def evaluate(self):
         """用于模型在验证集上验证和评估mAP"""
@@ -145,7 +165,7 @@ class Runner():
                                                training=False)
                 self.buffer['loss'].append(outputs['loss'])
                 self.buffer['acc'].append(outputs['acc1'])
-        vis_loss_acc(self.buffer, title='test')
+        visualization(self.buffer, title='test')
                 
         
     def predict_single(self):

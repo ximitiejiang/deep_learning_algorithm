@@ -5,9 +5,19 @@ Created on Mon Sep  2 11:30:35 2019
 
 @author: ubuntu
 """
+"""--------------------------------------------------------------------------
+基础设置选择
+1.optimizer:
+    - sgd: 
+    - 
+    
+   --------------------------------------------------------------------------
+"""
 
 task = 'classifier'              # 用于定义任务类型：classifier, detector, regressor
-gpus = 1                         
+gpus = 1
+parallel = False
+distribute = False                       
 n_epochs = 5
 imgs_per_core = 32               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
 workers_per_core = 2
@@ -17,17 +27,18 @@ load_from = None
 resume_from = None
 lr = 0.01
 
-lr_update = dict(
-                policy='step',
+lr_processor = dict(
+        type='step',
+        params = dict(
                 warmup='linear',
                 warmup_iters=500,
                 warmup_ratio=1.0 / 3,
-                step=[16, 20])
+                step=[2, 4]))
 
 logger = dict(
-        log_level='INFO',
-        log_dir='./',
-        interval=50)
+                log_level='INFO',
+                log_dir='./',
+                interval=50)
 
 model = dict(                    # model是必须要有的参数，用来表示主检测器集成模型或者单分类器模型
         type='alexnet8',          

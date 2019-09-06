@@ -10,6 +10,7 @@ from addict import Dict
 from importlib import import_module
 import logging
 import torch
+import torch.nn as nn
 
 from utils.tools import get_time_str
 
@@ -182,7 +183,11 @@ def get_model(model_cfg):
     if model_cfg.get('type', None) is None and model_cfg.task=='detector':   # 不包含type的detector
         model_name = model_cfg.model['type']
         model_class = models[model_name]
-        return model_class(model_cfg)        # 不包含type的classifier
+        model = model_class(model_cfg)        # 不包含type的classifier
+        # 在根模型识别是否并行训练
+        if model_cfg.parallel and torch.cuda.device_count() > 1:
+            model = nn.DataParallel(model)
+        return model
 
     elif model_cfg.get('type', None) is None and model_cfg.task=='classifier':         
         model_name = model_cfg.model.get('type')
@@ -199,6 +204,9 @@ def get_model(model_cfg):
 
 # %%       
 def get_optimizer(optimizer_cfg, model):
+    """创建优化器：用于更新所有权重数据，所以需要传入model的所有权重数据
+    
+    """
     optimizers = {
             'sgd' : torch.optim.SGD,
             'adam' : torch.optim.Adam,
@@ -207,10 +215,10 @@ def get_optimizer(optimizer_cfg, model):
     opt_name = optimizer_cfg.get('type')
     opt_class = optimizers[opt_name]
     params = optimizer_cfg['params']
-    model_params = dict(params=model.parameters())
+    model_params = dict(params=model.parameters())  # 获取模型权重
     for name, value in model_params.items():
         params.setdefault(name, value)
-    return opt_class(**params)
+    return opt_class(**params)    # 把模型权重，以及自定义的lr/momentum/weight_decay一起传入optimizer
 
 
 # %%
@@ -222,11 +230,126 @@ def get_loss_fn(loss_cfg):
     loss_name = loss_cfg.get('type')
     loss_class = loss_fn_dict[loss_name]
     params = loss_cfg.get('params')
-    if params is not None:
+    if params is not None:  # 带超参损失函数
         return loss_class(**params)
-    else:
+    else:                    # 不带超参损失函数
         return loss_class()
 
 
 
+# %%
+class LrProcessor():
+    """学习率调整器"""
+    def __init__(self, runner, warmup_type=None, 
+                 warmup_iters=0, warmup_ratio=0.1,
+                 **kwargs):
+        self.runner = runner
+        self.warmup_type = warmup_type
+        self.warmup_iters = warmup_iters  # 热身次数
+        self.warmup_ratio = warmup_ratio
+        # 均以group list的形式表示lr
+        self.base_lr_group = []     # 基础学习率组：可能等于optimizer预定义的不可变学习率，也可能等于resume后的学习率
+        self.regular_lr_group = []  # 常规学习率组: 随着基础学习率而变化
+    
+    def get_warmup_lr_group(self, current_iter):    
+        if self.warmup_type == 'constant': # 相当于用一个固定的小学习率热身
+            warmup_lr_group = [lr * self.warmup_ratio for lr in self.regular_lr_group]
+        if self.warmup_type == 'linear':   # 
+            k = (1 - current_iter / self.warmup_iters) * (1 - self.warmup_ratio)
+            warmup_lr_group = [lr * (1 - k) for lr in self.regular_lr_group]
+        if self.warmup_type == 'exp':
+            k = self.warmup_ratio**(1 - current_iter / self.warmup_iters)
+            warmup_lr_group = [_lr * k for _lr in self.regular_lr_group]
+        return warmup_lr_group
+            
+    def get_regular_lr_group(self):
+        """生成常规学习率组"""
+        regular_lr_group = []
+        for base_lr in self.base_lr_group:
+            regular_lr_group.append(self.get_regular_lr(self.runner, base_lr))   # 子类需要实现对单个学习率计算的函数，到这里汇总成regular_lr group的list形式
+        return regular_lr_group
+        
+    def get_regular_lr(self, runner, base_lr):
+        raise NotImplementedError
+    
+    def _set_lr(self, lr_groups):
+        """唯一的调整学习率的底层函数，其他函数都调用这个函数进行学习率修改
+        lr_groups: 用于填充到optimizer去的自定义学习率组
+        """
+        for group, lr in zip(self.runner.optimizer.param_groups, lr_groups):
+            group['lr'] = lr
+        
+    def set_base_lr_group(self):
+        """第一步：在训练开始或者恢复开始阶段，初始化base_lr_group
+        不能放在模型初始化时做，因为恢复训练模式下不会进行模型初始化，所以要确保在开始前向计算之前操作
+        """
+        self.base_lr_group = [group['lr'] for group in self.runner.optimizer.param_groups]  # 以优化器的参数为准，所以保存模型并恢复模型时，需要连优化器一起保存    
+    
+    def set_regular_lr_group(self):
+        """第二步：在每个epoch开始前，先获得regular_lr_group，并填入optimizer
+        """
+        self.regular_lr_group = self.get_regular_lr_group()
+        self._set_lr(self.regular_lr_group)
+    
+    def set_warmup_lr_group(self):
+        """第三步：在第一个epoch前的部分iters设置warmup_lr_group
+        """
+        current_iter = self.runner.current_iter   # (1->n)
+        current_epoch = self.runner.current_epoch # (1->n)
+        if current_epoch == 1:
+            warmup_lr_group = self.get_warmup_lr_group()
+            if current_iter <= self.warmup_iters:      # 如果没有超过热身次数，则设置为warmup_lr
+                self._set_lr(warmup_lr_group)
+            elif current_iter == self.warmup_iters+1:  # 如果初次超过热身次数，则设置学习率为常规学习率
+                self._set_lr(self.regular_lr_group)
+            elif self.warmup_type is None or current_iter > self.warmup_iters:
+                return
+
+class FixedLrProcessor(LrProcessor):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+    def get_regular_lr(self, runner, base_lr):
+        return base_lr
+
+
+class ListLrProcessor(LrProcessor):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+    def get_regular_lr(self, runner, base_lr):
+        return base_lr
+
+
+class StepLrProcessor(LrProcessor):
+    """学习率阶梯式下降，每一阶段
+    例如：step = [16, 22]，则在小于epoch16时学习率是lr, 而epoch16-epoch22之间学习率是lr*gamma^1也就是1/10 * lr
+    大于epoch22则为lr*gamma^2也就是1/100 * lr...因此相当于每个step下降0.1倍。
+    """
+    def __init__(self, step=None, gamma=0.1, **kwargs):
+        self.step = step
+        self.gamma = gamma
+        
+    def get_regular_lr(self, runner, base_lr):
+        current_epoch = runner.current_epoch
+        exp = len(self.step)  # 初始为n
+        for i, ep in enumerate(self.step):
+            if current_epoch < ep:
+                exp = i
+                break
+        return base_lr * self.gamma**exp
+        
+        
+def get_lr_processor(runner, lr_processor_cfg):
+    lr_processors = {'fix': FixedLrProcessor,
+                    'list': ListLrProcessor,
+                    'step': StepLrProcessor}
+    lr_processor_name = lr_processor_cfg.type
+    lr_processor_class = lr_processors[lr_processor_name]
+    params = lr_processor_cfg.params
+    return lr_processor_class(runner, **params)
+    
+    
+        
+        
 
