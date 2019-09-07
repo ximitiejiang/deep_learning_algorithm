@@ -7,12 +7,13 @@ Created on Mon Sep  2 16:46:38 2019
 """
 import torch
 import torch.nn as nn
+import os
 
 from utils.prepare_training import get_config, get_logger, get_dataset, get_dataloader 
 from utils.prepare_training import get_model, get_optimizer, get_lr_processor, get_loss_fn
 from utils.visualization import visualization
 from utils.tools import accuracy
-from utils.checkpoint import load_checkpoint
+from utils.checkpoint import load_checkpoint, save_checkpoint
     
 
 class BatchProcessor():    
@@ -113,16 +114,28 @@ class Runner():
     
     def check_dir_file(self, cfg):
         """检查目录和文件的合法性，防止运行中段报错导致训练无效"""
+        # 检查文件合法性
         if cfg.get('resume_from', None) is not None:
-            pass
+            file = cfg.resume_from
+            if not os.path.isfile(file):
+                raise FileNotFoundError('resume_from file is not a file.')
         if cfg.get('load_from', None) is not None:
-            pass
+            file = cfg.load_from
+            if not os.path.isfile(file):
+                raise FileNotFoundError('load_from file is not a file.')
+        # 检查路径合法性
         if cfg.get('work_dir', None) is not None:
-            pass
-        if cfg.trainset.params.get('root', None) is not None:
-            pass
-        if cfg.testset.params.get('root', None) is not None:
-            pass
+            dir = cfg.work_dir
+            if not os.path.isdir(dir):
+                raise FileNotFoundError('work_dir is not a dir.')
+        if cfg.trainset.params.get('root_path', None) is not None:
+            dir = cfg.trainset.params.root_path
+            if not os.path.isdir(dir):
+                raise FileNotFoundError('trainset path is not a dir.')
+        if cfg.testset.params.get('root_path', None) is not None:
+            dir = cfg.testset.params.root_path
+            if not os.path.isdir(dir):
+                raise FileNotFoundError('testset path is not a dir.')
     
     def current_lr(self):
         """获取当前学习率: 其中optimizer.param_groups有可能包含多个groups(但在我的应用中只有一个group)
@@ -136,13 +149,13 @@ class Runner():
     def train(self):
         """用于模型在训练集上训练"""
         self.model.train() # module的通用方法，可自动把training标志位设置为True
-        n_epoch = 1
+        n_epoch = 0
         self.lr_processor.set_base_lr_group()  # 设置初始学习率(直接从optimizer读取到：所以save model时必须保存optimizer) 
-        while n_epoch <= self.cfg.n_epochs:
-            self.current_epoch = n_epoch   # 1->n
+        while n_epoch < self.cfg.n_epochs:
+            self.current_epoch = n_epoch   # 0->n-1
             self.lr_processor.set_regular_lr_group()  # 设置常规学习率(计算出来并填入optimizer)
             for n_iter, data_batch in enumerate(self.dataloader):
-                self.current_iter = n_iter + 1 # 1->n
+                self.current_iter = n_iter # 0->n-1
                 self.lr_processor.set_warmup_lr_group() # 设置热身学习率(计算出来并填入optimizer)
                 # 前向计算
                 outputs = self.batch_processor(self.model, data_batch, 
@@ -152,10 +165,10 @@ class Runner():
                 self.optimizer.step()   
                 self.optimizer.zero_grad()       # 每个batch的梯度清零
                 # 显示text
-                if n_iter%self.cfg.logger.interval == 0:
+                if (n_iter+1)%self.cfg.logger.interval == 0:
                     lr_str = ','.join(['{:.4f}'.format(lr) for lr in self.current_lr()]) # 用逗号串联学习率得到一个字符串
                     log_str = 'Epoch [{}][{}/{}]\tloss: {:.4f}\tacc: {:.4f}\tlr: {}'.format(
-                            n_epoch, n_iter, len(self.dataloader),
+                            n_epoch+1, n_iter+1, len(self.dataloader),
                             outputs['loss'], outputs['acc1'], lr_str)
 
                     self.logger.info(log_str)

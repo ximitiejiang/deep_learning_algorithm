@@ -291,9 +291,9 @@ class LrProcessor():
     def set_warmup_lr_group(self):
         """第三步：在第一个epoch前的部分iters设置warmup_lr_group
         """
-        current_iter = self.runner.current_iter   # (1->n)
-        current_epoch = self.runner.current_epoch # (1->n)
-        if current_epoch == 1:
+        current_iter = self.runner.current_iter   # (0->n-1)
+        current_epoch = self.runner.current_epoch # (0->n-1)
+        if current_epoch == 0:
             warmup_lr_group = self.get_warmup_lr_group(current_iter)
             if current_iter <= self.warmup_iters:      # 如果没有超过热身次数，则设置为warmup_lr
                 self._set_lr(warmup_lr_group)

@@ -36,7 +36,7 @@ def weights_to_cpu(state_dict):
     """
     state_dict_cpu = OrderedDict()
     for key, value in state_dict.items():
-        state_dict_cpu[key] = value.cpu()
+        state_dict_cpu[key] = value.cpu()   # value.cpu()即把权值转换为cpu版本
     return state_dict_cpu
 
 
