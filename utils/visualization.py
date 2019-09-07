@@ -11,15 +11,15 @@ import cv2
 
 
 def visualization(buffer_dict, title='train result'):
-    """可视化结果: 至少包含loss, acc中的一项
+    """可视化结果: 至少包含acc(比如验证)
     输入: dict[key, value_list]
             loss(list): [loss1, loss2,..] or [[iter1, loss1], [iter2, loss2], ...]
             acc(list): [acc1, acc2,..] or [[iter1, acc1], [iter2, acc2], ...]
     """
-    losses = buffer_dict['loss']
-    accs = None
+    accs = buffer_dict['acc']
+    losses = None
     lrs = None
-    if buffer_dict.get('acc', None) is not None:
+    if buffer_dict.get('loss', None) is not None:
         accs = buffer_dict['acc']
     if buffer_dict.get('lr', None) is not None:
         lrs = buffer_dict['lr']
@@ -28,31 +28,30 @@ def visualization(buffer_dict, title='train result'):
         prefix = ""
     else:
         prefix = title
-    assert losses is not None and len(losses) != 0, 'can not visualize losses because losses is empty.'
     
-    if isinstance(losses[0], list) or isinstance(losses[0], tuple):  # 如果losses列表里边包含idx
-        x = np.array(losses)[:,0]
-        y_loss = np.array(losses)[:,1]
+    if isinstance(accs[0], list) or isinstance(accs[0], tuple):  # 如果losses列表里边包含idx
+        x = np.array(accs)[:,0]
+        y_acc = np.array(accs)[:,1]
     else:  # 如果losses列表里边不包含idx只是单纯loss数值
-        x = np.arange(len(losses))
-        y_loss = np.array(losses)
+        x = np.arange(len(accs))
+        y_acc = np.array(accs)
     # 绘制loss
     fig = plt.figure()
     ax1 = fig.add_subplot(1,1,1)
-    ax1.set_title(prefix + ' losses')
-    ax1.set_ylabel('loss')
-    lines = ax1.plot(x,y_loss, 'r', label='loss')
-    # 绘制acc
-    if accs is not None and len(accs) > 0:
-        if isinstance(accs[0], list) or isinstance(accs[0], tuple):
-            x = np.array(accs)[:,0]
-            y_acc = np.array(accs)[:,1]
+    ax1.set_title(prefix + ' accs')
+    ax1.set_ylabel('acc')
+    lines = ax1.plot(x,y_acc, 'r', label='acc')
+    # 绘制loss
+    if losses is not None and len(losses) > 0:
+        if isinstance(losses[0], list) or isinstance(losses[0], tuple):
+            x = np.array(losses)[:,0]
+            y_loss = np.array(losses)[:,1]
         else:
-            x = np.arange(len(accs))
-            y_acc = np.array(accs)
+            x = np.arange(len(losses))
+            y_loss = np.array(losses)
         ax2 = ax1.twinx()
-        ax2.set_ylabel('acc')
-        l2 = ax2.plot(x, y_acc, 'g', label='acc')
+        ax2.set_ylabel('loss')
+        l2 = ax2.plot(x, y_loss, 'g', label='loss')
         lines += l2
         
     # 提取合并的legend

@@ -173,7 +173,8 @@ def get_dataset_norm_params(dataset):
     
 # %% 变换类
 class ImgTransform():
-    """常规数据集都是hwc, bgr输出，所以在pytorch中至少需要to_rgb, to_chw, to_tensor
+    """常规数据集都是hwc, bgr输出，但pytorch操作是在chw,rgb条件下进行。
+    所以在pytorch中至少需要to_rgb, to_chw, to_tensor
     """
     def __init__(self, mean=None, std=None, to_rgb=None, to_tensor=None, 
                  to_chw=None, flip=None, scale=None, keep_ratio=None):
@@ -187,7 +188,9 @@ class ImgTransform():
         self.keep_ratio = keep_ratio    # 定义保持缩放比例
         
     def __call__(self, img):
-        """img输入：hwc, bgr"""
+        """img输入：hwc, bgr
+           img输出：chw, rgb, tensor
+        """
         # 默认值
         scale_factor = 1
         # 所有变换

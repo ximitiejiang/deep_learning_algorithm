@@ -8,10 +8,12 @@ Created on Tue Sep  3 21:29:33 2019
 from model.runner_lib import Runner
 
 
+
 def main():
     runner = Runner(cfg_path = '../model/cfg_classifier_alexnet8_mnist.py')
-    runner.train()
-    #runner.evaluation()
+#    runner.train()
+    runner.evaluate()
+    
     
 if __name__ == "__main__":
     main()

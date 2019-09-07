@@ -18,7 +18,9 @@ from utils.tools import exist_or_mkdir
 def save_checkpoint(path_with_name, model, optimizer, meta):
     """保存模型：无论之前是什么模型，一律保存成cpu模型，便与统一处理
     """
-    # 为确保能保存不报错，无论目录是否存在都创建目录并保存。 
+    # 为确保能保存不报错，无论目录是否存在都创建目录并保存。
+    dirname = os.path.dirname(path_with_name)
+    exist_or_mkdir(dirname)
     # 如果是DataParalle model，则去掉外壳module
     if hasattr(model, 'module'):
         model = model.module
@@ -28,7 +30,7 @@ def save_checkpoint(path_with_name, model, optimizer, meta):
         'state_dict': weights_to_cpu(model.state_dict())}
     # 保存优化器状态字典
     checkpoint['optimizer'] = optimizer.state_dict()
-    torch.save(checkpoint, filename)  
+    torch.save(checkpoint, path_with_name)  
     
     
 def weights_to_cpu(state_dict):
@@ -50,14 +52,15 @@ def load_checkpoint(model, checkpoint_path, map_location=None):
     return:
         checkpoint 也就是OrderedDict类型数据
     """
-    # 
+    # 从在线获取pytorch的模型参数：如果已经下载则从本地.torch文件夹直接加载
     if checkpoint_path.startswith("torchvision://"):
         model_urls = get_torchvision_models()  # 获得所有模型地址: dict形式
         model_name = checkpoint_path[14:]             # 获得模型地址：也就是去除字符"torchvision://"
         checkpoint = model_zoo.load_url(model_urls[model_name])  # 从model_zoo获得模型预训练参数：下载或者本地加载
-    else:
+    # 从本地获取模型参数
+    else: 
         if not os.path.isfile(checkpoint_path):
-            raise IOError("%s is not a checkpoint file."%filename)
+            raise IOError("%s is not a checkpoint file."%checkpoint_path)
         checkpoint = torch.load(checkpoint_path, map_location=map_location)  # 从本地路径加载
     return checkpoint
 

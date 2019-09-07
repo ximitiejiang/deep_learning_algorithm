@@ -11,6 +11,7 @@ from importlib import import_module
 import logging
 import torch
 import torch.nn as nn
+import copy
 
 from utils.tools import get_time_str
 
@@ -245,8 +246,8 @@ class LrProcessor():
         self.warmup_iters = warmup_iters  # 热身次数
         self.warmup_ratio = warmup_ratio
         # 均以group list的形式表示lr
-        self.base_lr_group = []     # 基础学习率组：可能等于optimizer预定义的不可变学习率，也可能等于resume后的学习率
-        self.regular_lr_group = []  # 常规学习率组: 随着基础学习率而变化
+        self.base_lr_group = []     # 基础学习率组(不变)：可能等于optimizer预定义的不可变学习率，也可能等于resume后的学习率
+        self.regular_lr_group = []  # 常规学习率组(动态): 每种LrProcessor都会动态调整的部分
     
     def get_warmup_lr_group(self, current_iter):    
         if self.warmup_type == 'constant': # 相当于用一个固定的小学习率热身
@@ -291,13 +292,13 @@ class LrProcessor():
     def set_warmup_lr_group(self):
         """第三步：在第一个epoch前的部分iters设置warmup_lr_group
         """
-        current_iter = self.runner.current_iter   # (0->n-1)
-        current_epoch = self.runner.current_epoch # (0->n-1)
+        current_iter = self.runner.c_iter   # 代表从0开始
+        current_epoch = self.runner.c_epoch # 代表从0开始
         if current_epoch == 0:
             warmup_lr_group = self.get_warmup_lr_group(current_iter)
-            if current_iter <= self.warmup_iters:      # 如果没有超过热身次数，则设置为warmup_lr
+            if current_iter < self.warmup_iters:      # 如果没有超过热身次数，则设置为warmup_lr
                 self._set_lr(warmup_lr_group)
-            elif current_iter == self.warmup_iters+1:  # 如果初次超过热身次数，则设置学习率为常规学习率
+            elif current_iter == self.warmup_iters:   # 如果初次超过热身次数，则设置学习率为常规学习率
                 self._set_lr(self.regular_lr_group)
             elif self.warmup_type is None or current_iter > self.warmup_iters:
                 return
@@ -311,17 +312,31 @@ class FixedLrProcessor(LrProcessor):
 
 
 class ListLrProcessor(LrProcessor):
-    def __init__(self, **kwargs):
+    """学习率按列表阶梯下降，每个阶梯下降的lr查表得到(此时跟base_lr无关了)
+    例如：step=[2,4], lr=[0.005, 0.0001], 则在第2个epoch调整lr到0.005，第4个epoch调整到0.0001
+    """
+    def __init__(self, step=None, lr=None, **kwargs):
         super().__init__(**kwargs)
+        self.step = step
+        self.lr = lr
+        self.lr_internal = copy.copy(lr)  # 深拷贝
         
     def get_regular_lr(self, runner, base_lr):
-        return base_lr
+        if len(self.lr_internal) == len(self.lr):
+            self.lr_internal.insert(0, base_lr)
+        current_epoch = runner.c_epoch
+        for i, ep in enumerate(self.step):
+            if current_epoch + 1 < ep:  # 加1表示epoch个数
+                pos = i  # 小于只要找到最小的，也就是第一个
+                break
+            if current_epoch + 1 >= ep:
+                pos = i + 1  # 大于需要找到最大的，也就是最后一个
+        return self.lr_internal[pos]
 
 
 class StepLrProcessor(LrProcessor):
-    """学习率阶梯式下降，每一阶段
-    例如：step = [16, 22]，则在小于epoch16时学习率是lr, 而epoch16-epoch22之间学习率是lr*gamma^1也就是1/10 * lr
-    大于epoch22则为lr*gamma^2也就是1/100 * lr...因此相当于每个step下降0.1倍。
+    """学习率阶梯式下降，每一阶段固定下降1/10
+    例如：step = [2, 4]，则在第2个epoch调整lr到0.1*lr, 第4个epoch调整学习率到0.01*lr
     """
     def __init__(self, step=None, gamma=0.1, **kwargs):
         super().__init__(**kwargs)
@@ -329,10 +344,10 @@ class StepLrProcessor(LrProcessor):
         self.gamma = gamma
         
     def get_regular_lr(self, runner, base_lr):
-        current_epoch = runner.current_epoch
+        current_epoch = runner.c_epoch  # 代表从0开始  
         exp = len(self.step)  # 初始为n
         for i, ep in enumerate(self.step):
-            if current_epoch < ep:
+            if current_epoch + 1 < ep:  # 这里加1表示epoch个数
                 exp = i
                 break
         return base_lr * self.gamma**exp

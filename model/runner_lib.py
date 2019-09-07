@@ -8,6 +8,7 @@ Created on Mon Sep  2 16:46:38 2019
 import torch
 import torch.nn as nn
 import os
+import time
 
 from utils.prepare_training import get_config, get_logger, get_dataset, get_dataloader 
 from utils.prepare_training import get_model, get_optimizer, get_lr_processor, get_loss_fn
@@ -22,7 +23,7 @@ class BatchProcessor():
 
 
 class BatchDetector(BatchProcessor):    
-    def __call__(self, model, data, training):
+    def __call__(self, model, data):
         losses = model(**data)  # 调用nn.module的__call__()函数，等效于调用forward()函数
         loss = losses.mean()
         outputs = dict(loss=loss)
@@ -30,20 +31,22 @@ class BatchDetector(BatchProcessor):
 
 
 class BatchClassifier(BatchProcessor):
-    def __call__(self, model, data, loss_fn, device, training):
+    def __call__(self, model, data, loss_fn, device, return_loss=True):
         img, label = data
         # 输入img要修改为float()格式float32，否则跟weight不匹配报错
         # 输入label要修改为long()格式int64，否则跟交叉熵公式不匹配报错
         img = img.float().to(device)
         label = label.long().to(device)
-        # 计算输出
+        # 前向计算
         y_pred = model(img)
-        # 计算损失(!!!注意，一定要得到标量loss)
-        loss = loss_fn(y_pred, label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
         acc1 = accuracy(y_pred, label, topk=1)
-        # 更新反向传播
-        loss.backward()                  # 用数值loss进行backward()      
-        outputs = dict(loss=loss, acc1=acc1)
+        outputs = dict(acc1=acc1)
+        # 反向传播
+        if return_loss:
+            # 计算损失(!!!注意，一定要得到标量loss)
+            loss = loss_fn(y_pred, label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
+            loss.backward()  # 更新反向传播, 用数值loss进行backward()      
+            outputs.update(loss=loss)
         return outputs
 
 
@@ -65,27 +68,34 @@ class Runner():
     自nn.module且包含forward函数。
     """
     def __init__(self, cfg_path,):
+        # 共享变量: 需要声明在resume/load之前，否则会把resume的东西覆盖
+        self.c_epoch = 0
+        self.c_iter = 0
+        self.buffer = {'loss': [],
+                       'acc': [],
+                       'lr':[]}
         # 获得配置
         self.cfg = get_config(cfg_path)
         # 检查文件夹和文件是否合法
         self.check_dir_file(self.cfg)
-        #设置设备
-        if self.cfg.gpus > 0 and torch.cuda.is_available():
-            self.device = torch.device("cuda:0")
-            self.logger.info('Training will start in GPU!')
-        if self.cfg.gpus == 0:
-            self.device = torch.device("cpu")
-            self.logger.info('Training will start in CPU!')
         #设置logger
         self.logger = get_logger(self.cfg.logger)
         self.logger.info('start logging info.')
+        #设置设备
+        if self.cfg.gpus > 0 and torch.cuda.is_available():
+            self.device = torch.device("cuda")   # 设置设备GPU: "cuda"和"cuda:0"的区别？
+            self.logger.info('Operation will start in GPU!')
+        if self.cfg.gpus == 0:
+            self.device = torch.device("cpu")      # 设置设备CPU
+            self.logger.info('Operation will start in CPU!')
         #创建batch处理器
         self.batch_processor = get_batch_processor(self.cfg)
         #创建数据集
         trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
-#        testset = get_dataset(self.cfg.testset, self.cfg.transform)
+        valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
         #创建数据加载器
         self.dataloader = get_dataloader(trainset, self.cfg.trainloader)
+        self.valloader = get_dataloader(valset, self.cfg.valloader)
         # 创建模型并初始化
         self.model = get_model(self.cfg)
         # 创建损失函数
@@ -96,22 +106,23 @@ class Runner():
         self.optimizer = get_optimizer(self.cfg.optimizer, self.model)
         # 学习率调整器
         self.lr_processor = get_lr_processor(self, self.cfg.lr_processor)
-        # 恢复训练：加载模型参数+训练参数
-        if self.cfg.resume_from:
-            self.resume_training()
-        # 加载参数：只加载模型参数
-        elif self.cfg.load_from:
-            self.load_checkpoint()
         # 送入GPU
-        # TODO: 包装并行模型是在optimizer提取参数之前还是之后？
+        # 包装并行模型是在optimizer提取参数之后，否则可能导致无法提取，因为并行模型在model之下加了一层module壳
         if self.cfg.parallel and torch.cuda.device_count() > 1:
             self.model = nn.DataParallel(self.model)
-        self.model.to(self.device)        
-        # 共享变量
-        self.buffer = {'loss': [],
-                       'acc': [],
-                       'lr':[]}
-    
+        self.model.to(self.device)
+        # 注意：恢复或加载是直接加载到目标设备，所以必须在模型传入设备之后进行，确保设备匹配
+        # 加载参数，从之前断开的位置继续训练
+        if self.cfg.resume_from:
+            self.resume_training(checkpoint_path=self.cfg.resume_from, 
+                                 map_location=self.device)  # 沿用设置的device
+        # 加载参数，一般用来做预测
+        elif self.cfg.load_from:
+            load_device = torch.device(self.cfg.load_device)
+            self._load_checkpoint(checkpoint_path=self.cfg.load_from, 
+                                  map_location=load_device)
+            self.weight_loaded = True
+      
     def check_dir_file(self, cfg):
         """检查目录和文件的合法性，防止运行中段报错导致训练无效"""
         # 检查文件合法性
@@ -149,26 +160,25 @@ class Runner():
     def train(self):
         """用于模型在训练集上训练"""
         self.model.train() # module的通用方法，可自动把training标志位设置为True
-        n_epoch = 0
         self.lr_processor.set_base_lr_group()  # 设置初始学习率(直接从optimizer读取到：所以save model时必须保存optimizer) 
-        while n_epoch < self.cfg.n_epochs:
-            self.current_epoch = n_epoch   # 0->n-1
+        start = time.time()
+        while self.c_epoch < self.cfg.n_epochs:
             self.lr_processor.set_regular_lr_group()  # 设置常规学习率(计算出来并填入optimizer)
-            for n_iter, data_batch in enumerate(self.dataloader):
-                self.current_iter = n_iter # 0->n-1
+            for self.c_iter, data_batch in enumerate(self.dataloader):
                 self.lr_processor.set_warmup_lr_group() # 设置热身学习率(计算出来并填入optimizer)
                 # 前向计算
                 outputs = self.batch_processor(self.model, data_batch, 
                                                self.loss_fn_clf,
-                                               self.device, training=True)
+                                               self.device,
+                                               return_loss=True)
                 # 反向传播
                 self.optimizer.step()   
                 self.optimizer.zero_grad()       # 每个batch的梯度清零
                 # 显示text
-                if (n_iter+1)%self.cfg.logger.interval == 0:
+                if (self.c_iter+1)%self.cfg.logger.interval == 0:
                     lr_str = ','.join(['{:.4f}'.format(lr) for lr in self.current_lr()]) # 用逗号串联学习率得到一个字符串
                     log_str = 'Epoch [{}][{}/{}]\tloss: {:.4f}\tacc: {:.4f}\tlr: {}'.format(
-                            n_epoch+1, n_iter+1, len(self.dataloader),
+                            self.c_epoch+1, self.c_iter+1, len(self.dataloader),
                             outputs['loss'], outputs['acc1'], lr_str)
 
                     self.logger.info(log_str)
@@ -176,46 +186,64 @@ class Runner():
                 self.buffer['loss'].append(outputs['loss'])
                 self.buffer['acc'].append(outputs['acc1'])
                 self.buffer['lr'].append(self.current_lr()[0])
-            n_epoch += 1
-            # 绘图
+            # 保存模型
+            if self.c_epoch%self.cfg.save_checkpoint_interval == 0:
+                self.save_training(self.cfg.work_dir)            
+            self.c_epoch += 1
+        times = time.time() - start
+        self.logger.info('training finished with times(s): {}'.format(times))
+        # 绘图
         visualization(self.buffer, title='train')
     
+    
+    def evaluate(self):
+        """用于模型在验证集上验证和acc评估: 
+        需要在cfg中设置load_from，也就是model先加载训练好的参数文件。
+        """
+        if self.weight_loaded:
+            self.model.eval()   # 关闭对batchnorm/dropout的影响，不再需要手动传入training标志
+            for c_iter, data_batch in enumerate(self.valloader):
+                with torch.no_grad():  # 停止反向传播，只进行前向计算
+                    outputs = self.batch_processor(self.model, data_batch, 
+                                                   self.loss_fn_clf,
+                                                   self.device,
+                                                   return_loss=False)
+                    self.buffer['acc'].append(outputs['acc1'])
+            visualization(self.buffer, title='val')
+        else:
+            raise ValueError('no model weights loaded.')
+    
+    
     def save_training(self, out_dir):
-        meta = dict(current_epoch = self.current_epoch,
-                    current_iter = self.current_iter)
-        filename = '{}'
-        
-        save_checkpoint(filename, self.model, self.optimizer, meta)
+        meta = dict(c_epoch = self.c_epoch,
+                    c_iter = self.c_iter)
+        filename = out_dir + 'epoch_{}.pth'.format(self.c_epoch + 1)
+        optimizer = self.optimizer
+        save_checkpoint(filename, self.model, optimizer, meta)
         
     
     def resume_training(self, checkpoint_path, map_location='default'):
         # 先加载checkpoint文件
         if map_location == 'default':
-            device_id = torch.cuda.current_device()
+            device_id = torch.cuda.current_device()  # 获取当前设备
             checkpoint = load_checkpoint(self.model, 
                                          checkpoint_path, 
                                          map_location=lambda storage, loc: storage.cuda(device_id))
         else:
             checkpoint = load_checkpoint(self.model,
-                                         checkpoint, 
+                                         checkpoint_path, 
                                          map_location=map_location)
         #再恢复训练数据
-        
-        
-            
-    def evaluate(self):
-        """用于模型在验证集上验证和评估mAP"""
-        self.model.eval() #
-        for i, data_batch in enumerate(self.val_dataloader):
-            with torch.no_grad():
-                outputs = self.batch_processor(self.model, data_batch, 
-                                               self.loss_fn_clf,
-                                               self.device,
-                                               training=False)
-                self.buffer['loss'].append(outputs['loss'])
-                self.buffer['acc'].append(outputs['acc1'])
-        visualization(self.buffer, title='test')
-                
+        self.c_epoch = checkpoint['meta']['c_epoch'] + 1  # 注意：保存的是上一次运行的epoch，所以恢复要从下一次开始
+        self.c_iter = checkpoint['meta']['c_iter'] + 1
+        self.optimizer.load_state_dict(checkpoint['optimizer'])
+        self.logger.info('resumed epoch %d, iter %d', self.c_epoch, self.c_iter)
+    
+    
+    def _load_checkpoint(self, checkpoint_path, map_location):
+        self.logger.info('load checkpoint from %s'%checkpoint_path)
+        return load_checkpoint(self.model, checkpoint_path, map_location)
+
         
     def predict_single(self):
         """用于模型
