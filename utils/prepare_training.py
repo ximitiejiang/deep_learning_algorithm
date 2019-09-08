@@ -115,16 +115,13 @@ def get_dataset(dataset_cfg, transform_cfg, divide_ratio=None):
 # %%
 from torch.utils.data.dataloader import default_collate
 def multi_collate(batch):
-    """自定义一个多数据分别堆叠的collate函数：
+    """自定义一个多数据分别堆叠的collate函数：此时要求数据集输出为[img,label, scale,..]
     参考：https://www.jianshu.com/p/bb90bff9f6e5
-    原有的collate_fn可以对输入的多种数据进行堆叠，堆叠行为是stack模式，
-    输入[dataset[i] for i in batch_indices], 也就是所有batch data打包的list.
-    也就是img(3,32,32)->(64,3,32,32), label(1)->[64], shape(3)
-    堆叠方式也比较简单粗暴，就是增加一个维度比如64个(3,32,32)变成(64,3,32,32),
-    如果需要传入其他数据比如bbox, scale，则需要自定义collate_fn
-    
-    输入：batch为list，是DataLoader提供了通过getitem获得的每个batch数据，list长度就是batch size.
-    输出：batch也为list，但每个变量都是堆叠好的。
+    原有default_collate在处理多种不同类型数据时，输出有时不是所需形式。通过自定义
+    multi_collate函数，可实现tensor/numpy/inf/float各种结构的堆叠，生成符合batch_data需求的数据。
+    数据集输出：list
+    输入：batch为list(list)，来自dataloader，[[img1,label1...],[img2,label2,...],[img3,label3,...]]
+    输出：result为list，每个变量都是堆叠好的，[img, label, scale]
     """
     result = []
     for sample in zip(*batch):  # 参考pytorch源码写法：数据先分组提取
@@ -141,8 +138,10 @@ def multi_collate(batch):
     
 
 def dict_collate(batch):
-    """自定义字典堆叠式collate
-    输入：batch(list), {'img':img, 'label', label, 'scale':scale}
+    """自定义字典堆叠式collate，此时要求数据集输出为一个dict。
+    数据集输出：dict
+    输入：batch为list(dict), 每个元素为一个dict, [{'img':img, 'label', label, 'scale':scale}, {..}, {..}]
+    输出：result为dict, 每个value都是堆叠好的 {'img':img, 'label':label, 'scale':scale,...}
     """
     result = {}
     data = batch[0].values()

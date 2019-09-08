@@ -15,7 +15,7 @@ Created on Mon Sep  2 11:30:35 2019
 """
 
 task = 'classifier'              # 用于定义任务类型：classifier, detector, regressor
-gpus = 1
+gpus = 0
 parallel = False
 distribute = False                       
 n_epochs = 5
@@ -97,7 +97,7 @@ trainloader = dict(
                 num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
                 pin_memory=False,   # 数据送入GPU进行加速(默认False)
                 drop_last=False,
-                collate_fn='multi_collate',    # 'multi_collate'
+                collate_fn='dict_collate',    # 'default_collate','multi_collate', 'dict_collate'
                 sampler=None))
 valloader = dict(        
         params=dict(
@@ -106,7 +106,7 @@ valloader = dict(
                 num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
                 pin_memory=False,   # 数据送入GPU进行加速(默认False)
                 drop_last=False,
-                collate_fn=None, # 'multi_collate'
+                collate_fn='dict_collate',    # 'default_collate','multi_collate', 'dict_collate'
                 sampler=None))   # 最后一个batch
 # 待增加学习率调整模块
 optimizer = dict(
