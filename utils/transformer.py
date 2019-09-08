@@ -221,7 +221,7 @@ class LabelTransform():
         self.to_onehot = to_onehot
     
     def __call__(self, label):
-        if self.one_hot:
+        if self.to_onehot:
             label = np.array(label)
             label = label_to_onehot(label)
             

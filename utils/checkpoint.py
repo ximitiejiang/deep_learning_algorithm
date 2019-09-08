@@ -62,6 +62,15 @@ def load_checkpoint(model, checkpoint_path, map_location=None):
         if not os.path.isfile(checkpoint_path):
             raise IOError("%s is not a checkpoint file."%checkpoint_path)
         checkpoint = torch.load(checkpoint_path, map_location=map_location)  # 从本地路径加载
+    # 获取state_dict
+    state_dict = checkpoint['state_dict']
+    if list(state_dict.keys())[0].startswith('module'):  # 如果是并行模型则去掉参数前面的module字段
+        state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
+    # 加载参数到模型
+    if hasattr(model, 'module'): # 如果是并行模型
+        model.module.load_state_dict(state_dict, strict=False)
+    else:   # 如果是常规模型
+        model.load_state_dict(state_dict, strict=False)
     return checkpoint
 
 

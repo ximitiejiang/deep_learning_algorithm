@@ -17,7 +17,9 @@ from utils.tools import accuracy
 from utils.checkpoint import load_checkpoint, save_checkpoint
     
 
-class BatchProcessor():    
+class BatchProcessor(): 
+    """batchProcessor独立出来，是为了让Runner更具有通用性
+    """
     def __call__(self):
         raise NotImplementedError('BatchProcessor class is not callable.')
 
@@ -32,7 +34,8 @@ class BatchDetector(BatchProcessor):
 
 class BatchClassifier(BatchProcessor):
     def __call__(self, model, data, loss_fn, device, return_loss=True):
-        img, label = data
+        img_data, label, *_ = data
+        img, *_ = img_data
         # 输入img要修改为float()格式float32，否则跟weight不匹配报错
         # 输入label要修改为long()格式int64，否则跟交叉熵公式不匹配报错
         img = img.float().to(device)
@@ -71,6 +74,7 @@ class Runner():
         # 共享变量: 需要声明在resume/load之前，否则会把resume的东西覆盖
         self.c_epoch = 0
         self.c_iter = 0
+        self.weight_ready = False
         self.buffer = {'loss': [],
                        'acc': [],
                        'lr':[]}
@@ -91,11 +95,16 @@ class Runner():
         #创建batch处理器
         self.batch_processor = get_batch_processor(self.cfg)
         #创建数据集
-        trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
-        valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
+        self.trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
+        self.valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
+        
+#        data = self.trainset[0]
+        
         #创建数据加载器
-        self.dataloader = get_dataloader(trainset, self.cfg.trainloader)
-        self.valloader = get_dataloader(valset, self.cfg.valloader)
+        self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)
+        self.valloader = get_dataloader(self.valset, self.cfg.valloader)
+        
+#        batch = next(iter(self.dataloader))
         # 创建模型并初始化
         self.model = get_model(self.cfg)
         # 创建损失函数
@@ -121,7 +130,7 @@ class Runner():
             load_device = torch.device(self.cfg.load_device)
             self._load_checkpoint(checkpoint_path=self.cfg.load_from, 
                                   map_location=load_device)
-            self.weight_loaded = True
+            self.weight_ready = True
       
     def check_dir_file(self, cfg):
         """检查目录和文件的合法性，防止运行中段报错导致训练无效"""
@@ -194,13 +203,16 @@ class Runner():
         self.logger.info('training finished with times(s): {}'.format(times))
         # 绘图
         visualization(self.buffer, title='train')
+        self.weight_ready= True
     
     
     def evaluate(self):
-        """用于模型在验证集上验证和acc评估: 
-        需要在cfg中设置load_from，也就是model先加载训练好的参数文件。
+        """针对数据集的预测：用于模型在验证集上验证和acc评估: 
+        注意：需要训练完成后，或在cfg中设置load_from，也就是model先加载训练好的参数文件。
         """
-        if self.weight_loaded:
+        self.buffer = {'acc': []}  # 重新初始化buffer
+        self.n_correct = 0    # 用于计算全局acc
+        if self.weight_ready:
             self.model.eval()   # 关闭对batchnorm/dropout的影响，不再需要手动传入training标志
             for c_iter, data_batch in enumerate(self.valloader):
                 with torch.no_grad():  # 停止反向传播，只进行前向计算
@@ -209,10 +221,30 @@ class Runner():
                                                    self.device,
                                                    return_loss=False)
                     self.buffer['acc'].append(outputs['acc1'])
+                # 计算总体精度
+                self.n_correct += self.buffer['acc'][-1] * len(data_batch[0])
+            
             visualization(self.buffer, title='val')
+            self.logger.info('ACC on valset: %.3f', self.n_correct/len(self.valset))
         else:
             raise ValueError('no model weights loaded.')
     
+    def predict_single(self, img):
+        """针对单个样本的预测：也是最精简的一个预测流程，因为不创建数据集，不进入batch_processor.
+        直接通过model得到结果，且支持cpu/GPU预测。
+        注意：需要训练完成后，或在cfg中设置load_from，也就是model先加载训练好的参数文件。
+        """
+        from utils.transformer import ImgTransform
+        if self.weight_ready:
+            img_transform = ImgTransform(self.cfg.transform_val)
+            img, *_ = img_transform(img)
+            img = img.float().to(self.device)
+            # 前向计算
+            y_pred = self.model(img)
+            y_class = self.trainset.CLASSES[y_pred]
+            self.logger.info('predict class: %s', y_class)
+        else:
+            raise ValueError('no model weights loaded.')
     
     def save_training(self, out_dir):
         meta = dict(c_epoch = self.c_epoch,
@@ -243,18 +275,6 @@ class Runner():
     def _load_checkpoint(self, checkpoint_path, map_location):
         self.logger.info('load checkpoint from %s'%checkpoint_path)
         return load_checkpoint(self.model, checkpoint_path, map_location)
-
-        
-    def predict_single(self):
-        """用于模型
-        """
-        self.model.eval()
-        for i, data in enumerate(self.dataloader):
-            pass
-    
-    def predict(self):
-        pass
-    
 
 
 class TFRunner(Runner):

@@ -9,7 +9,7 @@ import pickle
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-
+from collections import OrderedDict
 
 class BasePytorchDataset(Dataset):
     
@@ -56,6 +56,7 @@ class Cifar10Dataset(BasePytorchDataset):
         dataset = self.get_dataset()
         self.imgs = dataset['data']
         self.labels = dataset['target']
+        self.bboxes = dataset.get('bbox', None)
         self.CLASSES = dataset['target_names']
     
     def get_dataset(self):
@@ -85,18 +86,30 @@ class Cifar10Dataset(BasePytorchDataset):
         return dataset
     
     def __getitem__(self, idx):
+        """常规数据集传出的是多个变量，这里改为传出dict，再在定制collate中处理堆叠
+        注意：要求传出的为OrderedDict，这样在自定义collate_fn中不会出错。
+        """
+        data_dict = OrderedDict
         img = self.imgs[idx]
         label = self.labels[idx]
+        if self.bboxes is not None:
+            bbox = self.bboxes[idx]
         
         if self.label_transform is not None:
             label = self.label_transform(label)
+            data_dict['label'] = label            
         
         if self.img_transform is not None:
-            img = self.img_transform(img)  # transform输出img(img, ori_shape, scale_factor), label
-            # TODO: 先试试只img返回
-            if isinstance(img, tuple):
-                img, ori_shape, scale = img
-        return img, label
+            img, ori_shape, scale_factor = self.img_transform(img)  # transform输出img(img, ori_shape, scale_factor), label
+            data_dict['img'] = img
+            data_dict['ori_shape'] = ori_shape
+            data_dict['scale_factor'] = scale_factor
+            
+        if self.bboxes is not None and self.bbox_transform is not None:
+            bbox = self.bbox_transform(bbox)
+            data_dict['bbox'] = bbox
+            
+        return data_dict
     
     def __len__(self):
         return len(self.imgs)

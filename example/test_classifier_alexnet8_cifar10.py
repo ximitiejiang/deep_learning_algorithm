@@ -11,7 +11,7 @@ from model.runner_lib import Runner
 
 def main():
     runner = Runner(cfg_path = '../model/cfg_classifier_alexnet8_mnist.py')
-#    runner.train()
+    runner.train()
     runner.evaluate()
     
     

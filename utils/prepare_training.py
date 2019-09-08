@@ -10,8 +10,7 @@ from addict import Dict
 from importlib import import_module
 import logging
 import torch
-import torch.nn as nn
-import copy
+import numpy as np
 
 from utils.tools import get_time_str
 
@@ -58,7 +57,7 @@ def get_logger(logger_cfg):
 # %%
 from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
 from dataset.mnist_dataset import MnistDataset
-from utils.transformer import ImgTransform, BboxTransform
+from utils.transformer import ImgTransform, BboxTransform, LabelTransform
 
 class RepeatDataset(object):
 
@@ -77,50 +76,88 @@ class RepeatDataset(object):
         return self.times * self._ori_len
     
     
-def get_dataset(dataset_cfg, transform_cfg):
+def get_dataset(dataset_cfg, transform_cfg, divide_ratio=None):
+    """创建数据集
+    辅助功能：从数据集中分割出一定比例用于验证，设置divide_ratio为分割出来的验证集比例，通常0.2
+    """
     datasets = {'cifar10' : Cifar10Dataset,
-                    'cifar100' : Cifar100Dataset,
-                    'mnist' : MnistDataset}
+                'cifar100' : Cifar100Dataset,
+                'mnist' : MnistDataset}
     img_transform = None
+    label_transform = None
     bbox_transform = None    
     
     if transform_cfg.get('img_params') is not None:
         img_p = transform_cfg['img_params']
         img_transform = ImgTransform(**img_p)
+    if transform_cfg.get('label_params') is not None:
+        label_p = transform_cfg['label_params']
+        label_transform = LabelTransform(**label_p)
     if transform_cfg.get('bbox_params') is not None:
         bbox_p = transform_cfg['bbox_params']
         bbox_transform = BboxTransform(**bbox_p)
     
     dataset_name = dataset_cfg.get('type')
     dataset_class = datasets[dataset_name]
-    
     params = dataset_cfg.get('params', None)
     repeat = dataset_cfg.get('repeat', 0)
+    
+    dset = dataset_class(**params, 
+                         img_transform=img_transform,
+                         label_transform=label_transform,
+                         bbox_transform=bbox_transform)    
     if repeat:
-        return RepeatDataset(dataset_class(**params, 
-                                           img_transform=img_transform,  
-                                           bbox_transform=bbox_transform), repeat)
+        return RepeatDataset(dset, repeat)
     else:
-        return dataset_class(**params, 
-                             img_transform=img_transform, 
-                             bbox_transform=bbox_transform)
+        return dset
 
 
 # %%
 from torch.utils.data.dataloader import default_collate
 def multi_collate(batch):
-    """自定义一个多数据分别堆叠的collate函数：原有的collate_fn主要是对img/label进行堆叠，
+    """自定义一个多数据分别堆叠的collate函数：
+    参考：https://www.jianshu.com/p/bb90bff9f6e5
+    原有的collate_fn可以对输入的多种数据进行堆叠，堆叠行为是stack模式，
+    输入[dataset[i] for i in batch_indices], 也就是所有batch data打包的list.
+    也就是img(3,32,32)->(64,3,32,32), label(1)->[64], shape(3)
     堆叠方式也比较简单粗暴，就是增加一个维度比如64个(3,32,32)变成(64,3,32,32),
     如果需要传入其他数据比如bbox, scale，则需要自定义collate_fn
+    
     输入：batch为list，是DataLoader提供了通过getitem获得的每个batch数据，list长度就是batch size.
-    
+    输出：batch也为list，但每个变量都是堆叠好的。
     """
-    if isinstance(batch[0], tuple):
-        data, label = zip(*batch)
-        return data
+    result = []
+    for sample in zip(*batch):  # 参考pytorch源码写法：数据先分组提取
+        if isinstance(sample[0], torch.Tensor):
+            stacked = torch.stack(sample, dim=0)    
+            result.append(stacked)
+        if isinstance(sample[0], np.ndarray):
+            stacked = np.stack(sample, axis=0)
+            result.append(torch.tensor(stacked))
+        if isinstance(sample[0], (int, float)):
+            stacked = np.stack(sample, axis=0)
+            result.append(torch.tensor(stacked))
+    return result
     
-    else:
-        return default_collate(batch)
+
+def dict_collate(batch):
+    """自定义字典堆叠式collate
+    输入：batch(list), {'img':img, 'label', label, 'scale':scale}
+    """
+    result = {}
+    data = batch[0].values()
+    data = list(data)  # 取出数据用于检查类型
+    for i, name in enumerate(batch[0].keys()):  # 第i个变量的堆叠
+        if isinstance(data[i], torch.Tensor):  
+            stacked = torch.stack([sample[name] for sample in batch])
+            result[name] = stacked
+        if isinstance(data[i], np.ndarray):
+            stacked = np.stack([sample[name] for sample in batch])
+            result[name] = torch.tensor(stacked)
+        if isinstance(data[i], (int, float)):
+            stacked = np.stack([sample[name] for sample in batch])
+            result[name] = torch.tensor(stacked)
+    return result  # 期望的result应该是{'img': img, 'label':label}
     
 
 def get_dataloader(dataset, dataloader_cfg):
@@ -145,10 +182,13 @@ def get_dataloader(dataset, dataloader_cfg):
        就需要自定义collate_fn来合并成一个batch，方便后续的训练。
     
     注意：
-    1. 如果数据集getitem输出的是img+label，则
+    1. 如果数据集getitem输出的是img(3,32,32),label(标量tensor(1))，则经过dataloader输出会堆叠为img(64,3,32,32)的4维度数组, label([64])的1维度数组)
+       而当数据集getitem输出的是img, label, scale, shape，
     
     """
-    collate_fn_dict = {'multi_collate':multi_collate}
+    collate_fn_dict = {'default_collate':default_collate,
+                       'multi_collate':multi_collate,
+                       'dict_collate':dict_collate}
     sampler_fn_dict = {}
     sampler = None
     collate_fn = default_collate   # 注意不能让collate_fn的默认参数为None,否则会导致不可调用的报错
@@ -202,8 +242,7 @@ def get_model(model_cfg):
 
 # %%       
 def get_optimizer(optimizer_cfg, model):
-    """创建优化器：用于更新所有权重数据，所以需要传入model的所有权重数据
-    
+    """创建优化器：pytorch采用的单个优化器更新所有权重数据，所以需要传入给优化器model的所有权重数据
     """
     optimizers = {
             'sgd' : torch.optim.SGD,
@@ -213,7 +252,7 @@ def get_optimizer(optimizer_cfg, model):
     opt_name = optimizer_cfg.get('type')
     opt_class = optimizers[opt_name]
     params = optimizer_cfg['params']
-    model_params = dict(params=model.parameters())  # 获取模型权重
+    model_params = dict(params=model.parameters())  # 获取模型所有权重
     for name, value in model_params.items():
         params.setdefault(name, value)
     return opt_class(**params)    # 把模型权重，以及自定义的lr/momentum/weight_decay一起传入optimizer
@@ -236,122 +275,7 @@ def get_loss_fn(loss_cfg):
 
 
 # %%
-class LrProcessor():
-    """学习率调整器"""
-    def __init__(self, runner, warmup_type=None, 
-                 warmup_iters=0, warmup_ratio=0.1,
-                 **kwargs):
-        self.runner = runner
-        self.warmup_type = warmup_type
-        self.warmup_iters = warmup_iters  # 热身次数
-        self.warmup_ratio = warmup_ratio
-        # 均以group list的形式表示lr
-        self.base_lr_group = []     # 基础学习率组(不变)：可能等于optimizer预定义的不可变学习率，也可能等于resume后的学习率
-        self.regular_lr_group = []  # 常规学习率组(动态): 每种LrProcessor都会动态调整的部分
-    
-    def get_warmup_lr_group(self, current_iter):    
-        if self.warmup_type == 'constant': # 相当于用一个固定的小学习率热身
-            warmup_lr_group = [lr * self.warmup_ratio for lr in self.regular_lr_group]
-        if self.warmup_type == 'linear':   # 
-            k = (1 - current_iter / self.warmup_iters) * (1 - self.warmup_ratio)
-            warmup_lr_group = [lr * (1 - k) for lr in self.regular_lr_group]
-        if self.warmup_type == 'exp':
-            k = self.warmup_ratio**(1 - current_iter / self.warmup_iters)
-            warmup_lr_group = [_lr * k for _lr in self.regular_lr_group]
-        return warmup_lr_group
-            
-    def get_regular_lr_group(self):
-        """生成常规学习率组"""
-        regular_lr_group = []
-        for base_lr in self.base_lr_group:
-            regular_lr_group.append(self.get_regular_lr(self.runner, base_lr))   # 子类需要实现对单个学习率计算的函数，到这里汇总成regular_lr group的list形式
-        return regular_lr_group
-        
-    def get_regular_lr(self, runner, base_lr):
-        raise NotImplementedError
-    
-    def _set_lr(self, lr_groups):
-        """唯一的调整学习率的底层函数，其他函数都调用这个函数进行学习率修改
-        lr_groups: 用于填充到optimizer去的自定义学习率组
-        """
-        for group, lr in zip(self.runner.optimizer.param_groups, lr_groups):
-            group['lr'] = lr
-        
-    def set_base_lr_group(self):
-        """第一步：在训练开始或者恢复开始阶段，初始化base_lr_group
-        不能放在模型初始化时做，因为恢复训练模式下不会进行模型初始化，所以要确保在开始前向计算之前操作
-        """
-        self.base_lr_group = [group['lr'] for group in self.runner.optimizer.param_groups]  # 以优化器的参数为准，所以保存模型并恢复模型时，需要连优化器一起保存    
-    
-    def set_regular_lr_group(self):
-        """第二步：在每个epoch开始前，先获得regular_lr_group，并填入optimizer
-        """
-        self.regular_lr_group = self.get_regular_lr_group()
-        self._set_lr(self.regular_lr_group)
-    
-    def set_warmup_lr_group(self):
-        """第三步：在第一个epoch前的部分iters设置warmup_lr_group
-        """
-        current_iter = self.runner.c_iter   # 代表从0开始
-        current_epoch = self.runner.c_epoch # 代表从0开始
-        if current_epoch == 0:
-            warmup_lr_group = self.get_warmup_lr_group(current_iter)
-            if current_iter < self.warmup_iters:      # 如果没有超过热身次数，则设置为warmup_lr
-                self._set_lr(warmup_lr_group)
-            elif current_iter == self.warmup_iters:   # 如果初次超过热身次数，则设置学习率为常规学习率
-                self._set_lr(self.regular_lr_group)
-            elif self.warmup_type is None or current_iter > self.warmup_iters:
-                return
-
-class FixedLrProcessor(LrProcessor):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        
-    def get_regular_lr(self, runner, base_lr):
-        return base_lr
-
-
-class ListLrProcessor(LrProcessor):
-    """学习率按列表阶梯下降，每个阶梯下降的lr查表得到(此时跟base_lr无关了)
-    例如：step=[2,4], lr=[0.005, 0.0001], 则在第2个epoch调整lr到0.005，第4个epoch调整到0.0001
-    """
-    def __init__(self, step=None, lr=None, **kwargs):
-        super().__init__(**kwargs)
-        self.step = step
-        self.lr = lr
-        self.lr_internal = copy.copy(lr)  # 深拷贝
-        
-    def get_regular_lr(self, runner, base_lr):
-        if len(self.lr_internal) == len(self.lr):
-            self.lr_internal.insert(0, base_lr)
-        current_epoch = runner.c_epoch
-        for i, ep in enumerate(self.step):
-            if current_epoch + 1 < ep:  # 加1表示epoch个数
-                pos = i  # 小于只要找到最小的，也就是第一个
-                break
-            if current_epoch + 1 >= ep:
-                pos = i + 1  # 大于需要找到最大的，也就是最后一个
-        return self.lr_internal[pos]
-
-
-class StepLrProcessor(LrProcessor):
-    """学习率阶梯式下降，每一阶段固定下降1/10
-    例如：step = [2, 4]，则在第2个epoch调整lr到0.1*lr, 第4个epoch调整学习率到0.01*lr
-    """
-    def __init__(self, step=None, gamma=0.1, **kwargs):
-        super().__init__(**kwargs)
-        self.step = step
-        self.gamma = gamma
-        
-    def get_regular_lr(self, runner, base_lr):
-        current_epoch = runner.c_epoch  # 代表从0开始  
-        exp = len(self.step)  # 初始为n
-        for i, ep in enumerate(self.step):
-            if current_epoch + 1 < ep:  # 这里加1表示epoch个数
-                exp = i
-                break
-        return base_lr * self.gamma**exp
-        
+from model.lr_processor_lib import FixedLrProcessor, ListLrProcessor, StepLrProcessor
         
 def get_lr_processor(runner, lr_processor_cfg):
     lr_processors = {'fix': FixedLrProcessor,

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import cv2
 
 
-def visualization(buffer_dict, title='train result'):
+def visualization(buffer_dict, title='result: '):
     """可视化结果: 至少包含acc(比如验证)
     输入: dict[key, value_list]
             loss(list): [loss1, loss2,..] or [[iter1, loss1], [iter2, loss2], ...]
@@ -20,7 +20,7 @@ def visualization(buffer_dict, title='train result'):
     losses = None
     lrs = None
     if buffer_dict.get('loss', None) is not None:
-        accs = buffer_dict['acc']
+        losses = buffer_dict['loss']
     if buffer_dict.get('lr', None) is not None:
         lrs = buffer_dict['lr']
         
@@ -36,9 +36,10 @@ def visualization(buffer_dict, title='train result'):
         x = np.arange(len(accs))
         y_acc = np.array(accs)
     # 绘制loss
+    prefix += ' accs'
     fig = plt.figure()
     ax1 = fig.add_subplot(1,1,1)
-    ax1.set_title(prefix + ' accs')
+    ax1.set_title(prefix)
     ax1.set_ylabel('acc')
     lines = ax1.plot(x,y_acc, 'r', label='acc')
     # 绘制loss
@@ -49,6 +50,8 @@ def visualization(buffer_dict, title='train result'):
         else:
             x = np.arange(len(losses))
             y_loss = np.array(losses)
+        prefix += ' losses'
+        ax1.set_title(prefix)
         ax2 = ax1.twinx()
         ax2.set_ylabel('loss')
         l2 = ax2.plot(x, y_loss, 'g', label='loss')
@@ -71,7 +74,7 @@ def visualization(buffer_dict, title='train result'):
             y_lr = np.array(lrs)
         fig = plt.figure()
         ax1 = fig.add_subplot(1,1,1)
-        ax1.set_title(prefix + ' lr')
+        ax1.set_title(title + ' lr')
         ax1.set_ylabel('lr')
         lines = ax1.plot(x,y_lr, 'r', label='lr')
         legs = [l.get_label() for l in lines]   

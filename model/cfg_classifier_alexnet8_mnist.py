@@ -19,22 +19,21 @@ gpus = 1
 parallel = False
 distribute = False                       
 n_epochs = 5
-imgs_per_core = 32               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
+imgs_per_core = 64               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
 workers_per_core = 2
-save_checkpoint_interval = 1     # 每多少个epoch保存一次epoch
+save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
 work_dir = '/home/ubuntu/mytrain/alexnet8/'
 resume_from = None               # 恢复到前面指定的设备
-load_from = '/home/ubuntu/mytrain/alexnet8/epoch_5.pth'
-load_device = 'cuda'              # 额外定用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
+load_from = None
+load_device = 'cuda'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
 
 lr = 0.01
 
 lr_processor = dict(
         type='list',
         params = dict(
-                step=[2, 4],       # 代表第2个(从1开始算，等效于n_epochs的算法)
-                lr = [0.005, 0.002],
-                gamma=0.1,
+                step=[6, 8],       # 代表第2个(从1开始算，等效于n_epochs的算法)
+                lr = [0.001, 0.0001],
                 warmup_type='linear',
                 warmup_iters=500,
                 warmup_ratio=1./3))
@@ -42,7 +41,7 @@ lr_processor = dict(
 logger = dict(
                 log_level='INFO',
                 log_dir=work_dir,
-                interval=50)
+                interval=100)
 
 model = dict(                    # model是必须要有的参数，用来表示主检测器集成模型或者单分类器模型
         type='alexnet8',          
@@ -98,7 +97,7 @@ trainloader = dict(
                 num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
                 pin_memory=False,   # 数据送入GPU进行加速(默认False)
                 drop_last=False,
-                collate_fn=None,    # 'multi_collate'
+                collate_fn='multi_collate',    # 'multi_collate'
                 sampler=None))
 valloader = dict(        
         params=dict(
@@ -123,8 +122,8 @@ loss_clf = dict(
                 reduction='mean'
                 ))
 
-#loss_reg = dict(
-#        type='smooth_l1',
-#        params=dict(
-#                reduction='mean'
-#                ))
+loss_reg = dict(
+        type='smooth_l1',
+        params=dict(
+                reduction='mean'
+                ))
