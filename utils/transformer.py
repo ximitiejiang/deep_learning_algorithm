@@ -231,13 +231,40 @@ class LabelTransform():
         return label
 
     
-
 class BboxTransform():
     """Bbox变换类"""
     def __init__(self):
         pass
     def __call__(self):
         pass
+
+
+from albumentations import (
+    HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
+    Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
+    IAAAdditiveGaussianNoise, GaussNoise, MotionBlur, MedianBlur, IAAPiecewiseAffine,
+    IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, Compose)
+
+class AugmentTransform():
+    """数据增强变换类：通过封装albumentations来实现
+    参考：https://github.com/albu/albumentations, 
+    实例：https://github.com/albu/albumentations/blob/master/notebooks/example.ipynb
+    实例：https://github.com/albu/albumentations/blob/master/notebooks/example_16_bit_tiff.ipynb
+    """
+    def __init__(self, p=0.5,
+                 horizontal_flip=False,
+                 random_rotate_90=False):
+        aug_list = []
+        if horizontal_flip:
+            aug_list.append(HorizontalFlip())
+        if random_rotate_90:
+            aug_list.append(RandomRotate90())
+        self.aug = Compose(aug_list)
+        
+    def __call__(self, img, label, bbox):
+        auged = self.aug()
+        
+        return auged['image'], auged['']
 
 
 def img_inv_transform(img, mean, std, show=True):

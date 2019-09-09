@@ -110,7 +110,8 @@
 
 1. 现象：如果模型和数据送入GPU，dataloader会调用dataset的__getitem__函数获取数据进行堆叠，
    此时如果在__getitem__里边有自定义断点，会造成系统警告且暂停训练。
-2. 解决方案：取消断点后模型训练/验证就正常了。
+2. 解决方案：取消断点后模型训练/验证就正常了。而如果想要调试__getitem__里边的语法，可以设置
+   额外的语句img, label = dataset[0]来进入__getitem__，或者next(iter(dataloader))
 
 
 

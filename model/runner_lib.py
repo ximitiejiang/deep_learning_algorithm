@@ -34,8 +34,8 @@ class BatchDetector(BatchProcessor):
 
 class BatchClassifier(BatchProcessor):
     def __call__(self, model, data, loss_fn, device, return_loss=True):
-        img_data, label, *_ = data
-        img, *_ = img_data
+        img = data['img']
+        label = data['label']
         # 输入img要修改为float()格式float32，否则跟weight不匹配报错
         # 输入label要修改为long()格式int64，否则跟交叉熵公式不匹配报错
         img = img.float().to(device)
@@ -103,8 +103,6 @@ class Runner():
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)
         self.valloader = get_dataloader(self.valset, self.cfg.valloader)
-        
-#        batch = next(iter(self.dataloader))
         # 创建模型并初始化
         self.model = get_model(self.cfg)
         # 创建损失函数
@@ -148,14 +146,10 @@ class Runner():
             dir = cfg.work_dir
             if not os.path.isdir(dir):
                 raise FileNotFoundError('work_dir is not a dir.')
-        if cfg.trainset.params.get('root_path', None) is not None:
+        if cfg.get('data_root_path', None) is not None:
             dir = cfg.trainset.params.root_path
             if not os.path.isdir(dir):
                 raise FileNotFoundError('trainset path is not a dir.')
-        if cfg.testset.params.get('root_path', None) is not None:
-            dir = cfg.testset.params.root_path
-            if not os.path.isdir(dir):
-                raise FileNotFoundError('testset path is not a dir.')
     
     def current_lr(self):
         """获取当前学习率: 其中optimizer.param_groups有可能包含多个groups(但在我的应用中只有一个group)

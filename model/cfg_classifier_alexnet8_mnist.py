@@ -15,10 +15,10 @@ Created on Mon Sep  2 11:30:35 2019
 """
 
 task = 'classifier'              # 用于定义任务类型：classifier, detector, regressor
-gpus = 0
+gpus = 1
 parallel = False
 distribute = False                       
-n_epochs = 5
+n_epochs = 1
 imgs_per_core = 64               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
 workers_per_core = 2
 save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
@@ -32,7 +32,7 @@ lr = 0.01
 lr_processor = dict(
         type='list',
         params = dict(
-                step=[6, 8],       # 代表第2个(从1开始算，等效于n_epochs的算法)
+                step=[6, 8],       # 代表第2个(从1开始算)
                 lr = [0.001, 0.0001],
                 warmup_type='linear',
                 warmup_iters=500,
@@ -77,17 +77,18 @@ transform_val = dict(
                 to_tensor=True,
                 to_onehot=None))
 
+data_root_path='/home/ubuntu/MyDatasets/cifar-10-batches-py/'  # 统一一个data_root_path变量，便于书写，也便于check
 trainset = dict(
         type='cifar10',
         repeat=0,
         params=dict(
-                root_path='/home/ubuntu/MyDatasets/cifar-10-batches-py/', 
+                root_path=data_root_path, 
                 data_type='train'))
 valset = dict(
         type='cifar10',
         repeat=0,
         params=dict(
-                root_path='/home/ubuntu/MyDatasets/cifar-10-batches-py/', 
+                root_path=data_root_path, 
                 data_type='test'))
 
 trainloader = dict(
@@ -107,8 +108,8 @@ valloader = dict(
                 pin_memory=False,   # 数据送入GPU进行加速(默认False)
                 drop_last=False,
                 collate_fn='dict_collate',    # 'default_collate','multi_collate', 'dict_collate'
-                sampler=None))   # 最后一个batch
-# 待增加学习率调整模块
+                sampler=None))
+
 optimizer = dict(
         type='sgd',
         params=dict(

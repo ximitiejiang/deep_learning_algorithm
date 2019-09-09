@@ -5,15 +5,42 @@ Created on Mon Sep  2 11:31:23 2019
 
 @author: ubuntu
 """
-log_level = 'INFO'  # 用于定义输出内容：INFO为基础输出内容，DEBUG为完整输出内容
+task = 'detector'                # 用于定义任务类型：classifier, detector, regressor
 gpus = 1
+parallel = False
+distribute = False                       
+n_epochs = 1
+imgs_per_core = 64               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
+workers_per_core = 2
+save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
+work_dir = '/home/ubuntu/mytrain/ssd_vgg_voc/'
+resume_from = None               # 恢复到前面指定的设备
+load_from = None
+load_device = 'cuda'             # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
+
+lr = 0.01
+
+lr_processor = dict(
+        type='list',
+        params = dict(
+                step=[6, 8],       # 代表第2个(从1开始算)
+                lr = [0.001, 0.0001],
+                warmup_type='linear',
+                warmup_iters=500,
+                warmup_ratio=1./3))
+
+logger = dict(
+                log_level='INFO',
+                log_dir=work_dir,
+                interval=100)
 
 model = dict(
         type='one_stage_detector')
         
 backbone=dict(
-        type='alexnet8',
+        type='ssdvgg16',
         params=dict(
+                pretrained='',
                 num_classes=10))
 
 header=dict(
@@ -27,30 +54,94 @@ header=dict(
                 target_means=(.0, .0, .0, .0),
                 target_stds=(0.1, 0.1, 0.2, 0.2)))
 
-dataset = dict(
-        type='Cifar10Dataset',
-        repeat=5,
+transform = dict(
+        img_params=dict(
+                mean=[113.86538318, 122.95039414, 125.30691805],  # 基于BGR顺序
+                std=[51.22018275, 50.82543151, 51.56153984],
+                to_rgb=True,    # bgr to rgb
+                to_tensor=True, # numpy to tensor 
+                to_chw=True,    # hwc to chw
+                flip=None,
+                scale=None,
+                keep_ratio=None),
+        label_params=dict(
+                to_tensor=True,
+                to_onehot=None),
+        bbox_params=None,
+        aug_params=None)
+
+transform_val = dict(
+        img_params=dict(
+                mean=[113.86538318, 122.95039414, 125.30691805],  # 基于BGR顺序
+                std=[51.22018275, 50.82543151, 51.56153984],
+                to_rgb=True,    # bgr to rgb
+                to_tensor=True, # numpy to tensor 
+                to_chw=True,    # hwc to chw
+                flip=None,
+                scale=None,
+                keep_ratio=None),
+        label_params=dict(
+                to_tensor=True,
+                to_onehot=None),
+        bbox_params=None)
+
+data_root_path='/home/ubuntu/MyDatasets/voc/VOCdevkit/'
+trainset = dict(
+        type='voc',
+        repeat=0,
         params=dict(
-                root_path='../dataset/source/cifar10/', 
-                data_type='train',
-                norm=None, 
-                label_transform_dict=None, 
-                one_hot=None, 
-                binary=None, 
-                shuffle=None))
+                root_path=data_root_path, 
+                ann_file=[data_root_path + 'VOC2007/ImageSets/Main/trainval.txt',
+                          data_root_path + 'VOC2012/ImageSets/Main/trainval.txt'],
+                subset_path=[data_root_path + 'VOC2007/',
+                          data_root_path + 'VOC2012/'],
+                data_type='train'))
+valset = dict(
+        type='voc',
+        repeat=0,
+        params=dict(
+                root_path=data_root_path, 
+                ann_file=[data_root_path + 'VOC2007/ImageSets/Main/trainval.txt',
+                          data_root_path + 'VOC2012/ImageSets/Main/trainval.txt'],
+                subset_path=[data_root_path + 'VOC2007/',
+                          data_root_path + 'VOC2012/'],
+                data_type='test'))
 
-imgs_per_gpu = 4
-workers_per_gpu = 2
+trainloader = dict(
+        params=dict(
+                shuffle=True,
+                batch_size=gpus * imgs_per_core if gpus>0 else imgs_per_core,
+                num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
+                pin_memory=False,   # 数据送入GPU进行加速(默认False)
+                drop_last=False,
+                collate_fn='dict_collate',    # 'default_collate','multi_collate', 'dict_collate'
+                sampler=None))
 
-dataloader = dict(
+valloader = dict(        
         params=dict(
                 shuffle=False,
-                batch_size=gpus * imgs_per_gpu,
-                num_workers=gpus * workers_per_gpu, 
+                batch_size=gpus * imgs_per_core if gpus>0 else imgs_per_core,
+                num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
                 pin_memory=False,   # 数据送入GPU进行加速(默认False)
-                drop_last=False))   # 最后一个batch
+                drop_last=False,
+                collate_fn='dict_collate',    # 'default_collate','multi_collate', 'dict_collate'
+                sampler=None))
 
 optimizer = dict(
-        type = 'SGD'
-        params = dict(
+        type='sgd',
+        params=dict(
+                lr=lr, 
+                momentum=0.9, 
+                weight_decay=5e-4))
+
+loss_clf = dict(
+        type='cross_entropy',
+        params=dict(
+                reduction='mean'
+                ))
+
+loss_reg = dict(
+        type='smooth_l1',
+        params=dict(
+                reduction='mean'
                 ))

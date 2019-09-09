@@ -7,20 +7,9 @@ Created on Tue Jun 11 17:54:50 2019
 """
 import pickle
 import numpy as np
-import torch
-from torch.utils.data import Dataset
 from collections import OrderedDict
 
-class BasePytorchDataset(Dataset):
-    
-    def __init__(self):
-        pass
-    
-    def __getitem__(self, idx):
-        raise NotImplementedError
-
-    def __len__(self):
-        raise NotImplementedError
+from dataset.base_dataset import BasePytorchDataset
     
 
 class Cifar10Dataset(BasePytorchDataset):
@@ -29,6 +18,7 @@ class Cifar10Dataset(BasePytorchDataset):
     cifar10: 10个类别，每个类别6000张
     cifar100: 100个类别，每个类别600张
     该数据集没有索引，所以只能一次性加载到内存
+    输入：data_type(数据集类型)，包括train训练集和test测试集
     输出：n,h,w,c (bgr格式), 所有图片源数据都统一用这种格式(包括voc/coco)
     """
     def __init__(self, root_path='/home/ubuntu/MyDatasets/cifar-10-batches-py/', 
@@ -89,7 +79,7 @@ class Cifar10Dataset(BasePytorchDataset):
         """常规数据集传出的是多个变量，这里改为传出dict，再在定制collate中处理堆叠
         注意：要求传出的为OrderedDict，这样在自定义collate_fn中不会出错。
         """
-        data_dict = OrderedDict
+        data_dict = OrderedDict()
         img = self.imgs[idx]
         label = self.labels[idx]
         if self.bboxes is not None:

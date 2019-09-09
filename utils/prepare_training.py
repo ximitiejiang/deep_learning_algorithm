@@ -76,9 +76,8 @@ class RepeatDataset(object):
         return self.times * self._ori_len
     
     
-def get_dataset(dataset_cfg, transform_cfg, divide_ratio=None):
+def get_dataset(dataset_cfg, transform_cfg):
     """创建数据集
-    辅助功能：从数据集中分割出一定比例用于验证，设置divide_ratio为分割出来的验证集比例，通常0.2
     """
     datasets = {'cifar10' : Cifar10Dataset,
                 'cifar100' : Cifar100Dataset,
@@ -131,6 +130,9 @@ def multi_collate(batch):
         if isinstance(sample[0], np.ndarray):
             stacked = np.stack(sample, axis=0)
             result.append(torch.tensor(stacked))
+        if isinstance(sample[0], (tuple,list)):
+            stacked = np.stack(sample, axis=0)
+            result.append(torch.tensor(stacked))
         if isinstance(sample[0], (int, float)):
             stacked = np.stack(sample, axis=0)
             result.append(torch.tensor(stacked))
@@ -151,6 +153,9 @@ def dict_collate(batch):
             stacked = torch.stack([sample[name] for sample in batch])
             result[name] = stacked
         if isinstance(data[i], np.ndarray):
+            stacked = np.stack([sample[name] for sample in batch])
+            result[name] = torch.tensor(stacked)
+        if isinstance(data[i], (tuple,list)):
             stacked = np.stack([sample[name] for sample in batch])
             result[name] = torch.tensor(stacked)
         if isinstance(data[i], (int, float)):

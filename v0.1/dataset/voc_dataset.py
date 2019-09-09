@@ -238,7 +238,7 @@ class VOCDataset(Dataset):
         root = tree.getroot()
         bboxes = []
         labels = []
-        bboxes_ignore = []
+        bboxes_ignore = []  # 存放difficult=1的较难数据
         labels_ignore = []
         for obj in root.findall('object'):
             name = obj.find('name').text
@@ -257,7 +257,7 @@ class VOCDataset(Dataset):
             else:
                 bboxes.append(bbox)
                 labels.append(label)
-        if not bboxes:
+        if not bboxes: #如果bbox数据缺失则先放空
             bboxes = np.zeros((0, 4))
             labels = np.zeros((0, ))
         else:
