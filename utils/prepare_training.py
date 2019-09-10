@@ -57,7 +57,7 @@ def get_logger(logger_cfg):
 # %%
 from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
 from dataset.mnist_dataset import MnistDataset
-from utils.transformer import ImgTransform, BboxTransform, LabelTransform
+from utils.transform import ImgTransform, BboxTransform, LabelTransform
 
 class RepeatDataset(object):
 
@@ -162,7 +162,12 @@ def dict_collate(batch):
         if isinstance(data[i], (int, float)):
             stacked = np.stack([sample[name] for sample in batch])
             result[name] = torch.tensor(stacked)
-    return result  # 期望的result应该是{'img': img, 'label':label}
+        # 针对子dict，比如img_meta数据，没有进行堆叠，而是放在list里边，通过result['img_meat'][i]也可以调用
+        # 因为这种meta数据类型多样，包括了tuple/float，所以无法堆叠
+        # 同时也没有转换成tensor
+        if isinstance(data[i], dict):
+            result[name] = [sample[name] for sample in batch] 
+    return result  # 期望的result应该是{'img': img, 'label':label, 'img_meta':list(dict)}
     
 
 def get_dataloader(dataset, dataloader_cfg):

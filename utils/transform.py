@@ -154,23 +154,35 @@ def impad_to_multiple(img, divisor, pad_val=0):
 def imflip(img, flip_type='h'):
     """图片翻转：h为水平，v为竖直
     """
-    if flip_type=='h':
+    if flip_type == 'h':
         return np.flip(img, axis=1)  # 水平翻转
-    else:
+    elif flip_type == 'v':
         return np.flip(img, axis=0)  # 竖直翻转
 
 
-def bbox_flip(bboxes, img_shape):
-    """bbox的翻转：注意这个bbox flip只支持水平翻转
-    args:
-        bboxes()
-        img_shape(h, w)
+def bbox_flip(bboxes, img_shape, flip_type='h'):
+    """bbox翻转: 这是自己实现的一个版本，可以同时支持bbox的水平和垂直翻转
+    Args:
+        bboxes(list): [[xmin,ymin,xmax,ymax],[xmin,ymin,xmax,ymax],...]
+        img_shape(tuple): (h, w)
+    Returns:
+        fliped_img(array): (h,w,c)
     """
-    assert bboxes.shape[-1] % 4 == 0
-    w = img_shape[1]
-    flipped = bboxes.copy()
-    flipped[..., 0::4] = w - bboxes[..., 2::4] - 1  # 
-    flipped[..., 2::4] = w - bboxes[..., 0::4] - 1
+    assert flip_type in ['h','v', 'horizontal', 'vertical']
+    bboxes=np.array(bboxes)
+    h, w = img_shape[0], img_shape[1]
+    assert bboxes.shape[-1] == 4
+    
+    if flip_type == 'h':
+        flipped = bboxes.copy()
+        # xmin = w-xmax-1, xmax = w-xmin-1
+        flipped[...,0] = w - bboxes[..., 2] - 1
+        flipped[...,2] = w - bboxes[..., 0] - 1
+    elif flip_type == 'v':
+        flipped = bboxes.copy()
+        flipped[...,1] = h - bboxes[..., 3] - 1
+        flipped[...,3] = h - bboxes[..., 1] - 1
+        
     return flipped
 
 
@@ -261,17 +273,39 @@ class ImgTransform():
             flip = True if np.random.rand() < self.flip_ratio else False  # 随机一个均匀分布(0-1)
             if flip:
                 img = imflip(img)
+                
         if self.size_divisor is not None:
             img = impad_to_multiple(img, self.size_divisor)
-            pad_shape = img.shape  # (h,w,c)
+        pad_shape = img.shape  # (h,w,c)
         
         if self.to_chw:
             img = img.transpose(2, 0, 1) # h,w,c to c,h,w
-        ori_shape = img.shape
         
         if self.to_tensor:
             img = torch.tensor(img)
         return (img, ori_shape, scale_shape, pad_shape, scale_factor, flip)
+
+    
+class BboxTransform():
+    """Bbox变换类: 这个变换比较特殊，他需要基于img_transform的结果进行变换。
+    所以初始化时不输入什么参数，而在call的时候输入所有变换参数。
+    注意：bbox的变换顺序需要跟img一致，由于img是先scale再flip，所以bbox也采用先scale再flip
+    因此输入用于flip的shape也应该是scale之后的shape
+    """
+    def __init__(self, to_tensor=None):
+        self.to_tensor = to_tensor
+        
+    def __call__(self, bboxes, img_shape, scale_factor, flip):
+        gt_bboxes = bboxes * scale_factor
+        
+        if flip:
+            gt_bboxes = bbox_flip(gt_bboxes, img_shape, flip_type='h')
+        gt_bboxes[:, 0::2] = np.clip(gt_bboxes[:, 0::2], 0, img_shape[1])
+        gt_bboxes[:, 1::2] = np.clip(gt_bboxes[:, 1::2], 0, img_shape[0])
+        
+        if self.to_tensor:
+            gt_bboxes = torch.tensor(gt_bboxes)
+        return gt_bboxes
 
 
 class LabelTransform():
@@ -289,26 +323,7 @@ class LabelTransform():
             label = torch.tensor(label)
             
         return label
-
     
-class BboxTransform():
-    """Bbox变换类: 这个变换比较特殊，他需要基于img_transform的结果进行变换。
-    所以初始化时不输入什么参数，而在call的时候输入所有变换参数
-    """
-    def __init__(self, to_tensor=None):
-        self.to_tensor = to_tensor
-        
-    def __call__(self, bboxes, img_shape, scale_factor, flip):
-        gt_bboxes = bboxes * scale_factor
-        
-        if flip:
-            gt_bboxes = bbox_flip
-        
-        
-        if self.to_tensor:
-            bboxes = torch.tensor(bboxes)
-        return bboxes
-
 
 from albumentations import (
     HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
@@ -338,7 +353,7 @@ class AugmentTransform():
         return auged['image'], auged['']
 
 
-def img_inv_transform(img, mean, std, show=True):
+def img_transform_inv(img, mean, std, show=True):
     """图片逆变换显示"""
     img = img * std + mean      # denormalize
     img = img.numpy()           # tensor to numpy

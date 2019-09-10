@@ -40,6 +40,7 @@ class VOCDataset(BasePytorchDataset):
                  data_type=None,
                  with_difficult=False):
         self.with_difficult = with_difficult
+        self.data_type = data_type
         # 变换函数
         self.img_transform = img_transform
         self.label_transform = label_transform
@@ -67,11 +68,13 @@ class VOCDataset(BasePytorchDataset):
                 img_file = self.subset_path[i] + 'JPEGImages/{}.jpg'.format(img_id)
                 xml_file = self.subset_path[i] + 'Annotations/{}.xml'.format(img_id)
                 # 解析xml文件
+                # TODO: 这部分解析是否可去除，原本只是为了获得img的w,h,在img_transform里边已经搜集
                 tree = ET.parse(xml_file)
                 root = tree.getroot()
                 size = root.find('size')
                 width = int(size.find('width').text)
                 height = int(size.find('height').text) 
+                
                 img_anns.append(dict(img_id=img_id, img_file=img_file, xml_file=xml_file, width=width, height=height))
         return img_anns
     
@@ -127,6 +130,8 @@ class VOCDataset(BasePytorchDataset):
         return ann
         
     def __getitem__(self, idx):
+        """虽然ann中有解析出difficult的情况，但这里简化统一没有处理difficult的情况，只对标准数据进行输出。
+        """
         # 读取图片
         img_info = self.img_anns[idx]
         img_path = img_info['img_file']
@@ -136,43 +141,44 @@ class VOCDataset(BasePytorchDataset):
         ann_dict = self.parse_ann_info(idx)
         gt_bboxes = ann_dict['bboxes']
         gt_labels = ann_dict['labels']
-        if self.with_difficult:
-            gt_bboxes_difficult = ann_dict['bboxes_difficult']
-            gt_labels_difficult = ann_dict['labels_difficult']
 
         # aug transform
-        # TODO: 这里没有处理gt_bboxes_difficult, gt_labels_difficult
         if self.aug_transform is not None:
             img, gt_bboxes, gt_labels = self.aug_transform(img, gt_bboxes, gt_labels)
-        # img transform
-        img, ori_shape, scale_shape, pad_shape, scale_factor, flip = self.img_transform(img)
-        
-        gt_bboxes = self.bbox_transform(gt_bboxes)
+        # basic transform
+        if self.img_transform is not None:    
+            # img transform
+            img, ori_shape, scale_shape, pad_shape, scale_factor, flip = self.img_transform(img)
+            # bbox transform: 传入的是scale_shape而不是ori_shape        
+            gt_bboxes = self.bbox_transform(gt_bboxes, scale_shape, scale_factor, flip)
+            # label transform
+            gt_labels = self.label_transform(gt_labels)
         # 组合img_meta
         img_meta = dict(ori_shape = ori_shape,
+                        scale_shape = scale_shape,
+                        pad_shape = pad_shape,
                         scale_factor = scale_factor,
                         flip = flip)
-        # 组合数据
+        # 组合数据: 注意img_meta数据无法堆叠，需要在collate_fn中单独处理
         data = dict(img = img,
                     img_meta = img_meta,
                     gt_bboxes = gt_bboxes,
                     gt_labels = gt_labels)
-        if self.with_difficult:
-            data['gt_bboxes_difficult'] = gt_bboxes_difficult
-            data['gt_labels_difficult'] = gt_labels_difficult
         # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片
         while True:
             if len(gt_bboxes) == 0:
-                idx = np.random.choice()
+                idx = np.random.choice(len(self.img_infos))
                 self.__getitem__(idx)
             return data
 
-        
-    
     def __len__(self):
         return len(self.img_infos)
     
 if __name__ == '__main__':
+    from utils.transform import ImgTransform, LabelTransform, BboxTransform, img_transform_inv
+    from utils.prepare_training import dict_collate
+    import torch
+    
     data_root_path='/home/ubuntu/MyDatasets/voc/VOCdevkit/'
     params=dict(
                 root_path=data_root_path, 
@@ -182,7 +188,41 @@ if __name__ == '__main__':
                           data_root_path + 'VOC2012/'],
                 data_type='train')
     
-    dataset = VOCDataset(**params)
-    dataset[0]    
+    transform = dict(
+        img_params=dict(
+                mean=[113.86538318, 122.95039414, 125.30691805],  # 基于BGR顺序
+                std=[51.22018275, 50.82543151, 51.56153984],
+                to_rgb=True,    # bgr to rgb
+                to_tensor=True, # numpy to tensor 
+                to_chw=True,    # hwc to chw
+                flip_ratio=None,
+                scale=[512, 512],
+                size_divisor=None,
+                keep_ratio=True),
+        label_params=dict(
+                to_tensor=True,
+                to_onehot=None),
+        bbox_params=dict(
+                to_tensor=True
+                ),
+        aug_params=None)
+    
+    img_transform = ImgTransform()
+    bbox_transform = BboxTransform()
+    label_transform = LabelTransform()
+        
+    dataset = VOCDataset(**params, 
+                         img_transform = img_transform,
+                         label_transform=label_transform, 
+                         bbox_transform=bbox_transform)
+    data = dataset[0]   
+    img = data['img']
+    img = img_transform_inv(img, transform['img_params']['mean'])
+    bbox = data['gt_bboxes']
+    dataloader = torch.utils.data.DataLoader(dataset, **params, 
+                                             collate_fn=dict_collate)
+    data_batch = next(iter(dataloader))
+    img_batch = data_batch['img']
+    meta_batch = data_batch['img_meta']
 
     
