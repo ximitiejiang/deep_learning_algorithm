@@ -89,7 +89,7 @@ def imresize(img, size, interpolation='bilinear', return_scale=False):
         return resized_img, w_scale, h_scale
 
 
-def imrescale(img, scales, interpolation='bilinear', return_scale=False):
+def imrescale(img, scales, interpolation='bilinear', return_scale=True):
     """基于imresize的imrescale，默认的保持比例，用于对图像进行等比例缩放到指定外框的最大尺寸
     注意：一个习惯差异是，计算机内部一般都用h,w，但描述图片尺寸惯例却是用w,h
     比如要求的scales=(1333,800)即w不超过1333，h不超过800
@@ -113,6 +113,42 @@ def imrescale(img, scales, interpolation='bilinear', return_scale=False):
         return new_img, scale_factor
     else:
         return new_img
+
+def impad(img, shape, pad_val=0):
+    """对图片边缘进行填充: 采用的方式是在图片右下角额外填充。
+    Args:
+        img (ndarray): 图片.
+        shape (tuple): 目标形状.
+        pad_val (number or sequence): 填充值.
+    Returns:
+        pad. 已经填充好的图片
+    """
+    if len(shape) < len(img.shape):
+        shape = shape + (img.shape[-1], )
+    assert len(shape) == len(img.shape)
+    
+    for i in range(len(shape) - 1):
+        assert shape[i] >= img.shape[i]
+        
+    pad = np.empty(shape, dtype=img.dtype)
+    pad[...] = pad_val  # 先生成一个空数组，并全部填充pad_val
+    pad[:img.shape[0], :img.shape[1], ...] = img  # 把图片在填入pad数组的左上角，相当于在右下角pad
+    return pad
+
+
+def impad_to_multiple(img, divisor, pad_val=0):
+    """对图片边缘进行填充，并确保填充完成的长和宽能够被某数整除。
+    用于神经网络的多尺度图片输入。
+    Args:
+        img (ndarray): 原始图片.
+        divisor (int): 图片w,h能被整除的数字
+        pad_val (number or sequence): 填充值.
+    Returns:
+        pad. 已经填充好的图片
+    """
+    pad_h = int(np.ceil(img.shape[0] / divisor)) * divisor  # 获得可以整除的h
+    pad_w = int(np.ceil(img.shape[1] / divisor)) * divisor  # 获得可以整除的w
+    return impad(img, (pad_h, pad_w), pad_val)   # 填充
     
 
 def imflip(img, flip_type='h'):
@@ -122,6 +158,20 @@ def imflip(img, flip_type='h'):
         return np.flip(img, axis=1)  # 水平翻转
     else:
         return np.flip(img, axis=0)  # 竖直翻转
+
+
+def bbox_flip(bboxes, img_shape):
+    """bbox的翻转：注意这个bbox flip只支持水平翻转
+    args:
+        bboxes()
+        img_shape(h, w)
+    """
+    assert bboxes.shape[-1] % 4 == 0
+    w = img_shape[1]
+    flipped = bboxes.copy()
+    flipped[..., 0::4] = w - bboxes[..., 2::4] - 1  # 
+    flipped[..., 2::4] = w - bboxes[..., 0::4] - 1
+    return flipped
 
 
 def imnormalize(img, mean, std):
@@ -177,20 +227,22 @@ class ImgTransform():
     所以在pytorch中至少需要to_rgb, to_chw, to_tensor
     """
     def __init__(self, mean=None, std=None, to_rgb=None, to_tensor=None, 
-                 to_chw=None, flip=None, scale=None, keep_ratio=None):
+                 to_chw=None, flip_ratio=None, scale=None, size_divisor=None, keep_ratio=None):
         self.mean = mean
         self.std = std
         self.to_rgb = to_rgb
         self.to_tensor = to_tensor
         self.to_chw = to_chw            # 定义转换到chw
-        self.scale = scale              # 定义缩放比例
-        self.flip = flip                # 定义水平翻转
+        self.flip_ratio = flip_ratio    # 定义水平翻转
+        self.scale = scale              # 定义缩放后的尺寸，比如[1300, 800]
+        self.size_divisor = size_divisor
         self.keep_ratio = keep_ratio    # 定义保持缩放比例
         
     def __call__(self, img):
         """img输入：hwc, bgr
            img输出：chw, rgb, tensor
         """
+        ori_shape = img.shape  #(h,w,c)
         # 默认值
         scale_factor = 1
         # 所有变换
@@ -202,16 +254,24 @@ class ImgTransform():
             img, scale_factor = imrescale(img, self.scale, return_scale=True)
         elif self.scale is not None and not self.keep_scale: #　如果不固定比例缩放
             img, w_scale, h_scale = imresize(img, self.scale, return_scale=True)
-            scale_factor = np.array([w_scale, h_scale, w_scale, h_scale], dtype=np.float32) #
-        if self.flip:
-            img = imflip(img)
+            scale_factor = np.array([w_scale, h_scale, w_scale, h_scale], dtype=np.float32) #变成4个scale目的是提供bbox的xmin/ymin/xmax/ymax的缩放比例
+        scale_shape = img.shape
+        
+        if self.flip_ratio is not None and self.flip_ratio > 0:
+            flip = True if np.random.rand() < self.flip_ratio else False  # 随机一个均匀分布(0-1)
+            if flip:
+                img = imflip(img)
+        if self.size_divisor is not None:
+            img = impad_to_multiple(img, self.size_divisor)
+            pad_shape = img.shape  # (h,w,c)
+        
         if self.to_chw:
             img = img.transpose(2, 0, 1) # h,w,c to c,h,w
         ori_shape = img.shape
         
         if self.to_tensor:
             img = torch.tensor(img)
-        return (img, ori_shape, scale_factor)
+        return (img, ori_shape, scale_shape, pad_shape, scale_factor, flip)
 
 
 class LabelTransform():
@@ -232,11 +292,22 @@ class LabelTransform():
 
     
 class BboxTransform():
-    """Bbox变换类"""
-    def __init__(self):
-        pass
-    def __call__(self):
-        pass
+    """Bbox变换类: 这个变换比较特殊，他需要基于img_transform的结果进行变换。
+    所以初始化时不输入什么参数，而在call的时候输入所有变换参数
+    """
+    def __init__(self, to_tensor=None):
+        self.to_tensor = to_tensor
+        
+    def __call__(self, bboxes, img_shape, scale_factor, flip):
+        gt_bboxes = bboxes * scale_factor
+        
+        if flip:
+            gt_bboxes = bbox_flip
+        
+        
+        if self.to_tensor:
+            bboxes = torch.tensor(bboxes)
+        return bboxes
 
 
 from albumentations import (

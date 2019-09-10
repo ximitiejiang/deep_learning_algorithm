@@ -89,10 +89,11 @@ def get_dataset(dataset_cfg, transform_cfg):
     if transform_cfg.get('img_params') is not None:
         img_p = transform_cfg['img_params']
         img_transform = ImgTransform(**img_p)
-    if transform_cfg.get('label_params') is not None:
+        # 只要创建了img transform，就自动创建label transform，且必然跟img transform同步执行(因为包含to tensor操作) 
         label_p = transform_cfg['label_params']
         label_transform = LabelTransform(**label_p)
-    if transform_cfg.get('bbox_params') is not None:
+        # 只要创建img transform, 就自动创建bbox transform，但具体执行与否取决于数据集
+        # 且由于bbox_transform比较特殊，大部分变换参数取决于img_transform，因此在call的时候输入
         bbox_p = transform_cfg['bbox_params']
         bbox_transform = BboxTransform(**bbox_p)
     

@@ -13,7 +13,11 @@ from dataset.base_dataset import BasePytorchDataset
 
 class VOCDataset(BasePytorchDataset):
     """VOC数据集：用于物体分类和物体检测
-    2007+2012数据总数16551(5011 + 11540), 可以用2007版做小数据集试验。
+    2007版+2012版数据总数16551(5011 + 11540), 可以用2007版做小数据集试验。
+    主要涉及3个文件夹：ImageSets/Main/文件夹中包含.txt文件作为ann_file存放图片名称列表。
+                        (一般包含有所有类别的train.txt, val.txt, trainval.txt, test.txt，也包含有每种类别的，所以可以抽取其中几种做少类别二分类或多分类数据集)
+                      JPEGImages/文件夹包含.jpg文件，基于图片名称列表进行调用
+                      Annotations/文件夹包含.xml文件，基于图片名称列表进行调用
     输入：
         root_path
         ann_file
@@ -34,7 +38,8 @@ class VOCDataset(BasePytorchDataset):
                  label_transform=None,
                  bbox_transform=None,
                  data_type=None,
-                 difficult=False):
+                 with_difficult=False):
+        self.with_difficult = with_difficult
         # 变换函数
         self.img_transform = img_transform
         self.label_transform = label_transform
@@ -46,9 +51,10 @@ class VOCDataset(BasePytorchDataset):
         self.class_label_dict = {cat: i+1 for i, cat in enumerate(self.CLASSES)}  # 从1开始(1-20). 
         # 加载图片标注表(只是标注所需文件名，而不是具体标注值)，额外加了一个w,h用于后续参考
         self.img_anns = self.load_annotation_inds(self.ann_file) 
+        
     
     def load_annotation_inds(self, ann_file):
-        """从多个标注文件读取标注列表，过程是： 读取ann.txt获得图片名列表 -> 获得img/xml文件名 -> 打开img,打开xml
+        """从多个标注文件读取标注列表
         """
         img_anns = []
         for i, af in enumerate(ann_file): # 分别读取多个子数据源
@@ -125,22 +131,36 @@ class VOCDataset(BasePytorchDataset):
         img_info = self.img_anns[idx]
         img_path = img_info['img_file']
         img = cv2.imread(img_path)
+        
         # 读取bbox, label
         ann_dict = self.parse_ann_info(idx)
-        gt_bboxes = ann['bboxes']
-        gt_labels = ann['labels']
-        
-        # transform
+        gt_bboxes = ann_dict['bboxes']
+        gt_labels = ann_dict['labels']
+        if self.with_difficult:
+            gt_bboxes_difficult = ann_dict['bboxes_difficult']
+            gt_labels_difficult = ann_dict['labels_difficult']
+
+        # aug transform
+        # TODO: 这里没有处理gt_bboxes_difficult, gt_labels_difficult
         if self.aug_transform is not None:
             img, gt_bboxes, gt_labels = self.aug_transform(img, gt_bboxes, gt_labels)
-        
-        img, ori_shape, scale_factor = self.img_transform(img)
+        # img transform
+        img, ori_shape, scale_shape, pad_shape, scale_factor, flip = self.img_transform(img)
         
         gt_bboxes = self.bbox_transform(gt_bboxes)
-        
+        # 组合img_meta
+        img_meta = dict(ori_shape = ori_shape,
+                        scale_factor = scale_factor,
+                        flip = flip)
         # 组合数据
-        data = 0
-        # 如果gt bbox数据缺失，则重新随机一张图片
+        data = dict(img = img,
+                    img_meta = img_meta,
+                    gt_bboxes = gt_bboxes,
+                    gt_labels = gt_labels)
+        if self.with_difficult:
+            data['gt_bboxes_difficult'] = gt_bboxes_difficult
+            data['gt_labels_difficult'] = gt_labels_difficult
+        # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片
         while True:
             if len(gt_bboxes) == 0:
                 idx = np.random.choice()

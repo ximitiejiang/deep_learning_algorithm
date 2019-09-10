@@ -61,13 +61,16 @@ transform = dict(
                 to_rgb=True,    # bgr to rgb
                 to_tensor=True, # numpy to tensor 
                 to_chw=True,    # hwc to chw
-                flip=None,
-                scale=None,
-                keep_ratio=None),
+                flip_ratio=None,
+                scale=[512, 512],
+                size_divisor=None,
+                keep_ratio=True),
         label_params=dict(
                 to_tensor=True,
                 to_onehot=None),
-        bbox_params=None,
+        bbox_params=dict(
+                to_tensor=True
+                ),
         aug_params=None)
 
 transform_val = dict(
@@ -77,9 +80,10 @@ transform_val = dict(
                 to_rgb=True,    # bgr to rgb
                 to_tensor=True, # numpy to tensor 
                 to_chw=True,    # hwc to chw
-                flip=None,
-                scale=None,
-                keep_ratio=None),
+                flip_ratio=None,
+                scale=[512, 512],  # [w,h]
+                size_divisor=None,
+                keep_ratio=True),
         label_params=dict(
                 to_tensor=True,
                 to_onehot=None),
@@ -92,7 +96,7 @@ trainset = dict(
         params=dict(
                 root_path=data_root_path, 
                 ann_file=[data_root_path + 'VOC2007/ImageSets/Main/trainval.txt',
-                          data_root_path + 'VOC2012/ImageSets/Main/trainval.txt'],
+                          data_root_path + 'VOC2012/ImageSets/Main/trainval.txt'], #分为train.txt, val.txt, trainval.txt, test.txt
                 subset_path=[data_root_path + 'VOC2007/',
                           data_root_path + 'VOC2012/'],
                 data_type='train'))
@@ -101,10 +105,8 @@ valset = dict(
         repeat=0,
         params=dict(
                 root_path=data_root_path, 
-                ann_file=[data_root_path + 'VOC2007/ImageSets/Main/trainval.txt',
-                          data_root_path + 'VOC2012/ImageSets/Main/trainval.txt'],
-                subset_path=[data_root_path + 'VOC2007/',
-                          data_root_path + 'VOC2012/'],
+                ann_file=[data_root_path + 'VOC2007/ImageSets/Main/test.txt'],
+                subset_path=[data_root_path + 'VOC2007/'],                         #注意只有2007版本有test.txt，到2012版取消了。
                 data_type='test'))
 
 trainloader = dict(
