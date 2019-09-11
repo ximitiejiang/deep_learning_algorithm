@@ -83,12 +83,14 @@ def test3():
     label = torch.tensor(2)
     shape = np.array([3,16,16])
     scale = 1
+    meta = dict(ori_shape=(32,32,3),
+                pad_shape=(43,43,3))
     # 假定是OrderedDict
-    batch = [{'img':img, 'label':label, 'shape':shape, 'scale':scale},
-             {'img':img, 'label':label, 'shape':shape, 'scale':scale},
-             {'img':img, 'label':label, 'shape':shape, 'scale':scale}]
+    batch = [{'img':img, 'label':label, 'shape':shape, 'scale':scale, 'meta':meta},
+             {'img':img, 'label':label, 'shape':shape, 'scale':scale, 'meta':meta},
+             {'img':img, 'label':label, 'shape':shape, 'scale':scale, 'meta':meta}]
     
-    result = OrderedDict()
+    result = dict()
     data = batch[0].values()
     data = list(data)
     for i, name in enumerate(batch[0].keys()):  # 第i个变量的堆叠
@@ -101,50 +103,13 @@ def test3():
         if isinstance(data[i], (int, float)):
             stacked = np.stack([sample[name] for sample in batch])
             result[name] = torch.tensor(stacked)
+        if isinstance(data[i], dict):   # 处理dict的方式不同，没有堆叠
+            result[name] = [sample[name] for sample in batch]   
     return result  # 期望的result应该是{'img': img, 'label':label}
 
 # %%
-# a simple custom collate function, just to show the idea
-def my_collate(batch):
-    data = [item[0] for item in batch]
-    target = [item[1] for item in batch]
-    target = torch.LongTensor(target)
-    return [data, target]
-
-
-def show_image_batch(img_list, title=None):
-    num = len(img_list)
-    fig = plt.figure()
-    for i in range(num):
-        ax = fig.add_subplot(1, num, i+1)
-        ax.imshow(img_list[i].numpy().transpose([1,2,0]))
-        ax.set_title(title[i])
-
-    plt.show()
-
-
-def test2():
-    #  do not do randomCrop to show that the custom collate_fn can handle images of different size
-    train_transforms = transforms.Compose([transforms.Scale(size = 224),
-                                           transforms.ToTensor(),
-                                           ])
-    
-    # change root to valid dir in your system, see ImageFolder documentation for more info
-    train_dataset = datasets.ImageFolder(root="/hd1/jdhao/toyset",
-                                         transform=train_transforms)
-    
-    trainset = DataLoader(dataset=train_dataset,
-                          batch_size=4,
-                          shuffle=True,
-                          collate_fn=my_collate, # use custom collate function here
-                          pin_memory=True)
-    
-    trainiter = iter(trainset)
-    imgs, labels = trainiter.next()
-    
-    # print(type(imgs), type(labels))
-    show_image_batch(imgs, title=[train_dataset.classes[x] for x in labels])
-
-# %%
 if __name__ == "__main__":
-    test3()
+    result = test3()
+    result['img'].shape
+    len(result['meta'])
+    

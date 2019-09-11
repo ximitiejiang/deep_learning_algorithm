@@ -12,7 +12,7 @@ import time
 
 from utils.prepare_training import get_config, get_logger, get_dataset, get_dataloader 
 from utils.prepare_training import get_model, get_optimizer, get_lr_processor, get_loss_fn
-from utils.visualization import visualization
+from utils.visualization import vis_loss_acc
 from utils.tools import accuracy
 from utils.checkpoint import load_checkpoint, save_checkpoint
     
@@ -196,7 +196,7 @@ class Runner():
         times = time.time() - start
         self.logger.info('training finished with times(s): {}'.format(times))
         # 绘图
-        visualization(self.buffer, title='train')
+        vis_loss_acc(self.buffer, title='train')
         self.weight_ready= True
     
     

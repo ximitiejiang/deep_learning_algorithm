@@ -94,12 +94,12 @@ def imrescale(img, scales, interpolation='bilinear', return_scale=True):
     注意：一个习惯差异是，计算机内部一般都用h,w，但描述图片尺寸惯例却是用w,h
     比如要求的scales=(1333,800)即w不超过1333，h不超过800
     img: 图片输入格式(h,w,c)
-    scales: 比例输入格式(scale_value)或(w, h)
+    scales: 尺度输入格式(scale_value)或(w, h)
     """
     h, w = img.shape[:2]
     if isinstance(scales, (float, int)): # 如果输入单个数值
         scale_factor = scales
-    elif isinstance(scales, tuple): # 如果输入h,w范围
+    elif isinstance(scales, (tuple,list)): # 如果输入w,h取值范围
         max_long_edge = max(scales)
         max_short_edge = min(scales)
         long_edge = max(h, w)
@@ -109,10 +109,21 @@ def imrescale(img, scales, interpolation='bilinear', return_scale=True):
     new_size = (int(w * scale_factor+0.5), int(h * scale_factor+0.5))  # 注意必须是w,h输入
     new_img = imresize(img, new_size, interpolation=interpolation)
     
+#    show_scale_compare((img.shape[1],img.shape[0]), new_size, scales)
+    
     if return_scale:
         return new_img, scale_factor
     else:
         return new_img
+
+def show_scale_compare(old_size, new_size, scale_range):
+    """显式scale变换后的图片尺寸对比: 输入(w,h)"""
+    img = 255*np.ones((800,800,3))
+    cv2.rectangle(img, (0,0), old_size, (0,255,0),2)
+    cv2.rectangle(img, (0,0), new_size, (0,0,125),2)
+    cv2.rectangle(img, (0,0), scale_range, (0,0,0), 3)
+    cv2.imshow('compare', img)
+
 
 def impad(img, shape, pad_val=0):
     """对图片边缘进行填充: 采用的方式是在图片右下角额外填充。
@@ -193,12 +204,19 @@ def imnormalize(img, mean, std):
     std (3,)
     返回img(h,w,c)
     """
+    img = img.astype(np.float32)  # 为避免uint8与float的计算冲突，在计算类transform都增加类型转换
+    mean = np.array(mean).reshape(-1)
+    std = np.array(std).reshape(-1)
     return (img - mean) / std    # (h,w,3)-(3,)/(3,)=(h,w,3)
 
 
 def imdenormalize(img, mean, std):
-    """图片的逆标准化: 每个通道c独立进行操作"""
-    return img * std + mean
+    """图片的逆标准化: 每个通道c独立进行操作
+    img(h,w,c)
+    mean(3,)
+    std(3,)
+    """
+    return img * std + mean   # (h,w,3) *(3,) +(3,)=(h,w,3)
 
 
 def bgr2rgb(img):
@@ -215,7 +233,7 @@ def get_dataset_norm_params(dataset):
     输出: mean, std 也是基于bgr顺序的3个通道的值(3,) (3,)
         
     实例：参考mmcv中cifar10的数据mean = [0.4914, 0.4822, 0.4465], std = [0.2023, 0.1994, 0.2010]
-    以上是先归一化到[0-1]之后再求得均值和方差，本方法所求结果跟该mmcv在std上稍有差异，待澄清。
+    以上是先归一化到[0-1]之后再求得均值和方差，本方法所求结果跟该mmcv一致。 
     """
     all_means = []
     all_stds = []
@@ -262,15 +280,16 @@ class ImgTransform():
             img = imnormalize(img, self.mean, self.std)
         if self.to_rgb:
             img = bgr2rgb(img)
-        if self.scale is not None and self.keep_scale: # 如果是固定比例缩放
+        if self.scale is not None and self.keep_ratio: # 如果是固定比例缩放
             img, scale_factor = imrescale(img, self.scale, return_scale=True)
-        elif self.scale is not None and not self.keep_scale: #　如果不固定比例缩放
+        elif self.scale is not None and not self.keep_ratio: #　如果不固定比例缩放
             img, w_scale, h_scale = imresize(img, self.scale, return_scale=True)
             scale_factor = np.array([w_scale, h_scale, w_scale, h_scale], dtype=np.float32) #变成4个scale目的是提供bbox的xmin/ymin/xmax/ymax的缩放比例
         scale_shape = img.shape
         
+        flip = False
         if self.flip_ratio is not None and self.flip_ratio > 0:
-            flip = True if np.random.rand() < self.flip_ratio else False  # 随机一个均匀分布(0-1)
+            flip = True if np.random.rand() < self.flip_ratio else False  # 随机一个均匀分布(0-1)的值
             if flip:
                 img = imflip(img)
                 
@@ -279,8 +298,9 @@ class ImgTransform():
         pad_shape = img.shape  # (h,w,c)
         
         if self.to_chw:
-            img = img.transpose(2, 0, 1) # h,w,c to c,h,w
-        
+            img = img.transpose(2, 0, 1) # h,w,c to c,h,w，注意这里用transpose是numpy的命令所以能用在3d数据，但如果是tensor数据就会报错，因为tensor的transpose只支持2d, permute才支持3d
+            img = np.ascontiguousarray(img) # numpy在transpose之后可能导致not contiguous问题产生报错，参考https://discuss.pytorch.org/t/negative-strides-of-numpy-array-with-torch-dataloader/28769
+            
         if self.to_tensor:
             img = torch.tensor(img)
         return (img, ori_shape, scale_shape, pad_shape, scale_factor, flip)
@@ -324,7 +344,7 @@ class LabelTransform():
             
         return label
     
-
+"""
 from albumentations import (
     HorizontalFlip, IAAPerspective, ShiftScaleRotate, CLAHE, RandomRotate90,
     Transpose, ShiftScaleRotate, Blur, OpticalDistortion, GridDistortion, HueSaturationValue,
@@ -332,11 +352,11 @@ from albumentations import (
     IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, Compose)
 
 class AugmentTransform():
-    """数据增强变换类：通过封装albumentations来实现
+    '''数据增强变换类：通过封装albumentations来实现
     参考：https://github.com/albu/albumentations, 
     实例：https://github.com/albu/albumentations/blob/master/notebooks/example.ipynb
     实例：https://github.com/albu/albumentations/blob/master/notebooks/example_16_bit_tiff.ipynb
-    """
+    '''
     def __init__(self, p=0.5,
                  horizontal_flip=False,
                  random_rotate_90=False):
@@ -351,27 +371,52 @@ class AugmentTransform():
         auged = self.aug()
         
         return auged['image'], auged['']
+"""
 
 
-def img_transform_inv(img, mean, std, show=True):
-    """图片逆变换显示"""
-    img = img * std + mean      # denormalize
-    img = img.numpy()           # tensor to numpy
-    img = img.transpose(1,2,0)  # chw to hwc
-    img = img[..., [2,1,0]]     # rgb to bgr
+from utils.visualization import vis_img_bbox
+def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_names=None,show=False):
+    """图片和bbox的逆变换和显示，为了简化处理，不做scale/flip的逆变换，这样便于跟bbox统一比较
+    注意，逆变换过程需要注意的地方很多，尽可能用这个函数完成。
+    """
+    # 为了便于计算时广播，变换成一维array
+    mean = np.array(mean).reshape(-1)
+    std = np.array(std).reshape(-1)
+    # tensor to array, to cpu
+    if isinstance(img, torch.Tensor):
+        img = img.cpu()
+    img = img.numpy()
+    if bboxes is not None:
+        if isinstance(bboxes, torch.Tensor):
+            bboxes = bboxes.cpu()
+            labels = labels.cpu()
+        bboxes = bboxes.numpy()
+        labels = labels.numpy()
+    # chw to hwc
+    img = img.transpose(1,2,0)
+    img = np.ascontiguousarray(img)
+    # rgb to bgr
+    img = img[..., [2,1,0]]     # 该步必须在hwc之后操作
+    # denormalize，该步必须在bgr之后做，因为mean/std的顺序是BGR顺序 (512,512,3) * (3,) + (3,)
+    img = imdenormalize(img, mean, std)  
+    # 最后截取0-255的无符号整数
+    img = np.clip(img, 0, 255).astype(np.uint8)
     if show:
-        cv2.imshow('raw img', img)
-    return img
-        
+        if bboxes is None:  # 只显示img
+            cv2.imshow('raw img', img)  # hwc, bgr
+        else:   # 同时显示img,bboxes, labels
+            vis_img_bbox(img, bboxes, labels, class_names)
 
+    return img, bboxes, labels
+        
 
 if __name__ == "__main__":
 #    labels = np.array([[0,1,0],[0,0,1]])
 #    new_labels = onehot_to_label(labels)
     
-    img = cv2.imread('./test.jpg')
+    img = cv2.imread('../example/2.jpg')
     cv2.imshow('original', img)
-    new_img = imresize(img, (14,14), interpolation='bilinear')
+    new_img, scale_factor = imrescale(img, (700,600), interpolation='bilinear', return_scale=True)
     cv2.imshow('show', new_img)
 
 

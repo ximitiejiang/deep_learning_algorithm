@@ -56,7 +56,7 @@ def get_logger(logger_cfg):
 
 # %%
 from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
-from dataset.mnist_dataset import MnistDataset
+from dataset.voc_dataset import VOCDataset
 from utils.transform import ImgTransform, BboxTransform, LabelTransform
 
 class RepeatDataset(object):
@@ -81,7 +81,7 @@ def get_dataset(dataset_cfg, transform_cfg):
     """
     datasets = {'cifar10' : Cifar10Dataset,
                 'cifar100' : Cifar100Dataset,
-                'mnist' : MnistDataset}
+                'voc':VOCDataset}
     img_transform = None
     label_transform = None
     bbox_transform = None    
@@ -142,6 +142,7 @@ def multi_collate(batch):
 
 def dict_collate(batch):
     """自定义字典堆叠式collate，此时要求数据集输出为一个dict。
+    需要解决2个问题：1.如果img每张尺寸都不同无法堆叠如何处理？2.如果meta不是数组无法堆叠如何处理？
     数据集输出：dict
     输入：batch为list(dict), 每个元素为一个dict, [{'img':img, 'label', label, 'scale':scale}, {..}, {..}]
     输出：result为dict, 每个value都是堆叠好的 {'img':img, 'label':label, 'scale':scale,...}
@@ -151,11 +152,13 @@ def dict_collate(batch):
     data = list(data)  # 取出数据用于检查类型
     for i, name in enumerate(batch[0].keys()):  # 第i个变量的堆叠
         if isinstance(data[i], torch.Tensor):  
-            stacked = torch.stack([sample[name] for sample in batch])
-            result[name] = stacked
+#            stacked = torch.stack([sample[name] for sample in batch])
+            result[name] = [sample[name] for sample in batch]
         if isinstance(data[i], np.ndarray):
-            stacked = np.stack([sample[name] for sample in batch])
-            result[name] = torch.tensor(stacked)
+#            stacked = np.stack([sample[name] for sample in batch])
+#            result[name] = torch.tensor(stacked)
+            result[name] = [sample[name] for sample in batch]
+            
         if isinstance(data[i], (tuple,list)):
             stacked = np.stack([sample[name] for sample in batch])
             result[name] = torch.tensor(stacked)
@@ -297,7 +300,9 @@ def get_lr_processor(runner, lr_processor_cfg):
     params.setdefault('runner', runner)
     return lr_processor_class(**params)
     
-    
+
+if __name__ == "__main__":
+    pass    
         
         
 

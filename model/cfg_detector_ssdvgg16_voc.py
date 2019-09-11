@@ -56,8 +56,8 @@ header=dict(
 
 transform = dict(
         img_params=dict(
-                mean=[113.86538318, 122.95039414, 125.30691805],  # 基于BGR顺序
-                std=[51.22018275, 50.82543151, 51.56153984],
+                mean=[123.675, 116.28, 103.53], std=[1, 1, 1],  # 基于BGR顺序: 由于采用caffe的backbone模型，所以图片归一化参数基于caffe
+                std=[1, 1, 1],
                 to_rgb=True,    # bgr to rgb
                 to_tensor=True, # numpy to tensor 
                 to_chw=True,    # hwc to chw

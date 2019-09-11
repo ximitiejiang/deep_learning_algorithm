@@ -19,7 +19,18 @@
    img = img.float()
    label = label.long()
    这两句要放在每个batch开始位置。
-   
+
+2. 所以建议自定义一个to_tensor()函数可写成如下：
+    if isinstance(data, torch.Tensor):
+        return data
+    elif isinstance(data, np.ndarray):
+        return torch.from_numpy(data)
+    elif isinstance(data, Sequence) and not mmcv.is_str(data):
+        return torch.tensor(data)
+    elif isinstance(data, int):
+        return torch.LongTensor([data])
+    elif isinstance(data, float):
+        return torch.FloatTensor([data])
    
 ### 关于训练时候的路径问题
 
@@ -39,7 +50,7 @@
    - 来自pytorch的基模型：[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375]
    - 来自caffe的基模型：[123.675, 116.28, 103.53], std=[1, 1, 1]
 
-2. 如果在一个数据集上从头训练，则需要事先计算他的mean, std。
+2. 如果在一个数据集上从头训练，则需要事先计算他的mean, std。但要注意mean,std的数值顺序到底是BGR顺序还是RGB顺序。
    如下是参考的数据集数据(来自mmdetection):
     - cifar10(归一化加标准化): mean = [0.4914, 0.4822, 0.4465], std = [0.2023, 0.1994, 0.2010]
     - cifar10(只做标准化)：mean, std
@@ -108,6 +119,22 @@
    (从这个角度说，pytorch的官方英文文档有问题，注明DataLoader的collate_fn默认=None，
    但实际上collate_fn的默认=default_collate_fn。)
    
+
+### 关于contiguous的问题
+
+1. numpy和pytorch都有可能产生in_contiguous的问题。主要都是在transpose(),permute()之后会发生。
+参考：https://discuss.pytorch.org/t/negative-strides-of-numpy-array-with-torch-dataloader/28769
+
+2. 在numpy数据下的报错形式是：ValueError: some of the strides of a given numpy array are negative. 
+   This is currently not supported, but will be added in future releases.
+   
+3. 在tensor数据下的报错形式是：
+   可通过t1.is_contiguous()查看到是否连续。
+
+4. 解决方案;
+    - 对于numpy：  img = np.ascontiguousarray(img)
+    - 对于tensor： img = img.contiguous()
+
 
 ### 关于在dataset的__getitem__()中增加断点导致程序崩溃的问题
 

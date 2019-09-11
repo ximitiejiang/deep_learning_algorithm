@@ -37,6 +37,7 @@ class VOCDataset(BasePytorchDataset):
                  img_transform=None,
                  label_transform=None,
                  bbox_transform=None,
+                 aug_transform=None,
                  data_type=None,
                  with_difficult=False):
         self.with_difficult = with_difficult
@@ -45,11 +46,12 @@ class VOCDataset(BasePytorchDataset):
         self.img_transform = img_transform
         self.label_transform = label_transform
         self.bbox_transform = bbox_transform
+        self.aug_transform = aug_transform
         
         self.ann_file = ann_file
         self.subset_path = subset_path
-        # TODO: 是否取0-19更合适？
-        self.class_label_dict = {cat: i+1 for i, cat in enumerate(self.CLASSES)}  # 从1开始(1-20). 
+        # TODO: 这里改成了从0-19，是否要保持跟mmdetection一致成1-20？
+        self.class_label_dict = {cat: i for i, cat in enumerate(self.CLASSES)}  # 从1开始(1-20). 
         # 加载图片标注表(只是标注所需文件名，而不是具体标注值)，额外加了一个w,h用于后续参考
         self.img_anns = self.load_annotation_inds(self.ann_file) 
         
@@ -167,62 +169,13 @@ class VOCDataset(BasePytorchDataset):
         # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片
         while True:
             if len(gt_bboxes) == 0:
-                idx = np.random.choice(len(self.img_infos))
+                idx = np.random.choice(len(self.img_anns))
                 self.__getitem__(idx)
             return data
 
     def __len__(self):
-        return len(self.img_infos)
-    
-if __name__ == '__main__':
-    from utils.transform import ImgTransform, LabelTransform, BboxTransform, img_transform_inv
-    from utils.prepare_training import dict_collate
-    import torch
-    
-    data_root_path='/home/ubuntu/MyDatasets/voc/VOCdevkit/'
-    params=dict(
-                root_path=data_root_path, 
-                ann_file=[data_root_path + 'VOC2007/ImageSets/Main/trainval.txt',
-                          data_root_path + 'VOC2012/ImageSets/Main/trainval.txt'],
-                subset_path=[data_root_path + 'VOC2007/',
-                          data_root_path + 'VOC2012/'],
-                data_type='train')
-    
-    transform = dict(
-        img_params=dict(
-                mean=[113.86538318, 122.95039414, 125.30691805],  # 基于BGR顺序
-                std=[51.22018275, 50.82543151, 51.56153984],
-                to_rgb=True,    # bgr to rgb
-                to_tensor=True, # numpy to tensor 
-                to_chw=True,    # hwc to chw
-                flip_ratio=None,
-                scale=[512, 512],
-                size_divisor=None,
-                keep_ratio=True),
-        label_params=dict(
-                to_tensor=True,
-                to_onehot=None),
-        bbox_params=dict(
-                to_tensor=True
-                ),
-        aug_params=None)
-    
-    img_transform = ImgTransform()
-    bbox_transform = BboxTransform()
-    label_transform = LabelTransform()
-        
-    dataset = VOCDataset(**params, 
-                         img_transform = img_transform,
-                         label_transform=label_transform, 
-                         bbox_transform=bbox_transform)
-    data = dataset[0]   
-    img = data['img']
-    img = img_transform_inv(img, transform['img_params']['mean'])
-    bbox = data['gt_bboxes']
-    dataloader = torch.utils.data.DataLoader(dataset, **params, 
-                                             collate_fn=dict_collate)
-    data_batch = next(iter(dataloader))
-    img_batch = data_batch['img']
-    meta_batch = data_batch['img_meta']
+        return len(self.img_anns)
 
-    
+
+if __name__ == "__main__":
+    pass 

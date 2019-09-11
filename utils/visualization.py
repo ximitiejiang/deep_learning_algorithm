@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import cv2
 
 
-def visualization(buffer_dict, title='result: '):
+def vis_loss_acc(buffer_dict, title='result: '):
     """可视化结果: 至少包含acc(比如验证)
     输入: dict[key, value_list]
             loss(list): [loss1, loss2,..] or [[iter1, loss1], [iter2, loss2], ...]
@@ -83,13 +83,43 @@ def visualization(buffer_dict, title='result: '):
         plt.show()
 
 
-def img_inv_transform(img, mean, std, show=True):
-    """图片逆变换显示"""
-    img = img * std + mean      # denormalize
-    img = img.numpy()           # tensor to numpy
-    img = img.transpose(1,2,0)  # chw to hwc
-    img = img[..., [2,1,0]]     # rgb to bgr
-    if show:
-        cv2.imshow('raw img', img)
-    return img
+def vis_img_bbox(img, bboxes, labels, class_names=None,
+        thickness=1, font_scale=0.5):
+    """简化版显示img,bboxes,labels
+    img
+    bboxes
+    labels
+    """
+    from utils.colors import COLORS
+    # 准备颜色
+    color_list = []
+    for color in COLORS.values():
+        color_list.append(color)
+    color_list.pop(-1) # the last one is white, reserve for text only, not for bboxes
+    color_list = color_list * 12  # 循环加长到84，可以显示80类的coco
+    random_colors = np.stack(color_list, axis=0)  # (7,3)
+#    random_colors = np.tile(random_colors, (12,1))[:len(class_names),:]
+    # 开始绘制
+    for bbox, label in zip(bboxes, labels):
+        bbox_int = bbox.astype(np.int32)
+        left_top = (bbox_int[0], bbox_int[1])
+        right_bottom = (bbox_int[2], bbox_int[3])
+        cv2.rectangle(                  # 画方框
+            img, left_top, right_bottom, random_colors[label].tolist(), 
+            thickness=thickness)
+        label_text = class_names[       # 准备文字
+            label] if class_names is not None else 'cls {}'.format(label)
+        if len(bbox) > 4:
+            label_text += ': {:.02f}'.format(bbox[-1])
+            
+        txt_w, txt_h = cv2.getTextSize(
+            label_text, cv2.FONT_HERSHEY_DUPLEX, font_scale, thickness = 1)[0]
+        cv2.rectangle(                  # 画文字底色方框
+            img, (bbox_int[0], bbox_int[1]), 
+            (bbox_int[0] + txt_w, bbox_int[1] - txt_h - 4), 
+            random_colors[label].tolist(), -1)  # -1为填充，正整数为边框thickness
+        cv2.putText(
+            img, label_text, (bbox_int[0], bbox_int[1] - 2),     # 字体选择cv2.FONT_HERSHEY_DUPLEX, 比cv2.FONT_HERSHEY_COMPLEX好一点
+            cv2.FONT_HERSHEY_DUPLEX, font_scale, [255,255,255])
+    cv2.imshow('result', img)  
 
