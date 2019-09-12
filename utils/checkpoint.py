@@ -45,7 +45,7 @@ def weights_to_cpu(state_dict):
 def load_checkpoint(model, checkpoint_path, map_location=None):
     """加载模型参数：
     inputs
-        filename: 可以是torchvision://的形式，则从/.torch/models文件夹加载，如果不存在则从pytorch官网下载
+        checkpoint_path: 可以是torchvision://的形式，则从/.torch/models文件夹加载，如果不存在则从pytorch官网下载
                   比如torchvision://alexnet, torchvision://resnet34，都是合法形式
                   也可以是文件目录加载，比如/home/ubuntu/xxx/xxx.resnet34.pth
         map_location: 用于加载checkpoint时定义加载到cpu还是GPU

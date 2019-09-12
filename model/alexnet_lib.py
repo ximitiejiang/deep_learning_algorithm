@@ -7,12 +7,27 @@ Created on Tue Aug  6 20:35:36 2019
 """
 import torch.nn as nn
 from utils.init_weights import init_weights
+from model.activation import activation_dict
 
-activation_dict = {'sigmoid':nn.Sigmoid,
-                   'relu':nn.ReLU,
-                   'elu':nn.ELU,
-                   'leaky_relu':nn.LeakyReLU}
+# %% 标准alexnet
+class AlexNet(nn.Module):
+    """标准AlexNet
+    结构可参考torchvision.models.alexnet
+    注意：如果采用pytorch的预训练模型，需要：
+        - 输入img进行归一化和标准化：即先除以255归一化到[0-1]，然后标准化到N(0,1)基于参数mean = [0.485, 0.456, 0.406]，std = [0.229, 0.224, 0.225]
+        - 输入img尺寸w.h需要至少224
+    参考说明：https://pytorch.org/docs/stable/torchvision/models.html#classification
+    """
+    def __init__(self, n_classes):
+        super().__init__()
+        self.features = nn.Sequential(
+                nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
+                nn.ReLU(inplace = True),
+                nn.MaxPool2d(kernel_size=3, stride=2, padding=0, dilation=1, ceil_mode=False),)
+        
 
+
+# %% 自定义修改的alexnet
 def conv3x3(in_channels, out_channels, activation='relu', with_bn=True, stride=1, padding=1):
     """标准化基础conv3x3: 该标准conv默认不改变特征图尺寸(s=1,p=1)"""
     module = [nn.Conv2d(in_channels, out_channels, 3, stride, padding)]

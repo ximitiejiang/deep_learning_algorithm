@@ -15,6 +15,9 @@ from utils.prepare_training import get_model, get_optimizer, get_lr_processor, g
 from utils.visualization import vis_loss_acc
 from utils.tools import accuracy
 from utils.checkpoint import load_checkpoint, save_checkpoint
+
+def to_device(data, device):
+    """用于把数据添加进设备"""
     
 
 class BatchProcessor(): 
@@ -25,8 +28,14 @@ class BatchProcessor():
 
 
 class BatchDetector(BatchProcessor):    
-    def __call__(self, model, data):
-        losses = model(**data)  # 调用nn.module的__call__()函数，等效于调用forward()函数
+    def __call__(self, model, data, device):
+        # 数据送入设备：注意数据格式问题改为在to_tensor中结果
+        imgs = data['img'].to(device)
+        img_metas = data['img_meta'].to(device)
+        gt_bboxes = data['gt_bboxes'].to(device)
+        gt_labels = data['gt_labels'].to(device)
+        
+        losses = self.model.bbox_head(imgs)  # 调用nn.module的__call__()函数，等效于调用forward()函数
         loss = losses.mean()
         outputs = dict(loss=loss)
         return outputs

@@ -227,6 +227,23 @@ def rgb2bgr(img):
     return img[..., [2, 1, 0]]
 
 
+def to_tensor(data):
+    """pytorch专用转换成tensor的自定义函数：
+    确保img被转换为float32(跟weight匹配)，int被转化为int64(跟交叉熵公式匹配)
+    """
+    if isinstance(data, int):  # python3中只有一种整数类型int, 没有long的类型
+        return torch.LongTensor([data])
+    if isinstance(data, float): # python3中只有一种浮点数类型float，没有其他类型
+        return torch.FloatTensor([data])
+    
+    if isinstance(data, np.ndarray):  # numpy to tensor
+        return torch.from_numpy(data)
+    if isinstance(data, torch.Tensor): # tensor to tensor
+        return data
+    if isinstance(data, list):   # list to tensor (注意字符串不能转tensor)
+        return torch.tensor(data)
+
+
 def get_dataset_norm_params(dataset):
     """计算数据集的均值和标准差
     输入图片需基于hwc，bgr格式。
@@ -255,11 +272,22 @@ def get_dataset_norm_params(dataset):
 class ImgTransform():
     """常规数据集都是hwc, bgr输出，但pytorch操作是在chw,rgb条件下进行。
     所以在pytorch中至少需要to_rgb, to_chw, to_tensor
+    args:
+        mean, std: 标准化，[B, G, R]均值，[B, G, R]标准差
+        norm: 是否归一化
+        to_rgb: 转rgb
+        to_tensor: 转tensor
+        to_chw: hwc转chw
+        flip_ratio: 水平翻转比例
+        scale: 图片目标尺寸(w, h)
+        size_divisor: 边缘填充目标除数
+        keep_ratio: 缩放是否保持比例
     """
-    def __init__(self, mean=None, std=None, to_rgb=None, to_tensor=None, 
+    def __init__(self, mean=None, std=None, norm=None, to_rgb=None, to_tensor=None, 
                  to_chw=None, flip_ratio=None, scale=None, size_divisor=None, keep_ratio=None):
         self.mean = mean
         self.std = std
+        self.norm = norm
         self.to_rgb = to_rgb
         self.to_tensor = to_tensor
         self.to_chw = to_chw            # 定义转换到chw
@@ -276,7 +304,10 @@ class ImgTransform():
         # 默认值
         scale_factor = 1
         # 所有变换
-        if self.mean is not None:
+        if self.mean is not None and self.norm:  # 标准化+归一化
+            img = img / 255
+            img = imnormalize(img, self.mean, self.std)
+        if self.mean is not None and not self.norm:  # 标准化
             img = imnormalize(img, self.mean, self.std)
         if self.to_rgb:
             img = bgr2rgb(img)
@@ -302,7 +333,7 @@ class ImgTransform():
             img = np.ascontiguousarray(img) # numpy在transpose之后可能导致not contiguous问题产生报错，参考https://discuss.pytorch.org/t/negative-strides-of-numpy-array-with-torch-dataloader/28769
             
         if self.to_tensor:
-            img = torch.tensor(img)
+            img = to_tensor(img)
         return (img, ori_shape, scale_shape, pad_shape, scale_factor, flip)
 
     
@@ -324,7 +355,7 @@ class BboxTransform():
         gt_bboxes[:, 1::2] = np.clip(gt_bboxes[:, 1::2], 0, img_shape[0])
         
         if self.to_tensor:
-            gt_bboxes = torch.tensor(gt_bboxes)
+            gt_bboxes = to_tensor(gt_bboxes)
         return gt_bboxes
 
 
@@ -340,7 +371,7 @@ class LabelTransform():
             label = label_to_onehot(label)
             
         if self.to_tensor:
-            label = torch.tensor(label)
+            label = to_tensor(label)
             
         return label
     

@@ -10,33 +10,67 @@ import torch.nn as nn
 import torch.nn.functional as F
 from utils.checkpoint import load_checkpoint
 from utils.init_weights import kaiming_init, constant_init, normal_init, xavier_init
+from activation import activation_dict
 
 # %% 最简版ssd vgg16
 
+def vgg_3x3(num_convs, in_channels, out_channels, with_bn=False, activation='relu', with_maxpool, 
+            stride=1, padding=1, ceil_mode=True):
+    """vgg的3x3卷积集成模块：
+    - 可包含n个卷积(2-3个)，但卷积的通道数默认在第一个卷积变化，而中间卷积不变，即默认s=1,p=1(这种设置尺寸能保证尺寸不变)。
+      所以只由第一个卷积做通道数修改，只由最后一个池化做尺寸修改。
+    - 可包含n个bn
+    - 可包含n个激活函数
+    - 可包含一个maxpool: 默认maxpool的尺寸为2x2，stride=2，即默认特征输出尺寸缩减1/2
+    输出：
+        layer(list)
+    """
+    layers = []
+    for i in range(num_convs):
+        # conv3x3
+        layers.append(nn.Conv2d(in_channels, out_channels, kernel_size=3, stride, padding))
+        # bn
+        if with_bn:
+            layers.append(nn.BatchNorm2d(out_channels))
+        # activation
+        activation_class = activation_dict[activation] 
+        layers.append(activation_class(inplace=True))
+        in_channels = out_channels
+    # maxpool
+    if with_maxpool:
+        layers.append(nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=ceil_mode))
+    return layers
+
+
 class SSDVGG16(nn.Module):
-    """ 在基础版VGG16结构上ssd修改部分包括：去掉最后一层maxpool然后增加一层maxpool，增加extra convs, l2norm
+    """ vgg16是指带参层有16层(13conv + 3linear)
+    ssdvgg16是在基础版VGG16结构上ssd修改部分包括：
+    去掉最后一层maxpool然后增加一层maxpool，增加extra convs, l2norm
               img               (3,  h, w)
-        2x    3x3               (64, h, w)
+        ----------------------------------------
+              3x3               (64, h, w)
               3x3               (64, h, w)
               maxpool2x2    s2  (64, h/2, w/2)
-        2x    3x3               (128,h/2, w/2)
+              3x3               (128,h/2, w/2)
               3x3               (128,h/2, w/2)
               maxpool2x2    s2  (128, h/4, w/4)
-        3x    3x3               (256, h/4, w/4)
+              3x3               (256, h/4, w/4)
               3x3               (256, h/4, w/4)
               3x3               (256, h/4, w/4)
               maxpool2x2    s2  (256, h/8, w/8)
-        3x    3x3               (512, h/8, w/8)
+              3x3               (512, h/8, w/8)
               3x3               (512, h/8, w/8)
               3x3               (512, h/8, w/8)
               maxpool2x2    s2  (512, h/16, w/16)
-        3x    3x3               (512, h/16, w/16)
               3x3               (512, h/16, w/16)
               3x3               (512, h/16, w/16)
-              maxpool2x2    s2  (512, h/16, w/16)
+              3x3               (512, h/16, w/16)
+        add   maxpool2x2    s2  (512, h/16, w/16)
+        ------------------------------------------
         add
               3x3(p=6,d=6)  (1024, )
               1x1           (1024, )
+        ------------------------------------------
         extra
               1x1           ()
               3x3
@@ -63,8 +97,8 @@ class SSDVGG16(nn.Module):
         vgg_layers = []
         in_channels = 3
         for i, convs in enumerate(self.blocks):
-            out_channels = 64 * 2**i if i <=3 else 512
-            block_layers = self.make_vgg_block(convs, in_channels, out_channels)
+            out_channels = [64, 128, 256, 512, 512] # 输出通道数
+            block_layers = self.vgg_3x3(convs, in_channels, out_channels[i])
             vgg_layers.extend(block_layers) # 用extend而不是append
             in_channels = out_channels
             
@@ -87,18 +121,7 @@ class SSDVGG16(nn.Module):
         self.extra = self.make_extra_block(in_channels=1024)
         self.l2_norm = L2Norm(self.features[out_feature_indices[0] - 1].out_channels, l2_norm_scale)
 
-    def make_vgg_block(self, num_convs, in_channels, out_channels, with_bn=False, ceil_mode=True):
-        """构造一个conv + bn + relu + Maxpool的子模块，存成list，最后统一解包放入nn.Sequential()
-        """
-        layers = []
-        for i in range(num_convs):
-            layers.append(nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1))
-            if with_bn:
-                layers.append(nn.BatchNorm2d(out_channels))
-            layers.append(nn.ReLU(inplace=True))
-            in_channels = out_channels
-        layers.append(nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=ceil_mode))
-        return layers
+
      
     def make_extra_block(self, in_channels):
         """额外增加10个conv，用来获得额外的更多尺度输出

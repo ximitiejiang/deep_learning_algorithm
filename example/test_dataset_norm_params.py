@@ -6,9 +6,9 @@ Created on Tue Sep  3 18:35:56 2019
 @author: ubuntu
 """
 
-from utils.transformer import get_dataset_norm_params
+from utils.transform import get_dataset_norm_params, normalize
 from dataset.cifar_dataset import Cifar10Dataset
-from utils.transformer import normalize
+
 """
 计算一个数据集的均值和方差：输入图片需基于chw，rgb格式。
     实例：参考mmcv中cifar10的数据mean = [0.4914, 0.4822, 0.4465], std = [0.2023, 0.1994, 0.2010]

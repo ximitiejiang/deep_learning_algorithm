@@ -6,7 +6,8 @@ Created on Sat Aug 10 17:22:46 2019
 @author: ubuntu
 """
 
-from utils.module_factory import registry, build_module
+#from utils.module_factory import registry, build_module
+from utils.prepare_training import get_model
 import torch.nn as nn
 
 # %% onestage
@@ -17,17 +18,16 @@ class OneStageDetector(nn.Module):
         self.cfg = cfg
         
         # 创建基础模型
-        self.backbone = build_module(cfg.model.backbone, registry)
-        self.bbox_head = build_module(cfg.model.bbox_head, registry)
-        if cfg.model.neck is not None:
-            self.neck = build_module(cfg.model.neck, registry)
+        self.backbone = get_model(cfg.backbone)
+        if cfg.neck is not None:
+            self.neck = get_model(cfg.neck)
+        self.bbox_head = get_model(cfg.head)
         
-        # 初始化
-        # TODO: init weight中我没有指定map_location，那么指定cpu/gpu操作需要在之后进行
-        self.init_weights(pretrained=cfg.model.pretrained)
+        # 初始化: 注意权重需要送入cpu/gpu，该步在model.to()完成
+        self.init_weights()
     
-    def init_weights(self, pretrained):
-        self.backbone.init_weights(pretrained = pretrained)
+    def init_weights(self):
+        self.backbone.init_weights(pretrained = self.cfg.backbone.params.pretrained)
         self.bbox_head.init_weights()
         if self.neck is not None:
             self.neck.init_weights()  # TODO: 检查为什么上一版本没有这句neck的初始化

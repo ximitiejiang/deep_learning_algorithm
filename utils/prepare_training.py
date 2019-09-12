@@ -145,7 +145,7 @@ def dict_collate(batch):
     需要解决2个问题：1.如果img每张尺寸都不同无法堆叠如何处理？2.如果meta不是数组无法堆叠如何处理？
     数据集输出：dict
     输入：batch为list(dict), 每个元素为一个dict, [{'img':img, 'label', label, 'scale':scale}, {..}, {..}]
-    输出：result为dict, 每个value都是堆叠好的 {'img':img, 'label':label, 'scale':scale,...}
+    输出：result为dict(list), 每个value都分类放在同一list中 {'img':[imgs], 'label':[labels], 'scale':[scales],...}
     """
     result = {}
     data = batch[0].values()
@@ -160,14 +160,15 @@ def dict_collate(batch):
             result[name] = [sample[name] for sample in batch]
             
         if isinstance(data[i], (tuple,list)):
-            stacked = np.stack([sample[name] for sample in batch])
-            result[name] = torch.tensor(stacked)
+#            stacked = np.stack([sample[name] for sample in batch])
+#            result[name] = torch.tensor(stacked)
+            result[name] = [sample[name] for sample in batch]
+            
         if isinstance(data[i], (int, float)):
-            stacked = np.stack([sample[name] for sample in batch])
-            result[name] = torch.tensor(stacked)
-        # 针对子dict，比如img_meta数据，没有进行堆叠，而是放在list里边，通过result['img_meat'][i]也可以调用
-        # 因为这种meta数据类型多样，包括了tuple/float，所以无法堆叠
-        # 同时也没有转换成tensor
+#            stacked = np.stack([sample[name] for sample in batch])
+#            result[name] = torch.tensor(stacked)
+            result[name] = [sample[name] for sample in batch]
+
         if isinstance(data[i], dict):
             result[name] = [sample[name] for sample in batch] 
     return result  # 期望的result应该是{'img': img, 'label':label, 'img_meta':list(dict)}
@@ -220,10 +221,10 @@ def get_dataloader(dataset, dataloader_cfg):
         
 
 # %%
-from model.cnn_detector_lib import OneStageDetector
-from model.cnn_alexnet_lib import AlexNet8
-from model.cnn_ssdvgg16_lib import SSDVGG16
-from model.cnn_head_lib import SSDHead
+from model.detector_lib import OneStageDetector
+from model.alexnet_lib import AlexNet8
+from model.ssdvgg16_lib import SSDVGG16
+from model.head_lib import SSDHead
 
 def get_model(model_cfg):
     """创建模型：如果创建集成模型(detector)，则需要传入根cfg，如果创建单模型，则需要传入该模型cfg_model
@@ -234,18 +235,19 @@ def get_model(model_cfg):
             'vgg16' : SSDVGG16,
             'ssdhead' : SSDHead}
     
+    # 检测器主模型
     if model_cfg.get('type', None) is None and model_cfg.task=='detector':   # 不包含type的detector
         model_name = model_cfg.model['type']
         model_class = models[model_name]
         model = model_class(model_cfg)        # 不包含type的classifier
         return model
-
+    # 分类器主模型
     elif model_cfg.get('type', None) is None and model_cfg.task=='classifier':         
         model_name = model_cfg.model.get('type')
         model_class = models[model_name]
         params = model_cfg.model.params
         return model_class(**params)
-            
+    #　所有子模型        
     elif model_cfg.get('type', None) is not None:   # 否则就是直接创建model
         model_name = model_cfg['type']
         model_class = models[model_name]
@@ -299,6 +301,23 @@ def get_lr_processor(runner, lr_processor_cfg):
     params = lr_processor_cfg.params
     params.setdefault('runner', runner)
     return lr_processor_class(**params)
+
+
+# %%
+from torch.utils.tensorboard import SummaryWriter
+
+class TensorBoardWriter():
+    """创建tensorboard的writer类
+    参考：https://pytorch.org/docs/stable/tensorboard.html
+    """
+    def __init__(self):
+        self.writer = SummaryWriter()
+    
+    def update(self, data=None, grid=None, title='result'):
+        if grid is not None:
+            self.writer.add_image(title, grid, 0)
+        if data is not None:
+            self.writer.add_scalar(title, data)
     
 
 if __name__ == "__main__":

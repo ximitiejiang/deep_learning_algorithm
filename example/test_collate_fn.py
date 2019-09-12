@@ -63,21 +63,16 @@ def test1():
             result.append(torch.tensor(stacked))
     return result
 
+
 # %% 
 def dict_collate(batch):
     """batch的获取是通过[dataset[i] for i in indics]，所以必然是list
     但里边dataset返回的每一个数据，可以是dict, 比如{'img': img, 'label': label, 'shape': shape}
     """
     result = []
-    for sample in zip(*batch):
-        if isinstance(sample[0], dict):
-            stacked = 1
-            result.append()
-    
     return result
 
 def test3():
-    from collections import OrderedDict
     
     img = torch.ones(2,4)
     label = torch.tensor(2)
@@ -106,6 +101,7 @@ def test3():
         if isinstance(data[i], dict):   # 处理dict的方式不同，没有堆叠
             result[name] = [sample[name] for sample in batch]   
     return result  # 期望的result应该是{'img': img, 'label':label}
+
 
 # %%
 if __name__ == "__main__":

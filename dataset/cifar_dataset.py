@@ -82,18 +82,19 @@ class Cifar10Dataset(BasePytorchDataset):
         data_dict = OrderedDict()
         img = self.imgs[idx]
         label = self.labels[idx]
+        
         if self.bboxes is not None:
             bbox = self.bboxes[idx]
         
         if self.label_transform is not None:
             label = self.label_transform(label)
-            data_dict['label'] = label            
+        data_dict['label'] = label            
         
         if self.img_transform is not None:
             img, ori_shape, scale_factor = self.img_transform(img)  # transform输出img(img, ori_shape, scale_factor), label
-            data_dict['img'] = img
             data_dict['ori_shape'] = ori_shape
             data_dict['scale_factor'] = scale_factor
+        data_dict['img'] = img
             
         if self.bboxes is not None and self.bbox_transform is not None:
             bbox = self.bbox_transform(bbox)
