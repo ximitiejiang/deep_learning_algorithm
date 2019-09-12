@@ -22,7 +22,7 @@ n_epochs = 1
 imgs_per_core = 32               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
 workers_per_core = 2
 save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
-work_dir = '/home/ubuntu/mytrain/cls_antsbees/'
+work_dir = '/home/ubuntu/mytrain/ssdvgg16_antsbees/'
 resume_from = None               # 恢复到前面指定的设备
 load_from = None
 load_device = 'cuda'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
@@ -44,9 +44,9 @@ logger = dict(
                 interval=100)
 
 model = dict(                    # model是必须要有的参数，用来表示主检测器集成模型或者单分类器模型
-        type='alexnet8',          
+        type='ssdvgg16',          
         params=dict(
-                n_classes=10))
+                n_classes=2))
 
 transform = dict(
         img_params=dict(

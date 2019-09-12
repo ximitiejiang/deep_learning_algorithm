@@ -40,7 +40,7 @@ model = dict(
 backbone=dict(
         type='ssdvgg16',
         pretrained= '/home/ubuntu/.torch/models/vgg16_caffe-292e1171.pth',   # 这是caffe的模型，对应mean=[123.675, 116.28, 103.53], std=[1, 1, 1]
-#        pretrained='/home/ubuntu/.torch/models/vgg16-397923af.pth',   # 这是pytorch的模型，对应mean, std
+#        pretrained='/home/ubuntu/.torch/models/vgg16-397923af.pth',          # 这是pytorch的模型，对应mean, std
         params=dict(
                 num_classes=10,
                 out_feature_indices=(),

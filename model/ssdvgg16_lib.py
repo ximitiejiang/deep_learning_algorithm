@@ -9,12 +9,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from utils.checkpoint import load_checkpoint
-from utils.init_weights import kaiming_init, constant_init, normal_init, xavier_init
+from utils.init_weights import common_init_weights, kaiming_init, constant_init, normal_init, xavier_init
 from activation import activation_dict
 
 # %% 最简版ssd vgg16
 
-def vgg_3x3(num_convs, in_channels, out_channels, with_bn=False, activation='relu', with_maxpool, 
+def vgg3x3(num_convs, in_channels, out_channels, with_bn=False, activation='relu', with_maxpool=True, 
             stride=1, padding=1, ceil_mode=True):
     """vgg的3x3卷积集成模块：
     - 可包含n个卷积(2-3个)，但卷积的通道数默认在第一个卷积变化，而中间卷积不变，即默认s=1,p=1(这种设置尺寸能保证尺寸不变)。
@@ -92,13 +92,15 @@ class SSDVGG16(nn.Module):
         self.blocks = self.arch_setting[16]
         self.num_classes = num_classes
         self.out_feature_indices = out_feature_indices
+        self.extra_out_feature_indices = extra_out_feature_indices
+        self.l2_norm_scale = l2_norm_scale
         
         #构建所有vgg基础层
         vgg_layers = []
         in_channels = 3
         for i, convs in enumerate(self.blocks):
             out_channels = [64, 128, 256, 512, 512] # 输出通道数
-            block_layers = self.vgg_3x3(convs, in_channels, out_channels[i])
+            block_layers = self.vgg3x3(convs, in_channels, out_channels[i])
             vgg_layers.extend(block_layers) # 用extend而不是append
             in_channels = out_channels
             
@@ -106,6 +108,7 @@ class SSDVGG16(nn.Module):
         self.features = nn.Sequential(*vgg_layers) 
         
         # ssd额外添加maxpool + 2层conv
+        # 注意命名需要跟前面层一致，才能确保加载权重是正确的。
         self.features.add_module(
                 str(len(self.features)), nn.MaxPool2d(kernel_size=3, stride=1, padding=1))# 最后一个maxpool的stride改为1
         self.features.add_module(
@@ -146,24 +149,43 @@ class SSDVGG16(nn.Module):
     def init_weight(self, pretrained=None):
         """用于模型初始化，统一在detector中进行"""
         # 载入vgg16_caffe的权重初始化vgg
-        if pretrained is not None:
-            load_checkpoint(self, pretrained, map_location=None)
-        # 其他新增的features层的初始化
-        else:
-            for m in self.features.modules():
-                if isinstance(m, nn.Conv2d):
-                    kaiming_init(m)
-                elif isinstance(m, nn.BatchNorm2d):
-                    constant_init(m, 1)
-                elif isinstance(m, nn.Linear):
-                    normal_init(m, std=0.01)
+        common_init_weights(self.features, pretrained)
+        
+#        if pretrained is not None:
+#            load_checkpoint(self, pretrained, map_location=None)
+#        # 其他新增的features层的初始化
+#        else:
+#            for m in self.features.modules():
+#                if isinstance(m, nn.Conv2d):
+#                    kaiming_init(m)
+#                elif isinstance(m, nn.BatchNorm2d):
+#                    constant_init(m, 1)
+#                elif isinstance(m, nn.Linear):
+#                    normal_init(m, std=0.01)
         # exra层初始化
         for m in self.extra.modules():
             if isinstance(m, nn.Conv2d):
                 xavier_init(m, distribution='uniform')
         # l2 norm层初始化
         constant_init(self.l2_norm, self.l2_norm.scale)
-        
+    
+    
+#    def init_weights(model, pretrained=None):
+#        """通用的模型初始化函数"""
+#        if isinstance(pretrained, str):
+#            load_checkpoint(model, pretrained, strict=False)
+#        
+#        elif pretrained is None:
+#            for m in model.modules():
+#                if isinstance(m, nn.Conv2d):
+#                    kaiming_init(m)
+#                elif isinstance(m, nn.BatchNorm2d):
+#                    constant_init(m, 1)
+#                elif isinstance(m, nn.Linear):
+#                    normal_init(m, std=0.01)
+#        else:
+#            raise TypeError('pretrained must be a str or None')
+    
     def forward(self, x):
         outs = []
         # 前向计算features层

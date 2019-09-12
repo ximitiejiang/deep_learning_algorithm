@@ -1,7 +1,7 @@
 import torch.nn as nn
 from utils.checkpoint import load_checkpoint
 
-def init_weights(model, pretrained=None):
+def common_init_weights(model, pretrained=None):
     """通用的模型初始化函数"""
     if isinstance(pretrained, str):
         load_checkpoint(model, pretrained, strict=False)
