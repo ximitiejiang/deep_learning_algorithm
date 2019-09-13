@@ -28,7 +28,8 @@ def vgg3x3(num_convs, in_channels, out_channels, with_bn=False, activation='relu
     layers = []
     for i in range(num_convs):
         # conv3x3
-        layers.append(nn.Conv2d(in_channels, out_channels, kernel_size=3, stride, padding))
+        layers.append(nn.Conv2d(in_channels, out_channels, kernel_size=3, 
+                                stride=stride, padding=padding))
         # bn
         if with_bn:
             layers.append(nn.BatchNorm2d(out_channels))
@@ -44,6 +45,9 @@ def vgg3x3(num_convs, in_channels, out_channels, with_bn=False, activation='relu
 
 class SSDVGG16(nn.Module):
     """ vgg16是指带参层有16层(13conv + 3linear)
+    vgg的最大贡献在于：提出了2个3x3卷积相当于一个5x5卷积的感受野，3个3x3的卷积相当于一个7x7卷积的感受野。
+    因此vgg都是通过2个3x3卷积和3个3x3卷积的组合。
+    
     ssdvgg16是在基础版VGG16结构上ssd修改部分包括：
     去掉最后一层maxpool然后增加一层maxpool，增加extra convs, l2norm
               img               (3,  h, w)
@@ -100,9 +104,9 @@ class SSDVGG16(nn.Module):
         in_channels = 3
         for i, convs in enumerate(self.blocks):
             out_channels = [64, 128, 256, 512, 512] # 输出通道数
-            block_layers = self.vgg3x3(convs, in_channels, out_channels[i])
+            block_layers = vgg3x3(convs, in_channels, out_channels[i])
             vgg_layers.extend(block_layers) # 用extend而不是append
-            in_channels = out_channels
+            in_channels = out_channels[i]
             
         vgg_layers.pop(-1) # 去掉最后一层max pool
         self.features = nn.Sequential(*vgg_layers) 
@@ -169,23 +173,6 @@ class SSDVGG16(nn.Module):
         # l2 norm层初始化
         constant_init(self.l2_norm, self.l2_norm.scale)
     
-    
-#    def init_weights(model, pretrained=None):
-#        """通用的模型初始化函数"""
-#        if isinstance(pretrained, str):
-#            load_checkpoint(model, pretrained, strict=False)
-#        
-#        elif pretrained is None:
-#            for m in model.modules():
-#                if isinstance(m, nn.Conv2d):
-#                    kaiming_init(m)
-#                elif isinstance(m, nn.BatchNorm2d):
-#                    constant_init(m, 1)
-#                elif isinstance(m, nn.Linear):
-#                    normal_init(m, std=0.01)
-#        else:
-#            raise TypeError('pretrained must be a str or None')
-    
     def forward(self, x):
         outs = []
         # 前向计算features层
@@ -214,9 +201,14 @@ class L2Norm(nn.Module):
         self.scale = scale
     
     def forward(self, x):
-        norm = x.pow(2).sum(1, keepdim=True).sqrt() + self.eps
+        norm = x.pow(2).sum(1, keepdim=True).sqrt() + self.eps  #  l2 = sqrt(sum(xi^2))
         return self.weight[None, :, None].expand_as(x) * x / norm
 
 
 if __name__ == "__main__":
+    import numpy as np
     model = SSDVGG16()
+    print(model)
+    img = np.ones((8, 3, 300, 300))  # b,c,h,w
+    img = torch.tensor(img).float()
+    out = model(img)

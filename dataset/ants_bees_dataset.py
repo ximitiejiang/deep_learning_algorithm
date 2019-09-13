@@ -62,7 +62,8 @@ class AntsBeesDataset(BasePytorchDataset):
         img = cv2.imread(ann['img_path']) # hwc
         label = ann['label']
         
-        data_dict = {}        
+        data_dict = {}
+        
         if self.label_transform is not None:
             label = self.label_transform(label)
         data_dict['label'] = label            
@@ -76,7 +77,7 @@ class AntsBeesDataset(BasePytorchDataset):
         return data_dict
      
     def __len__(self):
-        pass
+        return len(self.img_anns)
 
 
 if __name__ == "__main__":

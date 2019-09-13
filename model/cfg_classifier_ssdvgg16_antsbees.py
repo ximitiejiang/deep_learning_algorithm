@@ -25,7 +25,7 @@ save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
 work_dir = '/home/ubuntu/mytrain/ssdvgg16_antsbees/'
 resume_from = None               # 恢复到前面指定的设备
 load_from = None
-load_device = 'cuda'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
+load_device = 'cpu'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
 
 lr = 0.01
 
@@ -50,9 +50,9 @@ model = dict(                    # model是必须要有的参数，用来表示�
 
 transform = dict(
         img_params=dict(
-                mean=[113.86538318, 122.95039414, 125.30691805],  # 基于BGR顺序
-                std=[51.22018275, 50.82543151, 51.56153984],
-                norm=None,
+                mean=[123.675, 116.28, 103.53],  # 基于BGR顺序
+                std=[1, 1, 1],
+                norm=None,      # 非pytorch模型不需要除以255
                 to_rgb=True,    # bgr to rgb
                 to_tensor=True, # numpy to tensor 
                 to_chw=True,    # hwc to chw
@@ -66,8 +66,8 @@ transform = dict(
 
 transform_val = dict(
         img_params=dict(
-                mean=[113.86538318, 122.95039414, 125.30691805],  # 基于BGR顺序
-                std=[51.22018275, 50.82543151, 51.56153984],
+                mean=[123.675, 116.28, 103.53],  # 基于BGR顺序
+                std=[1, 1, 1],
                 norm=None,
                 to_rgb=True,    # bgr to rgb
                 to_tensor=True, # numpy to tensor 
