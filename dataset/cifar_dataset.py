@@ -82,6 +82,7 @@ class Cifar10Dataset(BasePytorchDataset):
         data_dict = OrderedDict()
         img = self.imgs[idx]
         label = self.labels[idx]
+        data_dict['stack_list'] = ['img']
         
         if self.bboxes is not None:
             bbox = self.bboxes[idx]

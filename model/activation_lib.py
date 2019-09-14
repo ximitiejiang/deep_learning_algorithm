@@ -11,3 +11,9 @@ activation_dict = {'sigmoid':nn.Sigmoid,
                    'relu':nn.ReLU,
                    'elu':nn.ELU,
                    'leaky_relu':nn.LeakyReLU}
+
+class BaseActivation(nn.Module):
+    def __init__(self):
+        pass
+    def __call__(self, x):
+        pass

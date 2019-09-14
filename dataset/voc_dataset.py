@@ -165,7 +165,8 @@ class VOCDataset(BasePytorchDataset):
         data = dict(img = img,
                     img_meta = img_meta,
                     gt_bboxes = gt_bboxes,
-                    gt_labels = gt_labels)
+                    gt_labels = gt_labels,
+                    stack_list = ['img'])
         # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片
         while True:
             if len(gt_bboxes) == 0:

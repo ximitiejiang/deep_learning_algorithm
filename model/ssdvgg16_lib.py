@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from utils.checkpoint import load_checkpoint
 from utils.init_weights import common_init_weights, kaiming_init, constant_init, normal_init, xavier_init
-from activation import activation_dict
+from model.activation_lib import activation_dict
 
 # %% 最简版ssd vgg16
 

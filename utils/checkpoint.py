@@ -12,6 +12,7 @@ import torchvision
 from torch.utils import model_zoo
 import os
 from collections import OrderedDict
+from terminaltables import AsciiTable
 
 from utils.tools import exist_or_mkdir
 
@@ -48,10 +49,12 @@ def load_checkpoint(model, checkpoint_path, map_location=None):
         checkpoint_path: 可以是torchvision://的形式，则从/.torch/models文件夹加载，如果不存在则从pytorch官网下载
                   比如torchvision://alexnet, torchvision://resnet34，都是合法形式
                   也可以是文件目录加载，比如/home/ubuntu/xxx/xxx.resnet34.pth
-        map_location: 用于加载checkpoint时定义加载到cpu还是GPU
+        map_location: 用于加载checkpoint时定义加载到cpu还是GPU, 通常传入自定义的device
     return:
         checkpoint 也就是OrderedDict类型数据
     """
+    if map_location is None:
+        map_location = torch.device('cpu')
     # 从在线获取pytorch的模型参数：如果已经下载则从本地.torch文件夹直接加载
     if checkpoint_path.startswith("torchvision://"):
         model_urls = get_torchvision_models()  # 获得所有模型地址: dict形式
@@ -61,18 +64,71 @@ def load_checkpoint(model, checkpoint_path, map_location=None):
     else: 
         if not os.path.isfile(checkpoint_path):
             raise IOError("%s is not a checkpoint file."%checkpoint_path)
-        checkpoint = torch.load(checkpoint_path, map_location=map_location)  # 从本地路径加载
+        checkpoint = torch.load(checkpoint_path, map_location=map_location)
     # 获取state_dict
-    state_dict = checkpoint['state_dict']
+    if isinstance(checkpoint, OrderedDict):  # 如果是pytorch原有模型，即ordereddict格式，则直接为state dict
+        state_dict = checkpoint
+    elif isinstance(checkpoint, dict):        # 如果是自定义的checkpoint dict, 则从中取state dict
+        state_dict = checkpoint['state_dict']
     if list(state_dict.keys())[0].startswith('module'):  # 如果是并行模型则去掉参数前面的module字段
         state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
     # 加载参数到模型
     if hasattr(model, 'module'): # 如果是并行模型
-        model.module.load_state_dict(state_dict, strict=False)
+#        model.module.load_state_dict(state_dict, strict=False)
+        load_state_dict(model.module, state_dict)
     else:   # 如果是常规模型
-        model.load_state_dict(state_dict, strict=False)
+#        model.load_state_dict(state_dict, strict=False)
+        load_state_dict(model, state_dict)
     return checkpoint
 
+
+def load_state_dict(model, state_dict, logger=None):
+    """用于给model加载state_dict: 剔除命名不同的key和size不同的key，其他则copy给模型参数
+    Args:
+        model: 需要加载state_dict的梦想欧诺个
+        state_dict: 已准备好的state_dict
+    """
+    my_state_dict = model.state_dict()
+    
+    not_need_keys = []
+    size_mismatch_keys = []
+    err_msg = []
+    for key, param in state_dict.items():
+        if key not in my_state_dict.keys():   #如果key不匹配，则舍弃，跳出该轮循环
+            not_need_keys.append(key)
+            continue
+        if param.size() != my_state_dict[key].size():  # 如果尺寸不匹配，则舍弃，跳出该轮循环
+            size_mismatch_keys.append([key, my_state_dict[key].size(), param.size()])
+            continue
+        my_state_dict[key].copy_(param)   # 其他情况，则复制参数给模型
+        
+    # 通知用户加载差异：
+    all_missing_keys = set(my_state_dict.keys()) - set(state_dict.keys())
+    # ignore "num_batches_tracked" of BN layers
+    missing_keys = [
+        key for key in all_missing_keys if 'num_batches_tracked' not in key
+    ]
+    err_msg = []
+    if not_need_keys:
+        err_msg.append('unexpected key in source state_dict: {}'.format(
+            ', '.join(not_need_keys)))
+    if missing_keys:
+        err_msg.append('missing keys in source state_dict: {}'.format(
+            ', '.join(missing_keys)))
+    if size_mismatch_keys:
+        mismatch_info = 'these keys have mismatched shape: '
+        
+        header = ['key', 'expected shape', 'loaded shape']
+        table_data = [header] + size_mismatch_keys
+        table = AsciiTable(table_data)
+        err_msg.append(mismatch_info)
+    if logger is not None:
+        logger.warning(err_msg)
+        logger.warning(table.table)
+    else:
+        print(err_msg)
+        print(table.table)
+    
 
 def get_torchvision_models():
     """这是pytorch的标准函数，用于获取所有pytorch的模型下载地址"""

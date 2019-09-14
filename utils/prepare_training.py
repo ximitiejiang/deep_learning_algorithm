@@ -57,6 +57,7 @@ def get_logger(logger_cfg):
 # %%
 from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
 from dataset.voc_dataset import VOCDataset
+from dataset.ants_bees_dataset import AntsBeesDataset
 from utils.transform import ImgTransform, BboxTransform, LabelTransform
 
 class RepeatDataset(object):
@@ -81,7 +82,8 @@ def get_dataset(dataset_cfg, transform_cfg):
     """
     datasets = {'cifar10' : Cifar10Dataset,
                 'cifar100' : Cifar100Dataset,
-                'voc':VOCDataset}
+                'voc':VOCDataset,
+                'antsbees': AntsBeesDataset}
     img_transform = None
     label_transform = None
     bbox_transform = None    
@@ -92,7 +94,7 @@ def get_dataset(dataset_cfg, transform_cfg):
         # 只要创建了img transform，就自动创建label transform，且必然跟img transform同步执行(因为包含to tensor操作) 
         label_p = transform_cfg['label_params']
         label_transform = LabelTransform(**label_p)
-        # 只要创建img transform, 就自动创建bbox transform，但具体执行与否取决于数据集
+    if transform_cfg.get('bbox_params') is not None:        
         # 且由于bbox_transform比较特殊，大部分变换参数取决于img_transform，因此在call的时候输入
         bbox_p = transform_cfg['bbox_params']
         bbox_transform = BboxTransform(**bbox_p)
@@ -142,7 +144,10 @@ def multi_collate(batch):
 
 def dict_collate(batch):
     """自定义字典堆叠式collate，此时要求数据集输出为一个dict。
-    需要解决2个问题：1.如果img每张尺寸都不同无法堆叠如何处理？2.如果meta不是数组无法堆叠如何处理？
+    需要解决2个问题：1.如果一个batch的每张img尺寸都不同如何堆叠？2.如果meta不是数组无法堆叠如何处理？
+    问题1的解决方案是通过pad成最大尺寸后再进行堆叠，这里不能做成列表因为后续神经网络的前向计算是需要堆叠后的数据进行操作。
+        在每个dict中增加一个stack关键字'stack': ['img', 'segment']用来指定哪些变量需要堆叠。堆叠方式就是先填充成最大图片然后再堆叠。
+    问题2的解决方案是做成列表而不进行堆叠。
     数据集输出：dict
     输入：batch为list(dict), 每个元素为一个dict, [{'img':img, 'label', label, 'scale':scale}, {..}, {..}]
     输出：result为dict(list), 每个value都分类放在同一list中 {'img':[imgs], 'label':[labels], 'scale':[scales],...}
@@ -150,27 +155,22 @@ def dict_collate(batch):
     result = {}
     data = batch[0].values()
     data = list(data)  # 取出数据用于检查类型
+    stack_list = batch[0]['stack_list']
     for i, name in enumerate(batch[0].keys()):  # 第i个变量的堆叠
-        if isinstance(data[i], torch.Tensor):  
-#            stacked = torch.stack([sample[name] for sample in batch])
-            result[name] = [sample[name] for sample in batch]
-        if isinstance(data[i], np.ndarray):
-#            stacked = np.stack([sample[name] for sample in batch])
-#            result[name] = torch.tensor(stacked)
-            result[name] = [sample[name] for sample in batch]
+        
+        if name in stack_list:  # 如果需要堆叠
+            data_list = [sample[name] for sample in batch]
+            shape_stack = np.stack([data.shape for data in data_list], axis=0)
+            max_c, max_h, max_w =  np.max(shape_stack, axis=0)
+            stacked = torch.zeros(len(batch), max_c, max_h, max_w)  # b,c,h,w
+            for dim in range(len(batch)):
+                da = data_list[dim]
+                stacked[dim,:da.shape[0],:da.shape[1],:da.shape[2]] = da
+            result[name] = stacked
             
-        if isinstance(data[i], (tuple,list)):
-#            stacked = np.stack([sample[name] for sample in batch])
-#            result[name] = torch.tensor(stacked)
-            result[name] = [sample[name] for sample in batch]
-            
-        if isinstance(data[i], (int, float)):
-#            stacked = np.stack([sample[name] for sample in batch])
-#            result[name] = torch.tensor(stacked)
+        else:  # 如果不需要堆叠
             result[name] = [sample[name] for sample in batch]
 
-        if isinstance(data[i], dict):
-            result[name] = [sample[name] for sample in batch] 
     return result  # 期望的result应该是{'img': img, 'label':label, 'img_meta':list(dict)}
     
 
@@ -221,8 +221,8 @@ def get_dataloader(dataset, dataloader_cfg):
         
 
 # %%
-from model.detector_lib import OneStageDetector
-from model.alexnet_lib import AlexNet8
+#from model.detector_lib import OneStageDetector
+from model.alexnet_lib import AlexNet, AlexNet8
 from model.ssdvgg16_lib import SSDVGG16
 from model.head_lib import SSDHead
 
@@ -230,8 +230,9 @@ def get_model(model_cfg):
     """创建模型：如果创建集成模型(detector)，则需要传入根cfg，如果创建单模型，则需要传入该模型cfg_model
     """
     models = {
-            'one_stage_detector': OneStageDetector,
+#            'one_stage_detector': OneStageDetector,
             'alexnet8' : AlexNet8,
+            'alexnet' : AlexNet,
             'vgg16' : SSDVGG16,
             'ssdhead' : SSDHead}
     
@@ -304,20 +305,20 @@ def get_lr_processor(runner, lr_processor_cfg):
 
 
 # %%
-from torch.utils.tensorboard import SummaryWriter
-
-class TensorBoardWriter():
-    """创建tensorboard的writer类
-    参考：https://pytorch.org/docs/stable/tensorboard.html
-    """
-    def __init__(self):
-        self.writer = SummaryWriter()
-    
-    def update(self, data=None, grid=None, title='result'):
-        if grid is not None:
-            self.writer.add_image(title, grid, 0)
-        if data is not None:
-            self.writer.add_scalar(title, data)
+#from torch.utils.tensorboard import SummaryWriter
+#
+#class TensorBoardWriter():
+#    """创建tensorboard的writer类
+#    参考：https://pytorch.org/docs/stable/tensorboard.html
+#    """
+#    def __init__(self):
+#        self.writer = SummaryWriter()
+#    
+#    def update(self, data=None, grid=None, title='result'):
+#        if grid is not None:
+#            self.writer.add_image(title, grid, 0)
+#        if data is not None:
+#            self.writer.add_scalar(title, data)
     
 
 if __name__ == "__main__":

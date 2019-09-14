@@ -18,7 +18,7 @@ def accuracy(y_pred, label, topk=1):
     with torch.no_grad():
         # TODO: 增加topk的功能
         if topk == 1:
-            pred = torch.argmax(y_pred, dim=1) # 输出(b,)
+            pred = torch.argmax(y_pred, dim=1)         # 输出(b,)           
             acc = (pred == label).sum().float() / len(label)
         return acc
     

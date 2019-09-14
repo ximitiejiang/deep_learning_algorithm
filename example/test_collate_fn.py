@@ -74,32 +74,37 @@ def dict_collate(batch):
 
 def test3():
     
-    img = torch.ones(2,4)
-    label = torch.tensor(2)
+    img1 = torch.ones(3, 10, 10)
+    img2 = torch.ones(3, 15, 20)
+    img3 = torch.ones(3, 12, 30)
+    
+    label = torch.tensor([1,2,9])
     shape = np.array([3,16,16])
     scale = 1
     meta = dict(ori_shape=(32,32,3),
                 pad_shape=(43,43,3))
     # 假定是OrderedDict
-    batch = [{'img':img, 'label':label, 'shape':shape, 'scale':scale, 'meta':meta},
-             {'img':img, 'label':label, 'shape':shape, 'scale':scale, 'meta':meta},
-             {'img':img, 'label':label, 'shape':shape, 'scale':scale, 'meta':meta}]
+    batch = [{'img':img1, 'label':label, 'shape':shape, 'scale':scale, 'meta':meta, 'stack_list':['img']},
+             {'img':img2, 'label':label, 'shape':shape, 'scale':scale, 'meta':meta, 'stack_list':['img']},
+             {'img':img3, 'label':label, 'shape':shape, 'scale':scale, 'meta':meta, 'stack_list':['img']}]
     
     result = dict()
     data = batch[0].values()
     data = list(data)
+    stack_list = batch[0]['stack_list']
     for i, name in enumerate(batch[0].keys()):  # 第i个变量的堆叠
-        if isinstance(data[i], torch.Tensor):  
-            stacked = torch.stack([sample[name] for sample in batch])
+        if name in stack_list:
+            data_list = [sample[name] for sample in batch]
+            shape_stack = np.stack([data.shape for data in data_list], axis=0)
+            max_c, max_h, max_w =  np.max(shape_stack, axis=0)
+            stacked = torch.zeros(len(batch), max_c, max_h, max_w)  # b,c,h,w
+            for dim in range(len(batch)):
+                da = data_list[dim]
+                stacked[dim,:da.shape[0],:da.shape[1],:da.shape[2]] = da
             result[name] = stacked
-        if isinstance(data[i], np.ndarray):
-            stacked = np.stack([sample[name] for sample in batch])
-            result[name] = torch.tensor(stacked)
-        if isinstance(data[i], (int, float)):
-            stacked = np.stack([sample[name] for sample in batch])
-            result[name] = torch.tensor(stacked)
-        if isinstance(data[i], dict):   # 处理dict的方式不同，没有堆叠
-            result[name] = [sample[name] for sample in batch]   
+            
+        else:  
+            result[name] = [sample[name] for sample in batch]
     return result  # 期望的result应该是{'img': img, 'label':label}
 
 

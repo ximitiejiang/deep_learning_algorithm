@@ -15,17 +15,17 @@ Created on Mon Sep  2 11:30:35 2019
 """
 
 task = 'classifier'              # 用于定义任务类型：classifier, detector, regressor
-gpus = 0
+gpus = 1
 parallel = False
 distribute = False                       
-n_epochs = 1
-imgs_per_core = 32               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
+n_epochs = 10
+imgs_per_core = 8               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
 workers_per_core = 2
 save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
 work_dir = '/home/ubuntu/mytrain/ssdvgg16_antsbees/'
 resume_from = None               # 恢复到前面指定的设备
 load_from = None
-load_device = 'cpu'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
+load_device = 'cuda'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
 
 lr = 0.01
 
@@ -79,19 +79,19 @@ transform_val = dict(
                 to_tensor=True,
                 to_onehot=None))
 
-data_root_path='/home/ubuntu/MyDatasets/cifar-10-batches-py/'  # 统一一个data_root_path变量，便于书写，也便于check
+data_root_path='/home/ubuntu/MyDatasets/AntsBees/'  # 统一一个data_root_path变量，便于书写，也便于check
 trainset = dict(
-        type='cifar10',
+        type='antsbees',
         repeat=0,
         params=dict(
                 root_path=data_root_path, 
                 data_type='train'))
 valset = dict(
-        type='cifar10',
+        type='antsbees',
         repeat=0,
         params=dict(
                 root_path=data_root_path, 
-                data_type='test'))
+                data_type='val'))
 
 trainloader = dict(
         params=dict(

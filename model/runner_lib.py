@@ -15,9 +15,6 @@ from utils.prepare_training import get_model, get_optimizer, get_lr_processor, g
 from utils.visualization import vis_loss_acc
 from utils.tools import accuracy
 from utils.checkpoint import load_checkpoint, save_checkpoint
-
-def to_device(data, device):
-    """用于把数据添加进设备"""
     
 
 class BatchProcessor(): 
@@ -35,7 +32,7 @@ class BatchDetector(BatchProcessor):
         gt_bboxes = data['gt_bboxes'].to(device)
         gt_labels = data['gt_labels'].to(device)
         
-        losses = self.model.bbox_head(imgs)  # 调用nn.module的__call__()函数，等效于调用forward()函数
+        losses = self.model.bbox_head(imgs, gt_labels, gt_bboxes, img_metas)  # 调用nn.module的__call__()函数，等效于调用forward()函数
         loss = losses.mean()
         outputs = dict(loss=loss)
         return outputs
@@ -45,12 +42,17 @@ class BatchClassifier(BatchProcessor):
     def __call__(self, model, data, loss_fn, device, return_loss=True):
         img = data['img']
         label = data['label']
-        # 输入img要修改为float()格式float32，否则跟weight不匹配报错
-        # 输入label要修改为long()格式int64，否则跟交叉熵公式不匹配报错
-        img = img.float().to(device)
-        label = label.long().to(device)
+        # 输入img要修改为float()格式float32，否则跟weight不匹配报错，这步放到transform中to_tensor完成去了
+        # 输入label要修改为long()格式int64，否则跟交叉熵公式不匹配报错，这步放到transform中to_tensor完成去了
+        
+        # 由于model要送入device进行计算，且该计算只跟img相关，跟label无关，所以可以只送img到device，也就是说label可以不组合成一个变量。
+        img = img.to(device)
+#        label = label.to(device)
         # 前向计算
-        y_pred = model(img)
+        # 注意：一个检测问题中，每张图就是一个多样本分类问题，处理方式类似于一次分类，
+        # 所以这里需要先组合label，多张图多个label也就等效于检测中的一张图多个bbox对应多个label
+        y_pred = model(img).cpu()                     # 剩余计算都在cpu上进行
+        label = torch.cat(label, dim=0)               # label组合(b,)
         acc1 = accuracy(y_pred, label, topk=1)
         outputs = dict(acc1=acc1)
         # 反向传播
@@ -112,6 +114,7 @@ class Runner():
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)
         self.valloader = get_dataloader(self.valset, self.cfg.valloader)
+        
         # 创建模型并初始化
         self.model = get_model(self.cfg)
         # 创建损失函数
@@ -227,7 +230,7 @@ class Runner():
                 # 计算总体精度
                 self.n_correct += self.buffer['acc'][-1] * len(data_batch[0])
             
-            visualization(self.buffer, title='val')
+            vis_loss_acc(self.buffer, title='val')
             self.logger.info('ACC on valset: %.3f', self.n_correct/len(self.valset))
         else:
             raise ValueError('no model weights loaded.')

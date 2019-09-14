@@ -6,25 +6,59 @@ Created on Tue Aug  6 20:35:36 2019
 @author: ubuntu
 """
 import torch.nn as nn
-from utils.init_weights import init_weights
-from model.activation import activation_dict
+from utils.init_weights import common_init_weights
+from model.activation_lib import activation_dict
 
 # %% 标准alexnet
 class AlexNet(nn.Module):
     """标准AlexNet
-    结构可参考torchvision.models.alexnet
+    结构可参考torchvision.models.alexnet, 预训练参数可以通过model = torchvision.models.alexnet(pretrained=True)获得
     注意：如果采用pytorch的预训练模型，需要：
         - 输入img进行归一化和标准化：即先除以255归一化到[0-1]，然后标准化到N(0,1)基于参数mean = [0.485, 0.456, 0.406]，std = [0.229, 0.224, 0.225]
         - 输入img尺寸w.h需要至少224
     参考说明：https://pytorch.org/docs/stable/torchvision/models.html#classification
     """
-    def __init__(self, n_classes):
+    def __init__(self, n_classes, pretrained=None):
         super().__init__()
+        
         self.features = nn.Sequential(
                 nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
                 nn.ReLU(inplace = True),
-                nn.MaxPool2d(kernel_size=3, stride=2, padding=0, dilation=1, ceil_mode=False),)
+                nn.MaxPool2d(kernel_size=3, stride=2, padding=0, dilation=1, ceil_mode=False),
+                nn.Conv2d(64, 192, kernel_size=5, stride=1, padding=2),
+                nn.ReLU(inplace = True),
+                nn.MaxPool2d(kernel_size=3, stride=2, padding=0, dilation=1, ceil_mode=False),
+                
+                nn.Conv2d(192, 384, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace = True),
+                nn.Conv2d(384, 256, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace = True),
+                nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+                nn.ReLU(inplace = True),
+                nn.MaxPool2d(kernel_size=3, stride=2, padding=0, dilation=1, ceil_mode=False))
         
+        self.avgpool = nn.AdaptiveAvgPool2d(6)
+        
+        self.classifier = nn.Sequential(
+                nn.Dropout(p=0.5),
+                nn.Linear(9216, 4096),
+                nn.ReLU(inplace=True),
+                nn.Dropout(p=0.5),
+                nn.Linear(4096, 4096),
+                nn.ReLU(inplace=True),
+                nn.Linear(4096, n_classes))
+        
+        self.init_weight(pretrained=pretrained)
+    
+    def forward(self, x):
+        x = self.features(x)
+        x = self.avgpool(x)   # (b,c,h,w)
+        x = x.reshape(x.shape[0], -1)  # (b, c*h*w)
+        x = self.classifier(x)
+        return x
+    
+    def init_weight(self, pretrained):
+        common_init_weights(self, pretrained=pretrained)
 
 
 # %% 自定义修改的alexnet
@@ -69,7 +103,7 @@ class AlexNet8(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.Linear(4096, n_classes))
         
-        self._init_weights()
+        self.init_weights(self)
     
     def forward(self, x):
         x = self.features(x)
@@ -77,7 +111,10 @@ class AlexNet8(nn.Module):
         x = self.classifier(x)
         return x
     
-    def _init_weights(self):
-        init_weights(self, pretrained=None)
+    def init_weights(self):
+        common_init_weights(self, pretrained=None)
         
-        
+if __name__ == '__main__':
+    model = AlexNet(10, pretrained = '/home/ubuntu/MyWeights/alexnet-owt-4df8aa71.pth')       
+    
+    

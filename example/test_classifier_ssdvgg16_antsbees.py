@@ -5,7 +5,10 @@ Created on Thu Sep 12 18:30:02 2019
 
 @author: ubuntu
 """
-
+import sys, os
+path = os.path.abspath('.')
+if not path in sys.path:
+    sys.path.insert(0, os.path.abspath('.'))
 from model.runner_lib import Runner
 
 

@@ -406,9 +406,14 @@ class AugmentTransform():
 
 
 from utils.visualization import vis_img_bbox
-def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_names=None,show=False):
+from utils.tools import get_time_str
+def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_names=None,show=False,save=None):
     """图片和bbox的逆变换和显示，为了简化处理，不做scale/flip的逆变换，这样便于跟bbox统一比较
     注意，逆变换过程需要注意的地方很多，尽可能用这个函数完成。
+    args:
+        img: (c,h,w)
+        bboxes: (n,4)
+        labels: (n)
     """
     # 为了便于计算时广播，变换成一维array
     mean = np.array(mean).reshape(-1)
@@ -437,9 +442,12 @@ def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_name
             cv2.imshow('raw img', img)  # hwc, bgr
         else:   # 同时显示img,bboxes, labels
             vis_img_bbox(img, bboxes, labels, class_names)
-
+    if save is not None:
+        name = save + get_time_str() + '.jpg'
+        cv2.imwrite(name, img)
     return img, bboxes, labels
         
+
 
 if __name__ == "__main__":
 #    labels = np.array([[0,1,0],[0,0,1]])
