@@ -18,8 +18,7 @@ from utils.checkpoint import load_checkpoint, save_checkpoint
     
 
 class BatchProcessor(): 
-    """batchProcessor独立出来，是为了让Runner更具有通用性
-    """
+    """batchProcessor独立出来，是为了让Runner更具有通用性"""
     def __call__(self):
         raise NotImplementedError('BatchProcessor class is not callable.')
 

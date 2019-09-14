@@ -89,6 +89,7 @@ class SSDVGG16(nn.Module):
     
     def __init__(self, 
                  num_classes=2,
+                 pretrained=None,
                  out_feature_indices=(22,34),
                  extra_out_feature_indices = (1, 3, 5, 7),
                  l2_norm_scale=20.):

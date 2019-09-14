@@ -7,11 +7,6 @@ Created on Mon Sep  2 11:30:35 2019
 """
 """--------------------------------------------------------------------------
 基础设置选择
-1.optimizer:
-    - sgd: 
-    - 
-    
-   --------------------------------------------------------------------------
 """
 
 task = 'classifier'              # 用于定义任务类型：classifier, detector, regressor
@@ -46,7 +41,8 @@ logger = dict(
 model = dict(                    # model是必须要有的参数，用来表示主检测器集成模型或者单分类器模型
         type='ssdvgg16',          
         params=dict(
-                n_classes=2))
+                n_classes=2,
+                pretrained='/home/ubuntu/MyWeights/vgg16_caffe.pth'))
 
 transform = dict(
         img_params=dict(
