@@ -191,7 +191,7 @@ class SSDVGG16(nn.Module):
                 outs.append(x)
         # 前向计算l2 norm
         outs[0] = self.l2_norm(outs[0])
-        
+        # 如果作为分类器，则只输出一个
         if self.classifier:
             outs = outs[0][0].reshape(-1)
             outs = self.classifier(outs[0][0])
@@ -216,8 +216,21 @@ class L2Norm(nn.Module):
 
 if __name__ == "__main__":
     import numpy as np
-    model = SSDVGG16()
-    print(model)
-    img = np.ones((8, 3, 300, 300))  # b,c,h,w
+    # 检查ssdvgg的输出是否正确
+#    model = SSDVGG16()
+#    print(model)
+#    img = np.ones((8, 3, 300, 300))  # b,c,h,w
+#    img = torch.tensor(img).float()
+#    out = model(img)
+    
+    # 检查conv计算w,h的取整方式：maxpool可以手动设置，但conv不能，其默认方式是什么？
+    img = np.ones((8,3,9,9))
     img = torch.tensor(img).float()
-    out = model(img)
+    conv = nn.Conv2d(3,64,kernel_size=3, stride=1, padding=1)
+    out = conv(img)  # (9-3+2)/2 +1 = 9
+    
+    img = np.ones((8,3,10,10))
+    img = torch.tensor(img).float()
+    conv = nn.Conv2d(3,64,kernel_size=3, stride=2, padding=1)
+    out2 = conv(img)  # (10-3+2)/2 +1 = 5 (默认下取整，跟maxpool一样，只不过maxpool可以手动指定ceil mode，但conv不能手动指定)
+    

@@ -88,7 +88,19 @@
     - 如果从头开始训练：则采用的mean/std跟实际img的预处理方式必须一样。
       比如采用在0-1之间的小的mean, std，则实际数据处理也要要归一化+标准化。
       而采用大的mean,std，则实际数据处理也只要做标准化。
-      
+
+
+### 关于卷积的取整方式
+
+1. pytorch中conv, maxpool在计算输出w,h尺寸时，默认的取整方式都是下取整(floor)。
+   唯一不同的是，maxpool可以手动设置成上取整即ceil mode，但conv不能手动设置，也就只能下取整。
+
+2. conv, maxpool两者计算输出尺寸的公式一样
+    - 没有dilation时，w' = (w - ksize + 2p)/s + 1
+    - 有diliation时，相当于ksize被扩大，此时
+                     w' = (w - d(ksize-1) +2p -1)/s  + 1
+                     
+                          
       
 ### 关于神经网络的前向计算和反向传播在pytorch中的对应
 
