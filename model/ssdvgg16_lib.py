@@ -8,8 +8,8 @@ Created on Sat Aug 10 22:54:44 2019
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils.checkpoint import load_checkpoint
-from utils.init_weights import common_init_weights, kaiming_init, constant_init, normal_init, xavier_init
+
+from utils.init_weights import common_init_weights, constant_init, xavier_init
 from model.activation_lib import activation_dict
 
 # %% 最简版ssd vgg16
@@ -92,13 +92,16 @@ class SSDVGG16(nn.Module):
                  pretrained=None,
                  out_feature_indices=(22,34),
                  extra_out_feature_indices = (1, 3, 5, 7),
-                 l2_norm_scale=20.):
+                 l2_norm_scale=20.,
+                 classify=None):
         super().__init__()
         self.blocks = self.arch_setting[16]
         self.num_classes = num_classes
         self.out_feature_indices = out_feature_indices
         self.extra_out_feature_indices = extra_out_feature_indices
         self.l2_norm_scale = l2_norm_scale
+        self.classify = classify  # 用来做分类器
+        self.pretrained = pretrained
         
         #构建所有vgg基础层
         vgg_layers = []
@@ -128,7 +131,15 @@ class SSDVGG16(nn.Module):
         # 构建ssd额外卷积层和l2norm层(ssd论文提及)
         self.extra = self.make_extra_block(in_channels=1024)
         self.l2_norm = L2Norm(self.features[out_feature_indices[0] - 1].out_channels, l2_norm_scale)
-
+        
+        # 额外增加3层线性层用来做分类模型
+        if self.classify:
+            self.classifier = nn.Sequential(
+                    nn.Linear(),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(),
+                    nn.ReLU(inplace=True),
+                    nn.Linear())
 
      
     def make_extra_block(self, in_channels):
@@ -151,28 +162,19 @@ class SSDVGG16(nn.Module):
         layers.append(nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=0))
         return nn.Sequential(*layers)
     
-    def init_weight(self, pretrained=None):
+    def init_weight(self):
         """用于模型初始化，统一在detector中进行"""
         # 载入vgg16_caffe的权重初始化vgg
-        common_init_weights(self.features, pretrained)
-        
-#        if pretrained is not None:
-#            load_checkpoint(self, pretrained, map_location=None)
-#        # 其他新增的features层的初始化
-#        else:
-#            for m in self.features.modules():
-#                if isinstance(m, nn.Conv2d):
-#                    kaiming_init(m)
-#                elif isinstance(m, nn.BatchNorm2d):
-#                    constant_init(m, 1)
-#                elif isinstance(m, nn.Linear):
-#                    normal_init(m, std=0.01)
+        common_init_weights(self.features, pretrained=self.pretrained)        
         # exra层初始化
         for m in self.extra.modules():
             if isinstance(m, nn.Conv2d):
                 xavier_init(m, distribution='uniform')
         # l2 norm层初始化
         constant_init(self.l2_norm, self.l2_norm.scale)
+        # 如果作为分类模型的初始化补充
+        if self.classifier:
+            common_init_weights(self.classifier)
     
     def forward(self, x):
         outs = []
@@ -189,6 +191,12 @@ class SSDVGG16(nn.Module):
                 outs.append(x)
         # 前向计算l2 norm
         outs[0] = self.l2_norm(outs[0])
+        
+        if self.classifier:
+            outs = outs[0][0].reshape(-1)
+            outs = self.classifier(outs[0][0])
+            return outs
+            
         return tuple(outs)
         
         

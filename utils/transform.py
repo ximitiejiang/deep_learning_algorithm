@@ -229,9 +229,9 @@ def rgb2bgr(img):
 
 def to_tensor(data):
     """pytorch专用转换成tensor的自定义函数：
-    确保img被转换为float32(跟weight匹配)，int被转化为int64(跟交叉熵公式匹配)
+    确保img被转换为float32即FloatTensor(跟weight匹配)，int被转化为int64即LongTensor(跟交叉熵公式匹配)
     """
-    if isinstance(data, int):  # python3中只有一种整数类型int, 没有long的类型
+    if isinstance(data, (int, np.int64, np.int32, np.int8)):  # python3中只有一种整数类型int, 没有long的类型
         return torch.LongTensor([data])
     if isinstance(data, float): # python3中只有一种浮点数类型float，没有其他类型
         return torch.FloatTensor([data])
@@ -242,6 +242,8 @@ def to_tensor(data):
         return data
     if isinstance(data, list):   # list to tensor (注意字符串不能转tensor)
         return torch.tensor(data)
+    else:
+        raise TypeError('not recognized data type.')
 
 
 def get_dataset_norm_params(dataset):

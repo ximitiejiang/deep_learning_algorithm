@@ -55,7 +55,7 @@ class Cifar10Dataset(BasePytorchDataset):
         # 获取标签
         with open(self.meta_path, 'rb') as f:  # 参考cifar源网站的python代码
             dict = pickle.load(f, encoding='bytes')
-            label_names = dict[b'label_names']
+            label_names = [label.decode('utf-8') for label in dict[b'label_names']]  # decode用于去掉前缀的b
         # 获取数据    
         for path in self.path:
             with open(path, 'rb') as f:
@@ -79,28 +79,26 @@ class Cifar10Dataset(BasePytorchDataset):
         """常规数据集传出的是多个变量，这里改为传出dict，再在定制collate中处理堆叠
         注意：要求传出的为OrderedDict，这样在自定义collate_fn中不会出错。
         """
-        data_dict = OrderedDict()
+        data_dict = {}
         img = self.imgs[idx]
         label = self.labels[idx]
-        data_dict['stack_list'] = ['img']
-        
-        if self.bboxes is not None:
-            bbox = self.bboxes[idx]
         
         if self.label_transform is not None:
-            label = self.label_transform(label)
-        data_dict['label'] = label            
+            label = self.label_transform(label)           
         
         if self.img_transform is not None:
-            img, ori_shape, scale_factor = self.img_transform(img)  # transform输出img(img, ori_shape, scale_factor), label
-            data_dict['ori_shape'] = ori_shape
-            data_dict['scale_factor'] = scale_factor
-        data_dict['img'] = img
-            
-        if self.bboxes is not None and self.bbox_transform is not None:
-            bbox = self.bbox_transform(bbox)
-            data_dict['bbox'] = bbox
-            
+            img, ori_shape, scale_shape, pad_shape, scale_factor, flip = self.img_transform(img)  # transform输出img(img, ori_shape, scale_factor), label
+        
+        img_meta = dict(ori_shape = ori_shape,
+                        scale_shape = scale_shape,
+                        pad_shape = pad_shape,
+                        scale_factor = scale_factor,
+                        flip = flip)
+
+        data_dict = dict(img = img,
+                         img_meta = img_meta,
+                         gt_labels = label,
+                         stack_list = ['img'])  
         return data_dict
     
     def __len__(self):

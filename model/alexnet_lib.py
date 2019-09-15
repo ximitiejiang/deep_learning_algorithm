@@ -103,7 +103,7 @@ class AlexNet8(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.Linear(4096, n_classes))
         
-        self.init_weights(self)
+        self.init_weights()
     
     def forward(self, x):
         x = self.features(x)

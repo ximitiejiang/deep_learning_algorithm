@@ -18,7 +18,7 @@
    输入label要修改为long()格式int64，否则跟交叉熵公式不匹配报错
    img = img.float()
    label = label.long()
-   这两句要放在每个batch开始位置。
+   这两句要放在每个batch开始位置: 
 
 2. 所以建议自定义一个to_tensor()函数可写成如下：
     if isinstance(data, torch.Tensor):
@@ -31,7 +31,20 @@
         return torch.LongTensor([data])
     elif isinstance(data, float):
         return torch.FloatTensor([data])
-   
+
+
+### 关于transform中涉及的类型变换导致的错误
+
+1. transform和transform_inv中涉及的数据类型变换很多种类，很容易漏掉没有做而导致输出形式不对。
+
+2. 对于transform_inv的变换，需要重点关注
+    - 默认数据集输出类型：hwc, bgr。采用这种默认输出形式，主要是因为用opencv作为底层函数的输出就是这种形式。
+      而pytorch需要的形式是chw, rgb，所以经过transform后输出就是chw,rgb
+    - 逆变换需要先变换chw为hwc，然后才变换rgb为bgr：因为rgb2bgr是基于最后一个维度是c来写的。
+    - 逆变换需要把
+    - 
+
+
 ### 关于训练时候的路径问题
 
 1. 经常会产生路径找不到的情况，比较合理的解决方案是：
@@ -96,7 +109,7 @@
 1. 如果要在GPU训练，只需要3步
     - 创建设备device:  device = torch.
     - 模型送入device
-    - batch data送入device
+    - batch data送入device: 注意这里其实只要img送入device就可以，因为跟model相关的计算只需要img输入
 
 2. 并行式GPU训练并不一定比单GPU快，相反对于一些比较小的模型，单GPU的速度远超过并行式训练的速度。
    可能因为并行式训练需要让数据在GPU之间搬运造成时间损耗，同时python的并行式训练并不是真正的并行，
@@ -159,6 +172,22 @@
    所以，虽然能够加载但无法检出。
    也可以把参数移到自定义文件夹去，就可以通过os.path.isfile()检测到了。
    
+
+### 关于常规分类问题和物体检测中的分类问题的差异？
+
+1. 常规分类问题是对一张图片作为最小个体进行分类；而物体检测问题中的分类是以一张图片中的每一个bbox进行分类。
+   因此对于物体检测问题本质上一张图片是多个分类问题的集合。
+   
+2. 因此常规分类问题是一张img对应一个独立label, 1个batch的数据为多张img对应多个独立label，1个batch计算一次loss，
+   所以需要把一个batch的label组合成一组，相当于1个batch就是一组img对应一组label。
+   因此分类的一个batch计算本质上相当于检测问题的一张图片计算。
+
+3. 但是检测分类问题是一张img有一组bbox对应一组label，1个batch的数据为多张img拥有多组bbox对应多组label，每组bbox,label完成一次loss计算。
+   因此检测的一个batch计算本质上相当于每张图片是一次分类batch，多张图片就要手动进行多次img循环计算，循环的主体就是常规分类问题的一个batch。
+   这样理解的话，就可以统一常规分类问题和检测中的分类问题了：
+       - 常规分类问题需要把labels组合成一组，变成一个标准计算。
+       - 检测分类问题需要循环计算每张img，而每张img计算相当于一次常规分类问题的batch计算。
+
 
 ### 关于如何提升精度的tricks
 

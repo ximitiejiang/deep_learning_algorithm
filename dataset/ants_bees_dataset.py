@@ -63,17 +63,26 @@ class AntsBeesDataset(BasePytorchDataset):
         label = ann['label']
         
         data_dict = {}
-        data_dict['stack_list'] = ['img']
+
         
         if self.label_transform is not None:
-            label = self.label_transform(label)
-        data_dict['label'] = label            
+            label = self.label_transform(label)         
         
         if self.img_transform is not None:
             img, ori_shape, scale_shape, pad_shape, scale_factor, flip = self.img_transform(img)  # transform输出img(img, ori_shape, scale_factor), label
             data_dict['ori_shape'] = ori_shape
             data_dict['scale_factor'] = scale_factor
-        data_dict['img'] = img
+        
+        img_meta = dict(ori_shape = ori_shape,
+                        scale_shape = scale_shape,
+                        pad_shape = pad_shape,
+                        scale_factor = scale_factor,
+                        flip = flip)
+        
+        data_dict = dict(img = img,
+                         img_meta = img_meta,
+                         gt_labels = label,
+                         stack_list = ['img'])  
 
         return data_dict
      
@@ -85,4 +94,4 @@ if __name__ == "__main__":
     ab = AntsBeesDataset(root_path = '/home/ubuntu/MyDatasets/AntsBees/', data_type='val')
     data = ab[0]
     img = data['img']
-    label = data['label']
+    label = data['gt_labels']

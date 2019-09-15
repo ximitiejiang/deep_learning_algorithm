@@ -40,7 +40,7 @@ class BatchDetector(BatchProcessor):
 class BatchClassifier(BatchProcessor):
     def __call__(self, model, data, loss_fn, device, return_loss=True):
         img = data['img']
-        label = data['label']
+        label = data['gt_labels']
         # 输入img要修改为float()格式float32，否则跟weight不匹配报错，这步放到transform中to_tensor完成去了
         # 输入label要修改为long()格式int64，否则跟交叉熵公式不匹配报错，这步放到transform中to_tensor完成去了
         
@@ -227,7 +227,7 @@ class Runner():
                                                    return_loss=False)
                     self.buffer['acc'].append(outputs['acc1'])
                 # 计算总体精度
-                self.n_correct += self.buffer['acc'][-1] * len(data_batch[0])
+                self.n_correct += self.buffer['acc'][-1] * len(data_batch['gt_labels'])
             
             vis_loss_acc(self.buffer, title='val')
             self.logger.info('ACC on valset: %.3f', self.n_correct/len(self.valset))

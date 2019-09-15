@@ -41,13 +41,15 @@ lr_processor = dict(
 logger = dict(
                 log_level='INFO',
                 log_dir=work_dir,
-                interval=100)
+                interval=5)
 
 model = dict(                    # model是必须要有的参数，用来表示主检测器集成模型或者单分类器模型
         type='alexnet',
         params=dict(
                 n_classes=2,
-                pretrained='/home/ubuntu/MyWeights/alexnet-owt-4df8aa71.pth'))
+                pretrained=None
+#                pretrained='/home/ubuntu/MyWeights/alexnet-owt-4df8aa71.pth'
+                ))
 
 transform = dict(
         img_params=dict(

@@ -233,7 +233,7 @@ def get_model(model_cfg):
 #            'one_stage_detector': OneStageDetector,
             'alexnet8' : AlexNet8,
             'alexnet' : AlexNet,
-            'vgg16' : SSDVGG16,
+            'ssdvgg16' : SSDVGG16,
             'ssdhead' : SSDHead}
     
     # 检测器主模型
