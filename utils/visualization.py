@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 
-
+# %%
 def vis_loss_acc(buffer_dict, title='result: '):
     """可视化结果: 至少包含acc(比如验证)
     输入: dict[key, value_list]
@@ -82,7 +82,7 @@ def vis_loss_acc(buffer_dict, title='result: '):
         plt.grid()
         plt.show()
 
-
+# %%
 def vis_img_bbox(img, bboxes, labels, class_names=None,
         thickness=1, font_scale=0.5):
     """简化版显示img,bboxes,labels
@@ -123,3 +123,21 @@ def vis_img_bbox(img, bboxes, labels, class_names=None,
             cv2.FONT_HERSHEY_DUPLEX, font_scale, [255,255,255])
     cv2.imshow('result', img)  
 
+
+# %%
+def vis_activation_hist(data_list):
+    """用于查看激活层输出值的分布：
+    参考：deep learning from scratch， p178
+    激活层的输出一般称之为激活值，代表了特征在前向计算过程中是否正常，
+    激活值如果集中在左右两侧，则说明有经过激活函数后取值会越来越大，可能产生梯度爆炸或者梯度消失。
+    激活值如果集中在中间，则说明激活分布有偏向，在输出表现力上受限，模型学习能力就不够。
+    所以激活值应该在+-1之前区域较广泛分布，才是比较合理。
+    Args:
+        data_list(list): 表示激活函数输出的每一层的值，[d1, d2,..]每个元素为(b,c,h,w)
+    """
+    plt.figure()
+    for i, li in enumerate(data_list):  # 提取每层
+        plt.subplot(2, len(data_list)/2+1, i+1)  # 2行
+        plt.title(str(i+1)+"-layer")  
+        plt.hist(li.flatten(), 30, range=(-3,3))  # 展平成(b*c*h*w,), 然后取30个区间, 由于有bn，所以只统计取值在中间的数。
+    plt.show()

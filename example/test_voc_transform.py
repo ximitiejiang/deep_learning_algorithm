@@ -60,7 +60,7 @@ trainloader = dict(
 
 if __name__ == "__main__":
 
-#    cfg_path = '../model/cfg_detector_ssdvgg16_voc.py'
+#    cfg_path = './cfg_detector_ssdvgg16_voc.py'
 #    cfg = get_config(cfg_path)
     
     trainset = get_dataset(trainset, transform)

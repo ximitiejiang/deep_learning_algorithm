@@ -161,7 +161,7 @@ class VOCDataset(BasePytorchDataset):
                         pad_shape = pad_shape,
                         scale_factor = scale_factor,
                         flip = flip)
-        # 组合数据: 注意img_meta数据无法堆叠，尺寸不一的img也不能堆叠，所以需要在collate_fn中换成list存放
+        # 组合数据: 注意img_meta数据无法堆叠，尺寸不一的img也不能堆叠，所以需要在collate_fn中自定义处理方式
         data = dict(img = img,
                     img_meta = img_meta,
                     gt_bboxes = gt_bboxes,

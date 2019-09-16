@@ -450,7 +450,7 @@ def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_name
     return img, bboxes, labels
         
 
-
+# %%
 if __name__ == "__main__":
 #    labels = np.array([[0,1,0],[0,0,1]])
 #    new_labels = onehot_to_label(labels)

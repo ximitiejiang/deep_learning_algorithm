@@ -8,7 +8,7 @@ Created on Thu Sep 12 18:30:02 2019
 from model.runner_lib import Runner
 
 def test_ssdvgg16_antsbees():
-    runner = Runner(cfg_path = '../model/cfg_classifier_ssdvgg16_antsbees.py')
+    runner = Runner(cfg_path = './cfg_classifier_ssdvgg16_antsbees.py')
     runner.train()
     runner.evaluate()
     

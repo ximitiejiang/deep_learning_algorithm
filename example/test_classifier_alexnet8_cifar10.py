@@ -11,7 +11,7 @@ from model.runner_lib import Runner
 
 
 def test_alexnet8_cifar10():
-    runner = Runner(cfg_path = '../model/cfg_classifier_alexnet8_cifar10.py')
+    runner = Runner(cfg_path = './cfg_classifier_alexnet8_cifar10.py')
     runner.train()
     runner.evaluate()
     

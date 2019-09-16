@@ -14,9 +14,9 @@ from dataset.base_dataset import BasePytorchDataset
 
 class Cifar10Dataset(BasePytorchDataset):
     """原版数据集地址http://www.cs.toronto.edu/~kriz/cifar.html
-    单张图片为RGB 32x32的小图，总计60,000张，其中50,000张训练集，10,000张测试集
     cifar10: 10个类别，每个类别6000张
     cifar100: 100个类别，每个类别600张
+    单张图片为RGB 32x32的小图，总计60,000张，其中50,000张训练集，10,000张测试集
     该数据集没有索引，所以只能一次性加载到内存
     输入：data_type(数据集类型)，包括train训练集和test测试集
     输出：n,h,w,c (bgr格式), 所有图片源数据都统一用这种格式(包括voc/coco)
@@ -107,9 +107,10 @@ class Cifar10Dataset(BasePytorchDataset):
 
 class Cifar100Dataset(Cifar10Dataset):
     """原版数据集地址http://www.cs.toronto.edu/~kriz/cifar.html
-    单张图片为RGB 32x32的小图，总计60,000张，其中50,000张训练集，10,000张测试集
+
     cifar10: 10个类别，每个类别6000张
     cifar100: 100个类别，每个类别600张
+    单张图片为RGB 32x32的小图，总计60,000张，其中50,000张训练集，10,000张测试集
     """
     def __init__(self, root_path='../dataset/source/cifar100/', data_type='train',
                  norm=None, label_transform_dict=None, one_hot=None, 

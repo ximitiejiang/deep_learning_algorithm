@@ -82,15 +82,24 @@ class SSDVGG(VGG):
 
     def forward(self, x):
         outs = []
+        hist_list = []
+        
         for i, layer in enumerate(self.features):
             x = layer(x)
             if i in self.out_feature_indices:
                 outs.append(x)
+                hist_list.append(x.cpu().detach().numpy())
+                
         for i, layer in enumerate(self.extra):
             x = F.relu(layer(x), inplace=True)
             if i % 2 == 1:
                 outs.append(x)
+                hist_list.append(x.cpu().detach().numpy())
+                
         outs[0] = self.l2_norm(outs[0])
+        hist_list.append(outs[0].cpu().detach().numpy())
+        vis_activation_hist(hist_list)
+        
         if len(outs) == 1:
             return outs[0]
         else:
@@ -128,13 +137,22 @@ class L2Norm(nn.Module):
     def __init__(self, n_dims, scale=20., eps=1e-10):
         super(L2Norm, self).__init__()
         self.n_dims = n_dims
-        self.weight = nn.Parameter(torch.Tensor(self.n_dims))
+        self.weight = nn.Parameter(torch.Tensor(self.n_dims)) #(512,)
         self.eps = eps
         self.scale = scale
 
     def forward(self, x):
-        norm = x.pow(2).sum(1, keepdim=True).sqrt() + self.eps
-        return self.weight[None, :, None, None].expand_as(x) * x / norm
+        norm = x.pow(2).sum(1, keepdim=True).sqrt() + self.eps  # 沿着axis=1方向求和，也就是通道方向，得到(b,1,38,38)
+        return self.weight[None, :, None, None].expand_as(x) * x / norm # 
+
+import matplotlib.pyplot as plt
+def vis_activation_hist(data_list):
+    plt.figure()
+    for i, li in enumerate(data_list):  # 提取每层
+        plt.subplot(2, len(data_list)/2+1, i+1)  # 2行
+        plt.title(str(i+1)+"-layer")  
+        plt.hist(li.flatten(), 30, range=(-3,3))  # 展平成(b*c*h*w,), 然后取30个区间, 由于有bn，所以只统计取值在中间的数。
+    plt.show()
 
 
 if __name__=="__main__":

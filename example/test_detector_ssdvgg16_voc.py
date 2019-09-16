@@ -10,7 +10,7 @@ from model.runner_lib import Runner
 
 
 def main():
-    runner = Runner(cfg_path = '../model/cfg_detector_ssdvgg16_voc.py')
+    runner = Runner(cfg_path = './cfg_detector_ssdvgg16_voc.py')
     runner.train()
     runner.evaluate()
     

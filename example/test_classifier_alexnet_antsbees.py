@@ -17,7 +17,7 @@ def test_alexnet_antsbees():
     
     实验结果：
     """
-    runner = Runner(cfg_path = '../model/cfg_classifier_alexnet_antsbees.py')
+    runner = Runner(cfg_path = './cfg_classifier_alexnet_antsbees.py')
     runner.train()
     runner.evaluate()
     
