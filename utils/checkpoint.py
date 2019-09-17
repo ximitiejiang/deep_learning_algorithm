@@ -109,6 +109,7 @@ def load_state_dict(model, state_dict, logger=None):
         key for key in all_missing_keys if 'num_batches_tracked' not in key
     ]
     err_msg = []
+    table = AsciiTable([''])  # 初始为空字符
     if not_need_keys:
         err_msg.append('unexpected key in source state_dict: {}'.format(
             ', '.join(not_need_keys)))
@@ -122,6 +123,9 @@ def load_state_dict(model, state_dict, logger=None):
         table_data = [header] + size_mismatch_keys
         table = AsciiTable(table_data)
         err_msg.append(mismatch_info)
+    else:
+        header = ['all the keys sizes matched exactly.']
+        table = AsciiTable([header])
     if logger is not None:
         logger.warning(err_msg)
         logger.warning(table.table)
