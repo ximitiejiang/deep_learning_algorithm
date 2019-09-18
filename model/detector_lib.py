@@ -10,6 +10,18 @@ Created on Sat Aug 10 17:22:46 2019
 from utils.prepare_training import get_model
 import torch.nn as nn
 
+# %%
+def get_detector(cfg):
+    detectors = {
+            'one_stage_detector': OneStageDetector,
+            'two_stage_detector': TwoStageDetector}
+    detector = detectors[cfg.detector.type]
+    return detector
+    
+    
+    
+    
+    
 # %% onestage
 class OneStageDetector(nn.Module):
     

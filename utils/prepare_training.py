@@ -256,6 +256,8 @@ def get_model(model_cfg):
         return model_class(**params)  # 其他模型的创建，传入的是解包的dict
 
 
+
+
 # %%       
 def get_optimizer(optimizer_cfg, model):
     """创建优化器：pytorch采用的单个优化器更新所有权重数据，所以需要传入给优化器model的所有权重数据
