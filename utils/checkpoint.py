@@ -124,8 +124,10 @@ def load_state_dict(model, state_dict, logger=None):
         table = AsciiTable(table_data)
         err_msg.append(mismatch_info)
     else:
-        header = ['all the keys sizes matched exactly.']
+        header = ['same name keys sizes matched exactly.']
         table = AsciiTable([header])
+    if len(err_msg) == 0:
+        err_msg.append('no error happened during loading state_dict.')
     if logger is not None:
         logger.warning(err_msg)
         logger.warning(table.table)

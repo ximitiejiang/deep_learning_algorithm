@@ -95,14 +95,14 @@ class SSDVGG16(nn.Module):
                  out_feature_indices=(22,34),
                  extra_out_feature_indices = (1, 3, 5, 7),
                  l2_norm_scale=20.,
-                 classify=None):
+                 classify_classes=None):
         super().__init__()
         self.blocks = self.arch_setting[16]
         self.num_classes = num_classes
         self.out_feature_indices = out_feature_indices
         self.extra_out_feature_indices = extra_out_feature_indices
         self.l2_norm_scale = l2_norm_scale
-        self.classify = classify  # 用来做分类器
+        self.classify_classes = classify_classes  # 用来做分类器
         self.pretrained = pretrained
         
         #构建所有vgg基础层
@@ -134,14 +134,10 @@ class SSDVGG16(nn.Module):
         self.extra = self.make_extra_block(in_channels=1024)
         self.l2_norm = L2Norm(self.features[out_feature_indices[0] - 1].out_channels, l2_norm_scale) # 维度是第22层的输出通道数(512)
         
-        # 额外增加3层线性层用来做分类模型
-        if self.classify:
-            self.classifier = nn.Sequential(
-                    nn.Linear(),
-                    nn.ReLU(inplace=True),
-                    nn.Linear(),
-                    nn.ReLU(inplace=True),
-                    nn.Linear())
+        # 额外增加2层用来做分类模型(自适应平均池化+全连接，参考resnet)
+        if self.classify_classes is not None:
+            self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1,1))
+            self.fc = nn.Linear(1024, self.classify_classes)
 
      
     def make_extra_block(self, in_channels):
@@ -195,8 +191,6 @@ class SSDVGG16(nn.Module):
                 outs.append(x)
 #                hist_list.append(x.detach().numpy())
         
-        
-        
         # 前向计算l2 norm
         outs[0] = self.l2_norm(outs[0])  # 只计算第一个尺寸的特征图
         
@@ -204,12 +198,16 @@ class SSDVGG16(nn.Module):
 #        hist_list.append(outs[0].detach().numpy())
 #        vis_activation_hist(hist_list)
         # 如果作为分类器，则只输出一个
-        if self.classify:
-            outs = outs[0][0].reshape(-1)
-            outs = self.classifier(outs[0][0])
-            return outs
-            
-        return tuple(outs)
+        if self.classify_classes is not None:
+            x = self.avgpool(x)
+            x = x.reshape(x.shape[0], -1)
+            x = self.fc(x)
+            outs.append(x)
+        
+        if len(outs) == 1:
+            return outs[-1]
+        else:
+            return tuple(outs)
         
         
 class L2Norm(nn.Module):

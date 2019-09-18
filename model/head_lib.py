@@ -11,9 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from utils.module_factory import registry
 from utils.init_weights import xavier_init
-
-
-@registry.register_module    
+  
 class SSDHead(nn.Module):
     """分类回归头：
     1. 分类回归头的工呢过：保持尺寸w,h不变，变换层数进行层数匹配，把特征金字塔的每一级输出层变换成num_anchor

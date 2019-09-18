@@ -11,55 +11,10 @@ from utils.init_weights import common_init_weights
 
 # %% 基础模块
 
-class BasicBlock(nn.Module):
-    """resnet18,34及以下的模型使用
-    采用3x3+3x3 + residual的结构，类似于vgg的3x3+3x3(模拟出5x5的滤波器核)，但带有residual后就可以叠加更多层。
-    
-    结构特点：
-    1. 为了兼容pytorch的权重，各层命名需要固定为：bn1,bn2,downsample,conv1,conv2, 且不能嵌套在sequential中
-    2. 模块第一层conv进行输入输出通道变换，其他层输入输出通道都一样，为输出通道数, 也就是每个basicblock最多让通道数加倍，或者通道数不变。
-    3. 所有卷积层的bias都不是默认值，都变为False
-    4. 模块全部都带恒等映射分支(residual)，但分2种类型，一种在恒等映射分支中包含conv/bn做下采样，另一种则只是恒等映射，
-       对于basicblock来说，layer1没有downsample, 其他layers的第一层都是downsample。
-    5. 恒等映射分支的相加点是在batchnorm层之后relu之前，而不是最后的relu之后。
-    """
-    def __init__(self, in_channels, out_channels, stride, with_downsample=False):
-        super().__init__()
-        # 创建卷积层    
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)  # 第一个conv stride跟downsample一样
-        self.bn1 = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)  # 第二个conv stride永远等于1
-        self.bn2 = nn.BatchNorm2d(out_channels)
- 
-        # 创建residual层，并定义stride
-        self.downsample = None
-        if with_downsample:
-            self.downsample = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(out_channels))
-        
-    def forward(self, x):
-        identity = x    # 预存输入，作为恒等映射分支的输入
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.conv2(x)
-        x = self.bn2(x)
-        
-        if self.downsample is not None:
-            identity = self.downsample(identity)
-        x += identity   # 恒等映射都要有，区别是有的恒等映射增加了下采样模块，有的没有。
-        x = self.relu(x)
-        
-        return x
-
-
 class Bottleneck(nn.Module):
-    """resnet50,101,152及以上的模型使用
-    采用1x1+3x3+1x1的基础结构(注意，caffe版本的bottleneck跟pytorch版的bottleneck在基础结构上不一样，参考mmdetection的resnet说明)
-    这种结构目的是用1x1先通道数降维到跟resnet18一个水平，然后让3x3完成学习，再用1x1升维4倍，本质上是为了把3x3卷积操作的计算量降到跟resnet18一个水平
-    结构特点：
+    """resnext50,101,152及以上的模型使用: 主要是引入group conv组卷积
+    
+    采用1x1+3x3+1x1的基础结构，并在3x3卷积中进行组卷积。
     1. 为了兼容pytorch的权重，各层命名需要固定为：bn1,bn2,downsample,conv1,conv2, 且不能嵌套在sequential中 
     2. 3x3两边的1x1只用来降低通道数和恢复通道数，所以参数统一为s1,p0, 而3x3只用来过滤特征，既不改变通道数和也不改变尺寸。
     3. 为了跟resnet18兼容，输入的out_channels其实是3x3的输出通道数，而3x3之后的1x1通道数需要再乘以4，identity支路的输出通道也是乘以4
@@ -67,13 +22,21 @@ class Bottleneck(nn.Module):
     4. 模块全部带有恒等映射，但分3种，一种只有恒等映射，一种加了1x1卷积，但不做下采样，还有一种就是加了1x1卷积，且要做下采样stride=2.
        注意：这里bottleneck跟basicblock有区别，basicblock的layer1没有downsample, 但bottleneck的layer1就有downsample，不过该downsample的stride=1，其他都一样
     """
-    def __init__(self, in_channels, out_channels, stride, with_downsample=False):
+    def __init__(self, in_channels, out_channels, stride, with_downsample=False, groups=32):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(out_channels)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)  # 该层用于downsample，需要跟identity分支的downsample一致的stride
-        self.bn2 = nn.BatchNorm2d(out_channels)
-        self.conv3 = nn.Conv2d(out_channels, out_channels * 4, kernel_size=1, stride=1, bias=False)
+        # 针对resnext修改bottleneck部分只需要调整out_channels为width，并落实到3个conv中去。
+        if groups == 1: # 则为常规卷积
+            width = out_channels   # 参考resnext原论文(width of bottleneck, 即为d)，引入width概念，表示每个分组的通道数
+        else:
+            width = out_channels * 2  # 这里宽度就是指做组卷积的总宽度
+            
+        self.conv1 = nn.Conv2d(in_channels, width, kernel_size=1, stride=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(width)
+        # resnext修改bottleneck的第二个地方：把3x3卷积改为groups conv
+        self.conv2 = nn.Conv2d(width, width, kernel_size=3, stride=stride, 
+                               padding=1, groups=groups, bias=False)  # 该层用于downsample，需要跟identity分支的downsample一致的stride
+        self.bn2 = nn.BatchNorm2d(width)
+        self.conv3 = nn.Conv2d(width, out_channels * 4, kernel_size=1, stride=1, bias=False)
         self.bn3 = nn.BatchNorm2d(out_channels * 4)
         self.relu = nn.ReLU(inplace=True)
         
@@ -101,13 +64,16 @@ class Bottleneck(nn.Module):
 
 
 # %%
-class Resnet(nn.Module):
-    """Resnet主模型: 可生成如下5种基础resnet模型
+class Resnext(nn.Module):
+    """Resnext主模型: 是在resnet模型基础上的结构优化
     结构特点：具有很好的可扩展性，每一个layer下面，都可以无限增加block
-    可以看到bottleneck的每个3x3(中间那层)的运算通道数数其实跟basicblock一样，这样好处是利用1x1降维很大的节约了3x3卷积的计算量。
-    如下，可见在前两层conv上，basicblock和bottleneck是完全一样的通道数。
-    而下采样都是在每个layer的第一个block的第一个3x3进行。
-    1. 对比：
+    表达方式：resnext50_32x4d代表分为32个组，每个组的通道数是4
+    
+    结构改变：resnext的每层最终输出通道数跟resnet一样，但输入通道数调整成完全跟前一层输出一致，没有做降维。
+    保持了layer之间通道数的单调递增。
+    同时引入分组卷积，一方面减少卷积参数，另一方面分组方式比网络加深和加宽都更有效，并且这种分组很容易扩展。
+    
+    1. 对比resnet34 / resnet50 / resnext50 的基础block:
        如果是basicblock, 
         layer1(2)       layer2(2)       layer3(2)           layer4(2)
         --------------------------------------------------------------------
@@ -124,12 +90,20 @@ class Resnet(nn.Module):
                         128-128-512     256-256-1024
                                         256-256-1024
                                         256-256-1024
+        而如果是resnext的bottleneck:
+        layer1(3)       layer2(4)       layer3(6)           layer4(3)
+        --------------------------------------------------------------------
+        128-128-256     256-256(s2)-512 256-256(s2)-1024    512-512(s2)-2048
+        128-128-256     256-256-512     256-256-1024        512-512-2048
+        128-128-256     256-256-512     256-256-1024        512-512-2048
+                        256-256-512     256-256-1024
+                                        256-256-1024
+                                        256-256-1024
+        
     2. 在arch_setting里边增加一个block_expansion参数，该参数表示基于3x3卷积输出之后的通道升维倍数
     """
-    
+    # resnext的block个数结构跟resnet是完全一样的
     arch_settings = {
-        18: (BasicBlock, 1, (2, 2, 2, 2)),
-        34: (BasicBlock, 1, (3, 4, 6, 3)),
         50: (Bottleneck, 4, (3, 4, 6, 3)),
         101: (Bottleneck, 4, (3, 4, 23, 3)),
         152: (Bottleneck, 4, (3, 8, 36, 3))
@@ -225,13 +199,16 @@ if __name__ == '__main__':
     if name == 'ori':
         import torchvision
         from utils.checkpoint import load_checkpoint
-        model = torchvision.models.resnet50()
-    #    load_checkpoint(model, checkpoint_path = '/home/ubuntu/MyWeights/resnet18-5c106cde.pth')
-        load_checkpoint(model, checkpoint_path = '/home/ubuntu/MyWeights/resnet50-19c8e357.pth')
+        model = torchvision.models.resnext50_32x4d(pretrained=True)
+#        load_checkpoint(model, checkpoint_path = '/home/ubuntu/MyWeights/resnet18-5c106cde.pth')
+#        load_checkpoint(model, checkpoint_path = '/home/ubuntu/MyWeights/resnet50-19c8e357.pth')
+        load_checkpoint(model, checkpoint_path = '/home/ubuntu/MyWeights/resnext50_32x4d-7cdf4587.pth')
         print(model)
     
     if name == 'my':
-        model = Resnet(depth=18, classify_classes=10)
+        model = Resnext(depth=50, 
+                        pretrained = '/home/ubuntu/MyWeights/resnext50_32x4d-7cdf4587.pth',
+                        classify_classes=10)
         img = np.random.randn(8,3,300,300)
         img = torch.Tensor(img)
         output = model(img)
