@@ -29,7 +29,7 @@ class Mobilenet(nn.Module):
 
 if __name__ == "__main__":
     import torchvision
-#    model = torchvision.models.mobilenet_v2()
-    model = torchvision.models.densenet161()
+    model = torchvision.models.mobilenet_v2(pretrained=True)
+#    model = torchvision.models.densenet161()
     print(model)
     

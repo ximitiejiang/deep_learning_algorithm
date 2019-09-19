@@ -130,11 +130,11 @@ class Runner():
             self.model = nn.DataParallel(self.model)
         self.model.to(self.device)
         # 注意：恢复或加载是直接加载到目标设备，所以必须在模型传入设备之后进行，确保设备匹配
-        # 加载参数，从之前断开的位置继续训练
+        # 加载模型权重和训练参数，从之前断开的位置继续训练
         if self.cfg.resume_from:
             self.resume_training(checkpoint_path=self.cfg.resume_from, 
                                  map_location=self.device)  # 沿用设置的device
-        # 加载参数，一般用来做预测
+        # 加载模型权重，但没有训练参数，所以一般用来做预测
         elif self.cfg.load_from:
             load_device = torch.device(self.cfg.load_device)
             self._load_checkpoint(checkpoint_path=self.cfg.load_from, 
