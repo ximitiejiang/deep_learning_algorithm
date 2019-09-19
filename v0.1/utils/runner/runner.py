@@ -257,6 +257,15 @@ class Runner(object):
         for i, data_batch in enumerate(data_loader):
             self._inner_iter = i
             self.call_hook('before_train_iter')
+            
+            # 这里的batch数据显示看一下
+            from utils.transform import transform_inv
+            for db in range(len(data_batch['img'].data[0])):
+                img,bboxes,labels = transform_inv(data_batch['img'].data[0][db], 
+                                                  mean=[123.675, 116.28, 103.53], 
+                                                  std=[1, 1, 1],
+                                                  save='/home/ubuntu/Desktop/')
+            
             outputs = self.batch_processor(
                 self.model, data_batch, train_mode=True, **kwargs)
             if not isinstance(outputs, dict):

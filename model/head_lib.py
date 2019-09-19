@@ -11,27 +11,82 @@ import torch.nn as nn
 import torch.nn.functional as F
 from utils.module_factory import registry
 from utils.init_weights import xavier_init
+
+"""待整理：
+小物体检测效果不好的原因;
+1. 模型学习到了，但没有检测到，这属于漏检：这时可能是anchor的设置不合理，通过调整anchor尺寸去改善。
+2. 模型没有学习到，所以检测出来的是错的或者置信度不高，这属于误检：这时可能是模型输出特征的层数太浅，导致没有学习到相应小物体，通过增加层数取改善。
+
+"""
+
+
+def conv_head(in_channel_list, out_channel_list):
+    """用来创建卷积操作，用来分类或者回归通道数变换：
+    比如从通道数512变换成分类需要的通道数n_class*n_anchor, 或者变换成回归需要的通道数
+    """
+    n_convs = len(in_channel_list)
+    layers = []
+    for i in range(n_convs):
+        # 卷积参数是常规不改变w,h的参数(即s=1,p=1)
+        layers.append(nn.Conv2d(in_channel_list[i], out_channel_list[i], 
+                                kernel_size=3, padding=1, stride=1))
+    return layers
+    
+
+def get_base_anchor_params(img_size, ratio_range, n_featmap):
+    """这是SSD使用的一种通用的设计anchor尺寸的方法
+    假定已知图像尺寸img_size：
+    1.定义一个anchor相对于图像的尺寸比例范围ratio_range, 也就是最小anchor大概是图像的百分之多少，最大anchor大概是图像的百分之多少.
+      这个比例通常是通过对数据集进行聚类来获得anchor相对原图的最小最大比例范围.
+      但注意：直接用聚类结果设置anchor往往对小物体检测效果不好，因为小物体数量少可能被聚类忽略。
+    2. 添加额外的针对小物体的比例进比例列表
+    3. 
+    Args:
+        img_size
+        ratio_range(list): (min_ratio, max_ratio)代表anchor最小是img的百分比，最大是img的百分比，比如(0.2, 0.9)
+        n_featmap: 代表有多少张特征图，显然每张特征图对应的anchor基础尺寸不同
+    """
+    # 可以通过聚类来决定最小anchor和最大anchor的范围，但这会丢失一部分尺寸很小数量不多的小物体，
+    # 所以把聚类得到的比例放在后边5层，并在第一层再手动insert一组小比例ratio
+    min_ratio, max_ratio = ratio_range
+    step = (max_ratio - min_ratio) / (n_featmap - 2)  # 基于特征图个数，定义一个阶梯，保证每个特征图有一个min_ratio
+    min_ratios = [min_ratio + step * i for i in range(n_featmap)]    
+    max_ratios = min_ratio
+    # 为了提高小物体检测能力，对少量小物体再增加一组更小比例的anchor
+    min_ratios.insert(0, 0.1)
+    max_ratios.insert(0, 0.2)
+    for ratio in ratios:
+        min_sizes
+        max_sizes
+        
+    return base_sizes, scales, ratios, centers
+    
   
 class SSDHead(nn.Module):
     """分类回归头：
-    1. 分类回归头的工呢过：保持尺寸w,h不变，变换层数进行层数匹配，把特征金字塔的每一级输出层变换成num_anchor
-    其中分类层：输出层数 = 目标分类指标数量 = 类别数*每个特征像素映射到原图后上面放置的anchor个数
-        这里anchor个数在特征金字塔不同层不同，分别是(4,6,6,6,4,4)
-    其中回归层：输出层数 = 目标回归指标数量 = 回归坐标数*每个特征像素映射到原图后上面放置的anchor个数
-           -----------------
-          /                 \
-        [cls]               [reg]
-        3x3(512 to 81*4)    3x3(512 to 4*4)
-        3x3(1024 to 81*6)   3x3(1024 to 4*6)
-        3x3(512 to 81*6)    3x3(512 to 4*6)
-        3x3(256 to 81*6)    3x3(256 to 4*6)
-        3x3(256 to 81*4)    3x3(256 to 4*4) 
-        3x3(256 to 81*4)    3x3(256 to 4*4) 
+    分类回归头的工作过程： 以下描述在维度上都省略b，因为b在整个模型过程不变，只讨论单张图的情况
+    step1. 从backbone获取多层特征图(512,38,38),(1024,19,19),(512,10,10),(256,5,5),(256,3,3),(256,1,1)
     
-    2. anchor生成机制：
-    其中anchor的个数(4,6,6,6,4,4)是根据经验
+    step2. 采用卷积调整特征的层数到预测需要的形式(一个特征图对应一个卷积层即可)
+        > 其中作为分类问题需要模型这个万能函数输出y_pred(n_anchors, n_classes)，
+          n_anchors是总的anchor个数(8732个)，n_classes是类别数(21)类，这样才能跟labels(n_anchors)进行分类损失计算
+          所以调整层数的逻辑就是原来的512层变成21*4层，这样结合特征尺寸(w,h)，就可以通过reshape凑出anchor个数4*w*h和类别数21.
+        > 其中作为回归问题需要模型这个万能函数输出y_pred(n_anchors, n_coords)
+          n_anchors是总的anchor个数(8732个)，n_coords是每个bbox坐标数(4个)，这样才能跟labels(n_anchors, n_coords)进行回归损失计算
+          所以调整层数的逻辑就是原来的512层变成4*4层，这样结合特征尺寸(w,h)，就可以通过reshape凑出anchor个数4*w*h和坐标数4.
     
+    step3. 采用anchor机制确定每个anchor的分类标签和回归标签: anchor机制是整个物体检测的核心，目的就是用anchor扫一遍图像，并对所有anchor进行分类和回归判断
+        > 先生成base_anchor，然后扩展到grid_anchor(8732个)
+        > 把所有anchors跟gt_bbox进行iou计算，评价出每个anchor的身份：iou>0.5的是正样本，其他是负样本。
+        > 让正样本获得gt bbox的标签，负样本获得标签为0(这也是为什么分类要多一类变成21类或81类)，该标签就可以用来做分类的预测(计算acc，计算loss)
+        > 让正样本获得gt bbox的坐标，负样本获得坐标为0，该坐标就可以用来做回归的预测(计算loss)
     
+    step4. 计算损失
+        > 分类损失基于交叉熵损失函数：loss(y_pred, y_label), 其中y_pred(8732, 21), y_label(8732,)，都是预测概率，评价的是两个预测概率分布的相关性。
+        > 回归损失基于smoothl1损失函数：loss(y_pred, y_label), 其中y_pred(8732, 4), y_label(8732, 4), 都是坐标，评价的是类似于空间距离l2，但程度比l2稍微轻一点。
+        注意： 这里分类损失的计算跟常规分类问题不同，常规分类loss(y_pred, y_label)，其中y_pred(b, 10), y_label(10,)，说明是以b张图片同时进行损失的多类别计算，每一行是一张图片的一个多分类问题。
+        而在物体检测这里是以一张图片的b个anchors同时进行损失的多类别计算，每一行是一个anchor的一个多分类问题，再通过外循环进行多张图片的损失计算和汇总。
+            
     """
     
     def __init__(self, 
@@ -40,30 +95,26 @@ class SSDHead(nn.Module):
                  in_channels=(512, 1024, 512, 256, 256, 256),
                  num_anchors=(4, 6, 6, 6, 4, 4),
                  anchor_strides=(8, 16, 32, 64, 100, 300),
-
                  target_means=(.0, .0, .0, .0),
                  target_stds=(0.1, 0.1, 0.2, 0.2),
                  **kwargs): # 增加一个多余变量，避免修改cfg, 里边有一个type变量没有用
         super().__init__()
-        self.input_size = input_size
+#        self.input_size = input_size
         self.num_classes = num_classes
         self.cls_out_channels = num_classes
         self.anchor_strides = anchor_strides
         self.target_means = target_mean
         self.target_stds = target_stds 
+
         # 创建分类分支，回归分支
-        cls_convs = []
-        reg_convs = []
-        for i in range(len(in_channels)):
-            cls_convs.append(
-                    nn.Conv2d(in_channels[i], num_anchors[i], kernel_size=3, padding=1))
-            reg_convs.append(
-                    nn.Conv2d(in_channels[i], num_anchors[i], kernel_size=3, padding=1))
+        cls_convs = conv_head(in_channels, num_anchors * num_classes)  # 分类分支目的：通道数变换为21*n_anchors
+        reg_convs = conv_head(in_channels, num_anchors * 4)
         self.cls_convs = nn.ModuleList(cls_convs) # 由于6个convs是并行分别处理每一个特征层，所以不需要用sequential
         self.reg_convs = nn.ModuleList(reg_convs)
         
-        # 生成anchor所需标准参数
-        # base sizes：表示一组anchor的基础大小，然后乘以scale(比例)，变换宽高比(ratio)
+        # 生成base_anchor所需参数
+        base_sizes, scales, ratios, centers = get_base_anchor_params(img_size, ratio_range)
+        
         min_sizes = [30, 60, 111, 162, 213, 264]
         max_sizes = [60, 111, 162, 213, 264, 315]
         base_sizes = min_sizes
@@ -266,7 +317,9 @@ class AnchorGenerator():
         self.base_anchors = self.get_base_anchors()
     
     def get_base_anchors(self): 
-        """生成单个特征图的base anchors"""
+        """生成单个特征图的base anchors
+        
+        """
         w, h = self.base_size, self.base_size
         # 准备中心点坐标
         if self.ctr is None:

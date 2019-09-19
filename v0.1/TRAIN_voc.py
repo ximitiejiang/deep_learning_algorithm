@@ -102,8 +102,6 @@ def train(cfg_path, dataset_class):
         torch.backends.cudnn.benchmark = True
     
     # get logger
-    distributed = False
-    parallel = True
     logger = get_root_logger(cfg.log_level)
     logger.info('Distributed training: {}'.format(distributed))
     logger.info('DataParallel training: {}'.format(parallel))
