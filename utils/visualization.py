@@ -6,6 +6,7 @@ Created on Thu Sep  5 12:47:36 2019
 @author: ubuntu
 """
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
 import cv2
 
@@ -82,6 +83,7 @@ def vis_loss_acc(buffer_dict, title='result: '):
         plt.grid()
         plt.show()
 
+
 # %%
 def vis_img_bbox(img, bboxes, labels, class_names=None,
         thickness=1, font_scale=0.5):
@@ -123,6 +125,20 @@ def vis_img_bbox(img, bboxes, labels, class_names=None,
             cv2.FONT_HERSHEY_DUPLEX, font_scale, [255,255,255])
     cv2.imshow('result', img)  
 
+
+def vis_bbox(bboxes, img=None):
+    """绘制一组bboxes(n,4): (xmin,ymin,xmax,ymax)"""
+    if img is None:
+        img = np.zeros((300, 300)).astype(np.uint8)
+    if isinstance(bboxes, torch.Tensor):
+        bboxes = bboxes.numpy()
+    bboxes_int = bboxes.astype(np.int32)
+    for bbox in bboxes_int:
+        left_top = (bbox[0], bbox[1])
+        right_bottom = (bbox[2], bbox[3])
+        cv2.rectangle(img, left_top, right_bottom, (0,255,0), thickness=1)
+    cv2.imshow('bboxes', img)
+    
 
 # %%
 def vis_activation_hist(data_list):

@@ -50,8 +50,9 @@ class VOCDataset(BasePytorchDataset):
         
         self.ann_file = ann_file
         self.subset_path = subset_path
-        # TODO: 这里改成了从0-19，是否要保持跟mmdetection一致成1-20？
-        self.class_label_dict = {cat: i for i, cat in enumerate(self.CLASSES)}  # 从1开始(1-20). 
+        # 注意：这里对标签值的定义跟常规分类不同，常规分类问题的数据集标签是从0开始，
+        # 这里作为检测问题数据集标签是从1开始，目的是把0预留出来作为背景anchor的标签。
+        self.class_label_dict = {cat: i + 1 for i, cat in enumerate(self.CLASSES)}  # 从1开始(1-20). 
         # 加载图片标注表(只是标注所需文件名，而不是具体标注值)，额外加了一个w,h用于后续参考
         self.img_anns = self.load_annotation_inds(self.ann_file) 
         

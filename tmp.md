@@ -18,9 +18,9 @@
    输入label要修改为long()格式int64，否则跟交叉熵公式不匹配报错
    img = img.float()
    label = label.long()
-   这两句要放在每个batch开始位置: 
+   这两句要放在每个batch开始位置
 
-   所以建议自定义一个to_tensor()函数可写成如下：
+   为了避免遗忘，可以把这部分操作集成到自定义的to_tensor()函数中，在每次开始转tensor的时候自动转换：
     if isinstance(data, torch.Tensor):
         return data
     elif isinstance(data, np.ndarray):
@@ -34,6 +34,15 @@
         
 2. 如果要把在GPU中运算的数据可视化，必须先变换到cpu，然后解除grad，最后转numpy才能使用。
    即：x1 = x.cpu().detach().numpy()
+
+
+### 关于图片标签值的定义在分类问题和检测问题上的区别
+
+1. 在纯分类任务中，数据集的label一般定义成从0开始，比如10类就是[0,9]，这样的好处是在转独热编码的时候比较容易，
+   比如标签2的独热编码就是[0,0,1,0], 标签0的独热编码就是[1,0,0,0]
+2. 而在物体检测任务中的分类子任务中，一般会把数据集的label定义成从1开始，比如10类就是[1,10], 这样做的目的是
+   因为在检测任务中需要对anchor的身份进行指定，而比较简洁的处理是把负样本的anchor设定为label=0。所以相当于把
+   label=0预留给anchor的负样本。
 
 
 ### 关于transform中涉及的类型变换导致的错误
@@ -53,11 +62,11 @@
 1. 通常会定义一个边框尺寸，比如scale = (300, 300)，这是图片的最大尺寸范围。
 
 2. 图片首先经过transform，按比例缩放到边框尺寸，此时因为比例固定，所以每张图片尺寸都不同，但都有一条片跟边框尺寸拉平相等。
+   比如一个batch的图片可能尺寸会变成(300, 256),(300, 284),(240,300)这样的形式。
 
 3. 图片然后经过dataloader的collate_fn，对一个batch的图片取最大外沿，进行padding变成相同尺寸的图片。
-   由于transform时所有图片已有一条边靠近边框尺寸，所以取所有图片最大外沿结果基本都是边框尺寸，所以
-   最终进行训练的图片基本都是以边框尺寸进行训练。
-
+   由于transform时所有图片已有一条边靠近边框尺寸，所以取所有图片最大外沿结果基本都是边框尺寸，比如一个batch的图片会变成
+   (300,300),(300,300),(300,300)然后堆叠成(3,300,300), 所以最终进行训练的图片基本都是以边框尺寸进行训练。
 
 
 ### 关于训练时候的路径问题
@@ -121,7 +130,7 @@
 
 1. 前向传播：就是模型一层一层计算，output = model(img)
 2. 损失计算：采用pytorch自带的nn.CrossEntropyLoss(y_pred, y_label)，则不需要手动增加softmax，
-   也不需要手动把label转换成独热编码。
+   也不需要手动把label转换成独热编码。因为这两部分都被写在pytorch自带的交叉熵函数对象内部了。
 3. 损失反向传播：必须针对损失的标量进行，也就是losses先做规约缩减(reduction='mean')，然后才能
    loss.backward()，即这里loss是一个标量值，pytorch对这个标量内部梯度会自动获取，并反向传播。
 4. 优化器更新权值：必须采用optimizer.step()完成
@@ -155,9 +164,9 @@
 
 ### 关于如何设置DataLoader
 
-1. 对常规数据集，输出img, label，直接使用pytorch默认DataLoader就可以
-2. 对数据集中需要输出除了img/label之外额外参数的，比如bbox, scale, shape，则需要
-   自定义collate_fn对数据进行堆叠。
+1. 对常规的数据集，如果图片尺寸都是一样的，那么直接使用pytorch默认DataLoader就可以。
+2. 对数据集中img的尺寸不一样的，由于dataloader需要对img进行堆叠，此时图片尺寸不同无法直接堆叠，
+   则需要自定义collate_fn对img进行堆叠，同时处理那些labels/bboxes/segments是堆叠还是放入list.
    
 3. pytorch默认的collate_fn设置不是None而是default_collate_fn，所以即使不用collate_fn
    选项，也不要去把collate_fn设置为None，这会导致collate_fn找不到可用的函数导致错误。

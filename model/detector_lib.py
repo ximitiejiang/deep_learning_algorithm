@@ -58,14 +58,15 @@ class OneStageDetector(nn.Module):
         x = self.backbone(img)
         if self.neck is not None:
             x = self.neck(x)
-        outs = self.bbox_head(x)
+        outs = self.bbox_head(x)  # 获得分类和回归的预测值cls_score, bbox_preds
         # 计算损失
-        bbox_inputs = outs + (gt_bboxes, gt_labels, img_metas, self.cfg.train_cfg)
-        losses = self.bbox_head.get_losses(*bbox_inputs)
+        loss_inputs = outs + (gt_bboxes, gt_labels, img_metas, self.cfg.train_cfg)
+        losses = self.bbox_head.get_losses(*loss_inputs)
         return losses
         
     def forward_test(self, img, img_metas, rescale=False, **kwargs):
-        """测试过程的前向计算的底层函数: 只支持单张图片，如果多张图片则需要自定义循环"""
+        """测试过程的前向计算的底层函数: 只支持单张图片，如果多张图片则需要自定义循环
+        """
         # TODO: 测试过程只需要前向计算而不需要反向传播，是否可以缩减模型尺寸?
         # 特征提取
         x = self.backbone(img)

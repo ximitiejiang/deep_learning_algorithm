@@ -24,16 +24,22 @@ class BatchProcessor():
 
 
 class BatchDetector(BatchProcessor):    
-    def __call__(self, model, data, device):
+    def __call__(self, model, data, device, return_loss=True):
         # 数据送入设备：注意数据格式问题改为在to_tensor中结果
         imgs = data['img'].to(device)
         img_metas = data['img_meta'].to(device)
         gt_bboxes = data['gt_bboxes'].to(device)
         gt_labels = data['gt_labels'].to(device)
         
-        losses = self.model.bbox_head(imgs, gt_labels, gt_bboxes, img_metas)  # 调用nn.module的__call__()函数，等效于调用forward()函数
-        loss = losses.mean()
-        outputs = dict(loss=loss)
+        # 前向计算
+        bbox_list = self.model(imgs, img_metas, return_loss=False)
+        outputs = dict(acc1=acc1)
+        #反向传播
+        if return_loss:
+            losses = self.model(imgs, img_metas, gt_bboxes, gt_labels, return_loss=return_loss)  # 调用nn.module的__call__()函数，等效于调用forward()函数
+            loss = losses.mean()
+            outputs = dict(loss=loss)
+            
         return outputs
 
 

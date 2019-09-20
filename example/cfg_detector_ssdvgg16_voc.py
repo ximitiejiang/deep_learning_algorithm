@@ -37,7 +37,7 @@ logger = dict(
 model = dict(
         type='one_stage_detector')
         
-backbone=dict(
+backbone = dict(
         type='ssdvgg16',
 #        pretrained= '/home/ubuntu/.torch/models/vgg16_caffe-292e1171.pth',   # 这是caffe的模型，对应mean=[123.675, 116.28, 103.53], std=[1, 1, 1]
         pretrained='/home/ubuntu/.torch/models/vgg16-397923af.pth',          # 这是pytorch的模型，对应mean, std
@@ -47,16 +47,30 @@ backbone=dict(
                 extra_out_feature_indices=(),
                 l2_norm_scale=20.))
 
-header=dict(
+header = dict(
         type='ssd_head',
         params=dict(
                 input_size=300,
                 num_classes=21,
                 in_channels=(512, 1024, 512, 256, 256, 256),
                 num_anchors=(4, 6, 6, 6, 4, 4),
+                anchor_size_ratio_range=(0.2, 0.9),
+                anchor_ratios = ([2],[2, 3],[2, 3],[2, 3],[2],[2]),
                 anchor_strides=(8, 16, 32, 64, 100, 300),
                 target_means=(.0, .0, .0, .0),
                 target_stds=(0.1, 0.1, 0.2, 0.2)))
+
+assigner = dict(
+        type='max_iou_assigner',
+        params=dict(
+                pos_iou_thr=0.5,
+                neg_iou_thr=0.5,
+                min_pos_iou=0.))
+
+sampler = dict(
+        type='posudo_sampler',
+        params=dict(
+                ))
 
 transform = dict(
         img_params=dict(
