@@ -30,13 +30,13 @@ class BatchDetector(BatchProcessor):
         img_metas = data['img_meta'].to(device)
         gt_bboxes = data['gt_bboxes'].to(device)
         gt_labels = data['gt_labels'].to(device)
-        
-        # 前向计算
-        bbox_list = self.model(imgs, img_metas, return_loss=False)
-        outputs = dict(acc1=acc1)
-        #反向传播
+        # 计算模型输出
+        if not return_loss:
+            bbox_list = self.model(imgs, img_metas, return_loss=False)
+            outputs = dict(bbox_list=bbox_list)
+            
         if return_loss:
-            losses = self.model(imgs, img_metas, gt_bboxes, gt_labels, return_loss=return_loss)  # 调用nn.module的__call__()函数，等效于调用forward()函数
+            losses = self.model(imgs, img_metas, gt_bboxes, gt_labels, return_loss=True)  # 调用nn.module的__call__()函数，等效于调用forward()函数
             loss = losses.mean()
             outputs = dict(loss=loss)
             
@@ -44,27 +44,22 @@ class BatchDetector(BatchProcessor):
 
 
 class BatchClassifier(BatchProcessor):
+    """主要完成分类器的前向计算，生成outputs"""
     def __call__(self, model, data, loss_fn, device, return_loss=True):
         img = data['img']
         label = data['gt_labels']
-        # 输入img要修改为float()格式float32，否则跟weight不匹配报错，这步放到transform中to_tensor完成去了
-        # 输入label要修改为long()格式int64，否则跟交叉熵公式不匹配报错，这步放到transform中to_tensor完成去了
-        
         # 由于model要送入device进行计算，且该计算只跟img相关，跟label无关，所以可以只送img到device，也就是说label可以不组合成一个变量。
         img = img.to(device)
 #        label = label.to(device)
-        # 前向计算
         # 注意：一个检测问题中，每张图就是一个多样本分类问题，处理方式类似于一次分类，
         # 所以这里需要先组合label，多张图多个label也就等效于检测中的一张图多个bbox对应多个label
         y_pred = model(img).cpu()                     # 剩余计算都在cpu上进行
         label = torch.cat(label, dim=0)               # label组合(b,)
         acc1 = accuracy(y_pred, label, topk=1)
         outputs = dict(acc1=acc1)
-        # 反向传播
         if return_loss:
             # 计算损失(!!!注意，一定要得到标量loss)
             loss = loss_fn(y_pred, label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
-            loss.backward()  # 更新反向传播, 用数值loss进行backward()      
             outputs.update(loss=loss)
         return outputs
 
@@ -192,6 +187,7 @@ class Runner():
                                                self.device,
                                                return_loss=True)
                 # 反向传播
+                outputs['loss'].backward()  # 更新反向传播, 用数值loss进行backward()      
                 self.optimizer.step()   
                 self.optimizer.zero_grad()       # 每个batch的梯度清零
                 # 显示text
@@ -221,7 +217,7 @@ class Runner():
         """针对数据集的预测：用于模型在验证集上验证和acc评估: 
         注意：需要训练完成后，或在cfg中设置load_from，也就是model先加载训练好的参数文件。
         """
-        self.buffer = {'acc': []}  # 重新初始化buffer
+        self.buffer = {'acc': []}  # 重新初始化buffer,否则acc会继续累加
         self.n_correct = 0    # 用于计算全局acc
         if self.weight_ready:
             self.model.eval()   # 关闭对batchnorm/dropout的影响，不再需要手动传入training标志

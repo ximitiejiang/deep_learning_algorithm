@@ -240,8 +240,8 @@ class SSDHead(nn.Module):
             
                 
     def get_bboxes(self, cls_scores, bbox_preds):
-        """在测试时基于前向计算结果，计算bbox预测值，此时前向计算后不需要算loss，直接算bbox"""
-        pass
+        """在测试时基于前向计算结果，计算bbox预测类别和预测坐标，此时前向计算后不需要算loss，直接算bbox"""
+        
 
 
     

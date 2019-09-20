@@ -79,6 +79,8 @@ class OneStageDetector(nn.Module):
         # TODO: bbox形式转换还需要增加
         return bbox_list
     
+    def evaluation() 
+    
     def show_result(self):
         pass
     
