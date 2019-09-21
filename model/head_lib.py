@@ -124,7 +124,7 @@ class SSDHead(nn.Module):
         self.num_classes = num_classes
         self.cls_out_channels = num_classes
         self.anchor_strides = anchor_strides
-        self.target_means = target_mean
+        self.target_means = target_means
         self.target_stds = target_stds 
 
         # 创建分类分支，回归分支
@@ -136,7 +136,7 @@ class SSDHead(nn.Module):
         # 生成base_anchor所需参数
         n_featmap = len(in_channels)
         base_sizes, scales, ratios, centers = \
-            get_base_anchor_params(img_size, anchor_size_ratio_range, 
+            get_base_anchor_params(input_size, anchor_size_ratio_range, 
                                    n_featmap, anchor_strides, anchor_ratios)
         # 创建anchor生成器
         self.anchor_generators = []
@@ -235,28 +235,48 @@ class SSDHead(nn.Module):
                                          avg_factor=num_total_samples)
         
         return dict(loss_cls=all_loss_cls, loss_reg = all_loss_reg)
-    
-    
             
                 
-    def get_bboxes(self, cls_scores, bbox_preds):
-        """在测试时基于前向计算结果，计算bbox预测类别和预测坐标，此时前向计算后不需要算loss，直接算bbox"""
+    def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg, rescale=False):
+        """在测试时基于前向计算结果，计算bbox预测类别和预测坐标，此时前向计算后不需要算loss，直接计算bbox的预测
+        Args:
+            cls_scores:(b,)(c,h,w)
+            bbox_preds:(b,)()
+            img_metas:()
+            cfg:()
+        """
+        # 获得每层的grid-anchors
+        featmap_sizes = [featmap.size() for featmap in cls_scores]
+        multi_layer_anchors = []
+        for i in range(len(featmap_sizes)):
+            anchors = self.anchor_generators.grid_anchors(featmap_sizes[i], self.anchor_strides[i])
+            multi_layer_anchors.append(anchors)  # (6,)(k, 4)
+        # 分解所有输入为每张图的list形式
         
-
+        # 计算每张图的bbox预测
+        for j in :
+            bbox_list = self.get_one_img_bboxes()
+            
+        return bbox_list
+    
+    
+    def get_one_img_bboxes():
+        """"对单张图进行预测：""
+        
 
     
 
 
 # %%
 if __name__ == "__main__":
-    """base_anchor的标准数据
+    '''base_anchor的标准数据
     [[-11., -11.,  18.,  18.],[-17., -17.,  24.,  24.],[-17.,  -7.,  24.,  14.],[ -7., -17.,  14.,  24.]]
     [[-22., -22.,  37.,  37.],[-33., -33.,  48.,  48.],[-34., -13.,  49.,  28.],[-13., -34.,  28.,  49.],[-44.,  -9.,  59.,  24.],[ -9., -44.,  24.,  59.]]
     [[-40., -40.,  70.,  70.],[-51., -51.,  82.,  82.],[-62., -23.,  93.,  54.],[-23., -62.,  54.,  93.],[-80., -16., 111.,  47.],[-16., -80.,  47., 111.]]
     [[ -49.,  -49.,  112.,  112.],[ -61.,  -61.,  124.,  124.],[ -83.,  -25.,  146.,   88.],[ -25.,  -83.,   88.,  146.],[-108.,  -15.,  171.,   78.],[ -15., -108.,   78.,  171.]]
     [[ -56.,  -56.,  156.,  156.],[ -69.,  -69.,  168.,  168.],[-101.,  -25.,  200.,  124.],[ -25., -101.,  124.,  200.]]
     [[ 18.,  18., 281., 281.],[  6.,   6., 293., 293.],[-37.,  57., 336., 242.],[ 57., -37., 242., 336.]]
-    """
+    '''
     
 #    import sys, os
 #    path = os.path.abspath("../utils")
