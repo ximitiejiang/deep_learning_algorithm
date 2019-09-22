@@ -7,7 +7,10 @@ Created on Wed Sep  4 15:48:15 2019
 """
 
 """一个完全用pytorch从头训练cifar10的方法
+1. cpu训练
 https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html#sphx-glr-beginner-blitz-cifar10-tutorial-py
+2. GPU和data parallel训练
+https://pytorch.org/tutorials/beginner/blitz/data_parallel_tutorial.html
 """
 
 import torch
@@ -80,6 +83,19 @@ class Net(nn.Module):
 
 net = Net()
 
+# 定义设备
+gpu = True
+if gpu:
+    device = torch.device("cuda:0")
+else:
+    device = torch.device("cpu")
+# 如果要并行训练:
+parallel = True   
+if torch.cuda.device_count() > 1 and parallel:
+    net = nn.DataParallel(net)
+# 只需要送模型到第一个设备即可，data_parallel模型会自动把模型和数据复制到所有GPU，并行算完再汇总到第一个GPU(当然也可以自定义)
+net.to(device)
+
 import torch.optim as optim
 
 criterion = nn.CrossEntropyLoss()
@@ -92,6 +108,8 @@ for epoch in range(2):  # loop over the dataset multiple times
     for i, data in enumerate(trainloader, 0):
         # dataloader生成的数据形式是list,也就是一个data包里边包含了堆叠好的[imgs, labels]，其中imgs(4, 3, 32, 32), labels(4)
         inputs, labels = data
+        inputs = inputs.to(device)
+        labels = labels.to(device)
 
         # zero the parameter gradients
         optimizer.zero_grad()
@@ -118,6 +136,7 @@ images, labels = dataiter.next()
 imshow(torchvision.utils.make_grid(images))
 print('GroundTruth: ', ' '.join('%5s' % classes[labels[j]] for j in range(4)))
 
+images = images.to(device)
 outputs = net(images)
 _, predicted = torch.max(outputs, 1)
 
@@ -129,6 +148,9 @@ total = 0
 with torch.no_grad():
     for data in testloader:
         images, labels = data
+        images = images.to(device)
+        labels = labels.to(device)
+        
         outputs = net(images)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
@@ -143,6 +165,9 @@ class_total = list(0. for i in range(10))
 with torch.no_grad():
     for data in testloader:
         images, labels = data
+        images = images.to(device)
+        labels = labels.to(device)
+        
         outputs = net(images)
         _, predicted = torch.max(outputs, 1)
         c = (predicted == labels).squeeze()

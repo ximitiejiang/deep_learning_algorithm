@@ -50,10 +50,10 @@ class BatchClassifier(BatchProcessor):
         label = data['gt_labels']
         # 由于model要送入device进行计算，且该计算只跟img相关，跟label无关，所以可以只送img到device，也就是说label可以不组合成一个变量。
         img = img.to(device)
-#        label = label.to(device)
+        label = label.to(device)
         # 注意：一个检测问题中，每张图就是一个多样本分类问题，处理方式类似于一次分类，
         # 所以这里需要先组合label，多张图多个label也就等效于检测中的一张图多个bbox对应多个label
-        y_pred = model(img).cpu()                     # 剩余计算都在cpu上进行
+        y_pred = model(img)                          
         label = torch.cat(label, dim=0)               # label组合(b,)
         acc1 = accuracy(y_pred, label, topk=1)
         outputs = dict(acc1=acc1)
@@ -109,7 +109,7 @@ class Runner():
         self.trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
         self.valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
         
-#        data = self.trainset[0]
+        data = self.trainset[0]
         
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)

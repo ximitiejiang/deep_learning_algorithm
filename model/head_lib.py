@@ -254,16 +254,16 @@ class SSDHead(nn.Module):
         # 分解所有输入为每张图的list形式
         
         # 计算每张图的bbox预测
-        for j in :
+        for j in img_metas:
             bbox_list = self.get_one_img_bboxes()
             
         return bbox_list
     
     
     def get_one_img_bboxes():
-        """"对单张图进行预测：""
+        """"对单张图进行预测："""
         
-
+        pass
     
 
 

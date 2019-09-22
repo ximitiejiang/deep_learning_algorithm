@@ -306,3 +306,18 @@
    通过
 
 
+### 关于mmdetection是如何把数据打包，以及如何送入设备端的？
+
+0. 先写结论：通过重写data_parallel_model以及里边的scatter()函数，来拆开data_container，并送model, batch_data到指定gpu设备。
+   并通过to_tensor函数，把数据转换成pytorch需要的float(), Long()，防止了训练出错。
+   整个过程封装得非常隐蔽，虽然减少了用户出错的几率，但也让使用者不清楚应该有什么是需要做的，有什么是系统帮忙做掉的，在哪做掉的。
+   
+   具体来说：
+    - 定义了一个data container，用来打包数据
+    
+    - 定义了一个MMDataParallelModel对模型进行打包，这个包继承自DataParallel但重写了scatter函数。
+       目的是在scatter函数中对data container拆包，并对data container里边的数据送入device.
+       因此在mmdetection中无需增加data.to()这步手动操作，同时也无需手动去除data container的外壳，
+       而是在scatter函数中自定义处理data container的过程，以及data送入device的过程。
+    
+    - 自定义了collate_fn，并
