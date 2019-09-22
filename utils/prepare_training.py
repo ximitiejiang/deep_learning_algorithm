@@ -168,7 +168,7 @@ def dict_collate(batch):
                 stacked[dim,:da.shape[0],:da.shape[1],:da.shape[2]] = da
             result[name] = stacked
             
-        else:  # 如果不需要堆叠
+        else:  # 如果不需要堆叠: 则放入一个list,即 [tensor1, tensor2..]
             result[name] = [sample[name] for sample in batch]
 
     return result  # 期望的result应该是{'img': img, 'label':label, 'img_meta':list(dict)}

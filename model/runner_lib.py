@@ -15,21 +15,25 @@ from utils.prepare_training import get_model, get_optimizer, get_lr_processor, g
 from utils.visualization import vis_loss_acc
 from utils.tools import accuracy
 from utils.checkpoint import load_checkpoint, save_checkpoint
+from utils.transform import to_device
     
 
 class BatchProcessor(): 
-    """batchProcessor独立出来，是为了让Runner更具有通用性"""
+    """batchProcessor独立出来，是为了让Runner更具有通用性：
+    1. 只跟顶层的self.model做计算，不接触model下面的子模型：从而简化使用。
+    """
     def __call__(self):
         raise NotImplementedError('BatchProcessor class is not callable.')
 
 
 class BatchDetector(BatchProcessor):    
     def __call__(self, model, data, device, return_loss=True):
-        # 数据送入设备：注意数据格式问题改为在to_tensor中结果
-        imgs = data['img'].to(device)
-        img_metas = data['img_meta'].to(device)
-        gt_bboxes = data['gt_bboxes'].to(device)
-        gt_labels = data['gt_labels'].to(device)
+        # TODO: 是否可以把to_device集成到transform中或者collate_fn中或者model_wrapper的scatter中？
+        # 数据送入设备：注意数据格式问题改为在to_tensor中完成，数据设备问题改为在to_device完成
+        imgs = to_device(data['img'], device)
+        img_metas = to_device(data['img_meta'], device)
+        gt_bboxes = to_device(data['gt_bboxes'], device)
+        gt_labels = to_device(data['gt_labels'], device)
         # 计算模型输出
         if not return_loss:
             bbox_list = self.model(imgs, img_metas, return_loss=False)
@@ -45,18 +49,18 @@ class BatchDetector(BatchProcessor):
 
 class BatchClassifier(BatchProcessor):
     """主要完成分类器的前向计算，生成outputs"""
-    def __call__(self, model, data, loss_fn, device, return_loss=True):
-        img = data['img']
-        label = data['gt_labels']
-        # 由于model要送入device进行计算，且该计算只跟img相关，跟label无关，所以可以只送img到device，也就是说label可以不组合成一个变量。
-        img = img.to(device)
-        label = label.to(device)
-        # 注意：一个检测问题中，每张图就是一个多样本分类问题，处理方式类似于一次分类，
-        # 所以这里需要先组合label，多张图多个label也就等效于检测中的一张图多个bbox对应多个label
-        y_pred = model(img)                          
-        label = torch.cat(label, dim=0)               # label组合(b,)
+    def __call__(self, model, data, device, return_loss=True, loss_fn=None):
+        # 数据送入设备
+        img = to_device(data['img'], device)  # 由于model要送入device进行计算，且该计算只跟img相关，跟label无关，所以可以只送img到device
+        label = to_device(data['gt_labels'], device)
+        
+        outputs = {}
+        y_pred = model(img)
+        # 这里需要先组合label：分类问题中的一个batch多张图多个label等效于检测中的一张图多个bbox对应多个label                          
+        label = torch.cat(label, dim=0)               # (b,)
         acc1 = accuracy(y_pred, label, topk=1)
-        outputs = dict(acc1=acc1)
+        outputs.update(acc1=acc1)
+        
         if return_loss:
             # 计算损失(!!!注意，一定要得到标量loss)
             loss = loss_fn(y_pred, label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
@@ -109,7 +113,7 @@ class Runner():
         self.trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
         self.valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
         
-        data = self.trainset[0]
+#        data = self.trainset[0]
         
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)
@@ -172,7 +176,7 @@ class Runner():
         """
         return [group['lr'] for group in self.optimizer.param_groups]  # 取出每个group的lr返回list，大多数情况下，只有一个group
     
-    def train(self):
+    def train(self, vis=True):
         """用于模型在训练集上训练"""
         self.model.train() # module的通用方法，可自动把training标志位设置为True
         self.lr_processor.set_base_lr_group()  # 设置初始学习率(直接从optimizer读取到：所以save model时必须保存optimizer) 
@@ -209,14 +213,12 @@ class Runner():
         times = time.time() - start
         self.logger.info('training finished with times(s): {}'.format(times))
         # 绘图
-        vis_loss_acc(self.buffer, title='train')
+        if vis:
+            vis_loss_acc(self.buffer, title='train')
         self.weight_ready= True
     
-    
-    def evaluate(self):
-        """针对数据集的预测：用于模型在验证集上验证和acc评估: 
-        注意：需要训练完成后，或在cfg中设置load_from，也就是model先加载训练好的参数文件。
-        """
+    def val(self, vis=True):
+        """用于模型验证"""
         self.buffer = {'acc': []}  # 重新初始化buffer,否则acc会继续累加
         self.n_correct = 0    # 用于计算全局acc
         if self.weight_ready:
@@ -231,27 +233,12 @@ class Runner():
                 # 计算总体精度
                 self.n_correct += self.buffer['acc'][-1] * len(data_batch['gt_labels'])
             
-            vis_loss_acc(self.buffer, title='val')
+            if vis:
+                vis_loss_acc(self.buffer, title='val')
             self.logger.info('ACC on valset: %.3f', self.n_correct/len(self.valset))
         else:
             raise ValueError('no model weights loaded.')
     
-    def predict_single(self, img):
-        """针对单个样本的预测：也是最精简的一个预测流程，因为不创建数据集，不进入batch_processor.
-        直接通过model得到结果，且支持cpu/GPU预测。
-        注意：需要训练完成后，或在cfg中设置load_from，也就是model先加载训练好的参数文件。
-        """
-        from utils.transformer import ImgTransform
-        if self.weight_ready:
-            img_transform = ImgTransform(self.cfg.transform_val)
-            img, *_ = img_transform(img)
-            img = img.float().to(self.device)
-            # 前向计算
-            y_pred = self.model(img)
-            y_class = self.trainset.CLASSES[y_pred]
-            self.logger.info('predict class: %s', y_class)
-        else:
-            raise ValueError('no model weights loaded.')
     
     def save_training(self, out_dir):
         meta = dict(c_epoch = self.c_epoch,

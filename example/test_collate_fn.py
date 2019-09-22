@@ -107,10 +107,32 @@ def test3():
             result[name] = [sample[name] for sample in batch]
     return result  # 期望的result应该是{'img': img, 'label':label}
 
+# %%
+def to_device(data, device):
+    """用于把数据送入device: 可一次性把一个list中的tensor都送入同一device"""
+    if isinstance(data, torch.Tensor):
+        data = data.to(device)
+    if isinstance(data, list) and isinstance(data[0], torch.Tensor):
+        data = [data[i].to(device) for i in range(len(data))]
+    return data
 
 # %%
 if __name__ == "__main__":
-    result = test3()
-    result['img'].shape
-    len(result['meta'])
+    
+    name = 'to_device'
+    
+    if name == 'test':
+        result = test3()
+        result['img'].shape
+        len(result['meta'])
+    
+    if name == 'to_device':
+        device = torch.device('cpu')
+        a = torch.tensor([1,2])
+        b = torch.tensor([3,4])
+        c = [a, b]
+    
+        d = to_device(a, device)
+        e = to_device(c, device)
+    
     

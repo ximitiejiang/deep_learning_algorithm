@@ -246,6 +246,15 @@ def to_tensor(data):
         raise TypeError('not recognized data type.')
 
 
+def to_device(data, device):
+    """用于把数据送入device: 可一次性把一个list中的tensor都送入同一device"""
+    if isinstance(data, torch.Tensor):
+        data = data.to(device)
+    if isinstance(data, list) and isinstance(data[0], torch.Tensor):
+        data = [data[i].to(device) for i in range(len(data))]
+    return data
+        
+
 def get_dataset_norm_params(dataset):
     """计算数据集的均值和标准差
     输入图片需基于hwc，bgr格式。

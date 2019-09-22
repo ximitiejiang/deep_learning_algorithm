@@ -84,13 +84,13 @@ class Net(nn.Module):
 net = Net()
 
 # 定义设备
-gpu = True
+gpu = False
 if gpu:
     device = torch.device("cuda:0")
 else:
     device = torch.device("cpu")
 # 如果要并行训练:
-parallel = True   
+parallel = False  
 if torch.cuda.device_count() > 1 and parallel:
     net = nn.DataParallel(net)
 # 只需要送模型到第一个设备即可，data_parallel模型会自动把模型和数据复制到所有GPU，并行算完再汇总到第一个GPU(当然也可以自定义)
