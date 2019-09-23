@@ -177,7 +177,6 @@ class SSDHead(nn.Module):
         # 获得各个特征图尺寸: (6,)-(38,38)(19,19)(10,10)(5,5)(3,3)(1,1)
         featmap_sizes = [featmap.shape[2:] for featmap in cls_scores]
         num_imgs = len(img_metas)
-        
         # 先生成单张图的每个特征图的grid anchors, 并堆叠在一起
         multi_layer_anchors = []
         for i in range(len(featmap_sizes)):
@@ -205,9 +204,10 @@ class SSDHead(nn.Module):
          all_label_weights,    # (6, 4, 5776)  
          num_total_pos, 
          num_total_neg) = target_result
-        # 计算损失:
-        # 先组合一个batch所有图片的数据
-        all_cls_scores = [s.permute(0,2,3,1).reshape(num_imgs, -1, self.cls_out_channels) for s in cls_scores]    
+        
+         # 计算损失:
+        all_cls_scores = [score.permute(0,2,3,1).reshape(
+                num_imgs, -1, self.cls_out_channels) for score in cls_scores]    #(6,)(b,c,h,w)->(b,,21)
         all_cls_scores = torch.cat(all_cls_scores, dim=1)        # 从(6,)(4,84,38,38)...到(4, 8732, 21)
 #        all_labels = torch.cat(all_labels, dim=-1)               # 从(6,)(4,5776)到(4, 8732)
 #        all_label_weights = torch.cat(all_label_weights, dim=-1) # 从(6,)(4,5776)到(4, 8732)
@@ -220,6 +220,9 @@ class SSDHead(nn.Module):
         all_loss_cls = []
         all_loss_reg = []
         for _ in range(num_imgs):  # 分别计算每张图的损失
+            
+            self.get_one_img_losses()
+            
             # 计算分类损失
             loss_cls = F.cross_entropy(all_cls_score[i], all_labels[i], reduction="none") * all_label_weights[i] # {(8732,21),(8732,)} *(8732,4)
             
@@ -245,7 +248,31 @@ class SSDHead(nn.Module):
                                          avg_factor=num_total_samples)
         
         return dict(loss_cls=all_loss_cls, loss_reg = all_loss_reg)
-            
+    
+    
+    def get_one_img_losses(self, cls_scores, bbox_preds, labels, bbox_targets, 
+                           bbox_weights, label_weights, cfg):
+        """计算单张图的损失
+        注意：基于损失可进行负样本挖掘，提取对损失贡献较大的负样本，来控制正负样本比例在1:3
+        从而解决检测问题的正负样本不平衡问题
+        """
+        # 分类损失
+        loss_cls = F.cross_entropy(cls_scores, labels, reduction='none') * label_weights
+        # OHEM在线负样本挖掘
+        pos_inds = torch.nonzeros()
+        neg_inds = torch.nonzeros()
+        num_pos_samples
+        num_neg_samples
+        topk_loss_cls = loss_cls
+        #分类平均损失
+        loss_cls = 
+        
+        # 回归损失
+        loss_reg = weighted_smooth_l1(bbox_preds, bbox_targets, bbox_weights,
+                                      avg_factor)
+        
+        return loss_cls, loss_reg
+        
                 
     def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg, rescale=False):
         """在测试时基于前向计算结果，计算bbox预测类别和预测坐标，此时前向计算后不需要算loss，直接计算bbox的预测
@@ -255,6 +282,23 @@ class SSDHead(nn.Module):
             img_metas:()
             cfg:()
         """
+        # 获得各个特征图尺寸: (6,)-(38,38)(19,19)(10,10)(5,5)(3,3)(1,1)
+        featmap_sizes = [featmap.shape[2:] for featmap in cls_scores]
+        num_imgs = len(img_metas)
+        # 先生成单张图的每个特征图的grid anchors, 并堆叠在一起
+        multi_layer_anchors = []
+        for i in range(len(featmap_sizes)):
+            anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i], self.anchor_strides[i])
+            multi_layer_anchors.append(anchors)  # (6,)(k, 4)
+        num_level_anchors = [len(an) for an in multi_layer_anchors]
+        multi_layer_anchors = torch.cat(multi_layer_anchors, dim=0)  # 堆叠(8732, 4)    
+        # 再复制生成一个batch size多张图的grid_anchors
+        anchor_list = [multi_layer_anchors for _ in range(len(img_metas))]  # (b,) (s,4)
+        
+        #
+        for _ in range(num_imgs):  # 分别计算每张图的bbox预测
+        
+        
         # 获得每层的grid-anchors
         featmap_sizes = [featmap.size() for featmap in cls_scores]
         multi_layer_anchors = []
@@ -271,7 +315,12 @@ class SSDHead(nn.Module):
     
     
     def get_one_img_bboxes():
-        """"对单张图进行预测："""
+        """"对单张图进行预测：基于网络输出cls_score, bbox_pred需要做如下工作才能获得预测
+        1. cls_score概率化：采用softmax()函数
+        2. 对score进行过滤
+        3. 对bbox坐标逆变换delta2bbox()
+        4. 进行nms过滤
+        """
         
         pass
     

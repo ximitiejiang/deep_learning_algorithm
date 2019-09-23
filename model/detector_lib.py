@@ -10,17 +10,6 @@ Created on Sat Aug 10 17:22:46 2019
 
 import torch.nn as nn
 
-# %%
-def get_detector(cfg):
-    detectors = {
-            'one_stage_detector': OneStageDetector,
-            'two_stage_detector': TwoStageDetector}
-    detector = detectors[cfg.detector.type]
-    return detector
-    
-    
-    
-    
     
 # %% onestage
 class OneStageDetector(nn.Module):
@@ -83,11 +72,6 @@ class OneStageDetector(nn.Module):
         # TODO: bbox形式转换还需要增加
         return bbox_list
     
-    def evaluation(self):
-        pass
-    
-    def show_result(self):
-        pass
     
 
 # %% two stage

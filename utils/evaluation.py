@@ -81,19 +81,17 @@ def eval_dataset_det(cfg_path, device=None):
     print('ACC on dataset: %.3f', n_correct/len(dataset))
 
 
-def predict_single(self, img):
+def predict_one_img_cls(img):
     """针对单个样本的预测：也是最精简的一个预测流程，因为不创建数据集，不进入batch_processor.
     直接通过model得到结果，且支持cpu/GPU预测。
     注意：需要训练完成后，或在cfg中设置load_from，也就是model先加载训练好的参数文件。
     """
     from utils.transformer import ImgTransform
-    if self.weight_ready:
-        img_transform = ImgTransform(self.cfg.transform_val)
-        img, *_ = img_transform(img)
-        img = img.float().to(self.device)
-        # 前向计算
-        y_pred = self.model(img)
-        y_class = self.trainset.CLASSES[y_pred]
-        self.logger.info('predict class: %s', y_class)
-    else:
-        raise ValueError('no model weights loaded.')
+
+    img_transform = ImgTransform(cfg.transform_val)
+    img, *_ = img_transform(img)
+    img = img.to(device)
+    # 前向计算
+    y_pred = model(img)
+    y_class = trainset.CLASSES[y_pred]
+    print('predict class: %s', y_class)

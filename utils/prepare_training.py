@@ -153,11 +153,8 @@ def dict_collate(batch):
     输出：result为dict(list), 每个value都分类放在同一list中 {'img':[imgs], 'label':[labels], 'scale':[scales],...}
     """
     result = {}
-#    value = batch[0].values()
-#    value = list(value)  # 取出数据用于检查类型
     stack_list = batch[0]['stack_list']
     for i, name in enumerate(batch[0].keys()):  # 第i个变量的堆叠
-        
         if name in stack_list:  # 如果需要堆叠
             data_list = [sample[name] for sample in batch]
             shapes = np.stack([data.shape for data in data_list], axis=0)
@@ -167,11 +164,9 @@ def dict_collate(batch):
                 data = data_list[dim]
                 stacked[dim,:data.shape[0],:data.shape[1],:data.shape[2]] = data #
             result[name] = stacked
-            
         else:  # 如果不需要堆叠: 则放入一个list,即 [tensor1, tensor2..]
             result[name] = [sample[name] for sample in batch]
-
-    return result  # 期望的result应该是{'img': img, 'label':label, 'img_meta':list(dict)}
+    return result
     
 
 def get_dataloader(dataset, dataloader_cfg):
@@ -226,31 +221,28 @@ from model.alexnet_lib import AlexNet, AlexNet8
 from model.ssdvgg16_lib import SSDVGG16
 from model.head_lib import SSDHead
 
+models = {
+        'one_stage_detector': OneStageDetector,
+        'alexnet8' : AlexNet8,
+        'alexnet' : AlexNet,
+        'ssd_vgg16' : SSDVGG16,
+        'ssd_head' : SSDHead}
+
 def get_root_model(cfg):
     """根模型创建：传入根cfg"""
-    root_models = {'one_stage_detector': OneStageDetector,
-                   'alexnet8' : AlexNet8,
-                   }
     # 如果是classifier单模型的根模型
     if cfg.get('backbone', None) is None:
         return get_model(cfg.model)
     # 如果是detector复合模型，送入根cfg
     elif cfg.get('backbone', None) is not None:
         model_name = cfg.model['type']
-        model_class = root_models[model_name]
+        model_class = models[model_name]
         model = model_class(cfg)
         return model
 
 def get_model(cfg):
-    """创建模型：如果创建集成模型(detector)，则需要传入根cfg，
-    如果创建单模型，则需要传入该模型cfg_model
+    """创建单模型：传入模型cfg
     """
-    models = {
-            'alexnet8' : AlexNet8,
-            'alexnet' : AlexNet,
-            'ssd_vgg16' : SSDVGG16,
-            'ssd_head' : SSDHead}
-    
     model_name = cfg['type']
     model_class = models[model_name]
     params = cfg.params    
