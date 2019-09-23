@@ -10,7 +10,7 @@ gpus = 1
 parallel = False
 distribute = False                       
 n_epochs = 1
-imgs_per_core = 64               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
+imgs_per_core = 4               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
 workers_per_core = 2
 save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
 work_dir = '/home/ubuntu/mytrain/ssd_vgg_voc/'
@@ -38,16 +38,15 @@ model = dict(
         type='one_stage_detector')
         
 backbone = dict(
-        type='ssdvgg16',
-#        pretrained= '/home/ubuntu/.torch/models/vgg16_caffe-292e1171.pth',   # 这是caffe的模型，对应mean=[123.675, 116.28, 103.53], std=[1, 1, 1]
-        pretrained='/home/ubuntu/.torch/models/vgg16-397923af.pth',          # 这是pytorch的模型，对应mean, std
+        type='ssd_vgg16',
         params=dict(
                 num_classes=10,
-                out_feature_indices=(),
-                extra_out_feature_indices=(),
+                pretrained= '/home/ubuntu/.torch/models/vgg16_caffe-292e1171.pth',   # 这是caffe的模型，对应mean=[123.675, 116.28, 103.53], std=[1, 1, 1],  另外的pytorch的模型pretrained='/home/ubuntu/.torch/models/vgg16-397923af.pth', 对应mean, std需要先归一化再标准化
+                out_feature_indices=(22,34),
+                extra_out_feature_indices=(1,3,5,7),
                 l2_norm_scale=20.))
 
-header = dict(
+head = dict(
         type='ssd_head',
         params=dict(
                 input_size=300,

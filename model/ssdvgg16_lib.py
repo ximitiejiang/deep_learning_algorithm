@@ -102,7 +102,7 @@ class SSDVGG16(nn.Module):
         self.out_feature_indices = out_feature_indices
         self.extra_out_feature_indices = extra_out_feature_indices
         self.l2_norm_scale = l2_norm_scale
-        self.classify_classes = classify_classes  # 用来做分类器
+        self.classify_classes = classify_classes  # 如果不为None，则用来做分类器，增加几层进行分类
         self.pretrained = pretrained
         
         #构建所有vgg基础层
@@ -160,10 +160,10 @@ class SSDVGG16(nn.Module):
         layers.append(nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=0))
         return nn.Sequential(*layers)
     
-    def init_weight(self):
+    def init_weights(self):
         """用于模型初始化，统一在detector中进行"""
         # 载入vgg16_caffe的权重初始化vgg
-        common_init_weights(self.features, pretrained=self.pretrained)        
+        common_init_weights(self, pretrained=self.pretrained)        
         # exra层初始化
         for m in self.extra.modules():
             if isinstance(m, nn.Conv2d):
@@ -171,8 +171,8 @@ class SSDVGG16(nn.Module):
         # l2 norm层初始化
         constant_init(self.l2_norm, self.l2_norm.scale)
         # 如果作为分类模型的初始化补充
-        if self.classifier:
-            common_init_weights(self.classifier)
+        if self.classify_classes is not None:
+            common_init_weights(self.fc)
     
     def forward(self, x):
         outs = []

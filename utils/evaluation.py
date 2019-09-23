@@ -5,36 +5,80 @@ Created on Sun Sep 22 22:15:27 2019
 
 @author: ubuntu
 """
+import torch
+from utils.prepare_training import get_config, get_dataset, get_dataloader, get_model
+from utils.checkpoint import load_checkpoint
+from utils.transform import to_device
+from utils.visualization import vis_loss_acc
+from utils.tools import accuracy
 
 
-def eval_dataset_cls(cfg_path):
-    """等效于runner中的val，但可用来脱离runner进行独立的数据集验证
+def eval_dataset_cls(cfg_path, device=None):
+    """分类问题的eval dataset: 
+    等效于runner中的load_from + val，但可用来脱离runner进行独立的数据集验证
     """
     # 准备验证所用的对象
     cfg = get_config(cfg_path)
-    dataset
-    dataloader
-    model = get_model()
-    # 开始训练
+    dataset = get_dataset(cfg.valset, cfg.transform_val)
+    dataloader = get_dataloader(dataset, cfg.valloader)
+    model = get_model(cfg)
+    if device is None:
+        device = torch.device(cfg.load_device)
+    # TODO: 如下两句的顺序
+    load_checkpoint(model, cfg.load_from, device)
+    model = model.to(device)
+    # 开始验证
     buffer = {'acc': []}
     n_correct = 0
     model.eval()
     for c_iter, data_batch in enumerate(dataloader):
         with torch.no_grad():  # 停止反向传播，只进行前向计算
-            outputs = batch_processor(self.model, data_batch, 
-                                           self.loss_fn_clf,
-                                           self.device,
-                                           return_loss=False)
-            buffer['acc'].append(outputs['acc1'])
+            img = to_device(data_batch['img'], device)
+            label = to_device(data_batch['gt_labels'], device)
+            
+            y_pred = model(img)
+            label = torch.cat(label, dim=0)
+            acc1 = accuracy(y_pred, label, topk=1)
+            buffer['acc'].append(acc1)
         # 计算总体精度
         n_correct += buffer['acc'][-1] * len(data_batch['gt_labels'])
     
-    vis_loss_acc(self.buffer, title='val')
-    self.logger.info('ACC on valset: %.3f', self.n_correct/len(self.valset))
+    vis_loss_acc(buffer, title='eval dataset')
+    print('ACC on dataset: %.3f', n_correct/len(dataset))
 
 
-def eval_dataset_det():
-    pass
+def eval_dataset_det(cfg_path, device=None):
+    """检测问题的eval dataset
+    等效于runner中的load_from + val + bbox
+    """
+    # 准备验证所用的对象
+    cfg = get_config(cfg_path)
+    dataset = get_dataset(cfg.valset, cfg.transform_val)
+    dataloader = get_dataloader(dataset, cfg.valloader)
+    model = get_model(cfg)
+    if device is None:
+        device = torch.device(cfg.load_device)
+    # TODO: 如下两句的顺序
+    load_checkpoint(model, cfg.load_from, device)
+    model = model.to(device)
+    # 开始验证
+    buffer = {'acc': []}
+    n_correct = 0
+    model.eval()
+    for c_iter, data_batch in enumerate(dataloader):
+        with torch.no_grad():  # 停止反向传播，只进行前向计算
+            img = to_device(data_batch['img'], device)
+            label = to_device(data_batch['gt_labels'], device)
+
+            y_pred = model(img)
+            label = torch.cat(label, dim=0)
+            acc1 = accuracy(y_pred, label, topk=1)
+            buffer['acc'].append(acc1)
+        # 计算总体精度
+        n_correct += buffer['acc'][-1] * len(data_batch['gt_labels'])
+    
+    
+    print('ACC on dataset: %.3f', n_correct/len(dataset))
 
 
 def predict_single(self, img):

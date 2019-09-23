@@ -11,7 +11,7 @@ import os
 import time
 
 from utils.prepare_training import get_config, get_logger, get_dataset, get_dataloader 
-from utils.prepare_training import get_model, get_optimizer, get_lr_processor, get_loss_fn
+from utils.prepare_training import get_root_model, get_optimizer, get_lr_processor, get_loss_fn
 from utils.visualization import vis_loss_acc
 from utils.tools import accuracy
 from utils.checkpoint import load_checkpoint, save_checkpoint
@@ -27,20 +27,23 @@ class BatchProcessor():
 
 
 class BatchDetector(BatchProcessor):    
-    def __call__(self, model, data, device, return_loss=True):
+    def __call__(self, model, data, device, return_loss=True, **kwargs): # kwargs用来兼容分类时传入的loss_fn
         # TODO: 是否可以把to_device集成到transform中或者collate_fn中或者model_wrapper的scatter中？
         # 数据送入设备：注意数据格式问题改为在to_tensor中完成，数据设备问题改为在to_device完成
         imgs = to_device(data['img'], device)
-        img_metas = to_device(data['img_meta'], device)
         gt_bboxes = to_device(data['gt_bboxes'], device)
         gt_labels = to_device(data['gt_labels'], device)
+        img_metas = data['img_meta']
         # 计算模型输出
         if not return_loss:
-            bbox_list = self.model(imgs, img_metas, return_loss=False)
+            bbox_list = model(imgs, img_metas, 
+                              return_loss=False)
             outputs = dict(bbox_list=bbox_list)
             
         if return_loss:
-            losses = self.model(imgs, img_metas, gt_bboxes, gt_labels, return_loss=True)  # 调用nn.module的__call__()函数，等效于调用forward()函数
+            losses = model(imgs, img_metas, 
+                           gt_bboxes=gt_bboxes, 
+                           gt_labels=gt_labels, return_loss=True)  # 调用nn.module的__call__()函数，等效于调用forward()函数
             loss = losses.mean()
             outputs = dict(loss=loss)
             
@@ -49,7 +52,7 @@ class BatchDetector(BatchProcessor):
 
 class BatchClassifier(BatchProcessor):
     """主要完成分类器的前向计算，生成outputs"""
-    def __call__(self, model, data, device, return_loss=True, loss_fn=None):
+    def __call__(self, model, data, device, return_loss=True, loss_fn=None, **kwargs):
         # 数据送入设备
         img = to_device(data['img'], device)  # 由于model要送入device进行计算，且该计算只跟img相关，跟label无关，所以可以只送img到device
         label = to_device(data['gt_labels'], device)
@@ -104,9 +107,11 @@ class Runner():
         if self.cfg.gpus > 0 and torch.cuda.is_available():
             self.device = torch.device("cuda")   # 设置设备GPU: "cuda"和"cuda:0"的区别？
             self.logger.info('Operation will start in GPU!')
-        if self.cfg.gpus == 0:
+        elif self.cfg.gpus == 0:
             self.device = torch.device("cpu")      # 设置设备CPU
             self.logger.info('Operation will start in CPU!')
+        else:
+            raise ValueError('can not define device on CPU or GPU!')
         #创建batch处理器
         self.batch_processor = get_batch_processor(self.cfg)
         #创建数据集
@@ -118,9 +123,9 @@ class Runner():
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)
         self.valloader = get_dataloader(self.valset, self.cfg.valloader)
-        
         # 创建模型并初始化
-        self.model = get_model(self.cfg)
+        self.model = get_root_model(self.cfg)
+        
         # 创建损失函数
         self.loss_fn_clf = get_loss_fn(self.cfg.loss_clf)
         if self.cfg.get('loss_reg', None) is not None:
@@ -186,10 +191,11 @@ class Runner():
             for self.c_iter, data_batch in enumerate(self.dataloader):
                 self.lr_processor.set_warmup_lr_group() # 设置热身学习率(计算出来并填入optimizer)
                 # 前向计算
-                outputs = self.batch_processor(self.model, data_batch, 
-                                               self.loss_fn_clf,
+                outputs = self.batch_processor(self.model, 
+                                               data_batch, 
                                                self.device,
-                                               return_loss=True)
+                                               return_loss=True,
+                                               loss_fn=self.loss_fn_clf)
                 # 反向传播
                 outputs['loss'].backward()  # 更新反向传播, 用数值loss进行backward()      
                 self.optimizer.step()   
@@ -225,8 +231,8 @@ class Runner():
             self.model.eval()   # 关闭对batchnorm/dropout的影响，不再需要手动传入training标志
             for c_iter, data_batch in enumerate(self.valloader):
                 with torch.no_grad():  # 停止反向传播，只进行前向计算
-                    outputs = self.batch_processor(self.model, data_batch, 
-                                                   self.loss_fn_clf,
+                    outputs = self.batch_processor(self.model, 
+                                                   data_batch, 
                                                    self.device,
                                                    return_loss=False)
                     self.buffer['acc'].append(outputs['acc1'])

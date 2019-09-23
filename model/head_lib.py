@@ -128,8 +128,8 @@ class SSDHead(nn.Module):
         self.target_stds = target_stds 
 
         # 创建分类分支，回归分支
-        cls_convs = conv_head(in_channels, num_anchors * num_classes)  # 分类分支目的：通道数变换为21*n_anchors
-        reg_convs = conv_head(in_channels, num_anchors * 4)
+        cls_convs = conv_head(in_channels, [num_anchor * num_classes for num_anchor in num_anchors])  # 分类分支目的：通道数变换为21*n_anchors
+        reg_convs = conv_head(in_channels, [num_anchor * 4 for num_anchor in num_anchors])
         self.cls_convs = nn.ModuleList(cls_convs) # 由于6个convs是并行分别处理每一个特征层，所以不需要用sequential
         self.reg_convs = nn.ModuleList(reg_convs)
         
@@ -150,9 +150,9 @@ class SSDHead(nn.Module):
             anchor_generator.base_anchors = anchor_generator.base_anchors[keep_anchor_indices]
             self.anchor_generators.append(anchor_generator)
         # 初始化权重
-        self.init_weight()
+        self.init_weights()
         
-    def init_weight(self):
+    def init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 xavier_init(m, distribution="uniform", bias=0)
@@ -167,34 +167,44 @@ class SSDHead(nn.Module):
     
     def get_losses(self, cls_scores, bbox_preds, gt_bboxes, gt_labels, img_metas, cfg):
         """在训练时基于前向计算结果，计算损失
-        cls_scores(b, )(c, h, w)
-        bbox_preds(b,)(c, h, w)
-        gt_bboxes
-        gt_labels
-        img_metas
+        cls_scores(6, )(b, c, h, w): 按层分组
+        bbox_preds(6, )(b, c, h, w):按层分组
+        gt_bboxes(b, )(n, 4): 按batch分组
+        gt_labels(b, )(n, ):按batch分组
+        img_metas(b, )(dict):按batch分组
         cfg
         """
         # 获得各个特征图尺寸: (6,)-(38,38)(19,19)(10,10)(5,5)(3,3)(1,1)
-        featmap_sizes = [featmap.size() for featmap in cls_scores]
+        featmap_sizes = [featmap.shape[2:] for featmap in cls_scores]
         num_imgs = len(img_metas)
         
-        # 生成每个特征图的grid anchors, 并堆叠在一起
+        # 先生成单张图的每个特征图的grid anchors, 并堆叠在一起
         multi_layer_anchors = []
         for i in range(len(featmap_sizes)):
-            anchors = self.anchor_generators.grid_anchors(featmap_sizes[i], self.anchor_strides[i])
+            anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i], self.anchor_strides[i])
             multi_layer_anchors.append(anchors)  # (6,)(k, 4)
-        num_level_anchors = [an.numel() for an in multi_layers_anchors]
-        multi_layer_anchors = torch.cat(multi_layer_anchors, dim=0)  # (8732, 4)    
-        anchor_list = [multi_layer_anchors for _ in range(len(img_metas))]  # 复制给每一张图(n_imgs,) (s,4)
+        num_level_anchors = [len(an) for an in multi_layer_anchors]
+        multi_layer_anchors = torch.cat(multi_layer_anchors, dim=0)  # 堆叠(8732, 4)    
+        # 再复制生成一个batch size多张图的grid_anchors
+        anchor_list = [multi_layer_anchors for _ in range(len(img_metas))]  # (b,) (s,4)
         
         # 计算每个grid_anchor的分类标签labels，以及回归标签坐标bbox_target
-        (all_bbox_targets,     # (6,) (4, 5776, 4)
-         all_bbox_weights,     # (6,) (4, 5776, 4)
-         all_labels,           # (6,) (4, 5776)  
-         all_label_weights,    # (6,) (4, 5776)  
+        target_result = get_anchor_target(anchor_list, 
+                                          gt_bboxes, 
+                                          gt_labels,
+                                          img_metas, 
+                                          cfg.assigner, 
+                                          cfg.sampler,
+                                          num_level_anchors,
+                                          target_means = self.target_means,
+                                          target_stds = self.target_stds)
+        # 解析target
+        (all_bbox_targets,     # (6, 4, 5776, 4)
+         all_bbox_weights,     # (6, 4, 5776, 4)
+         all_labels,           # (6, 4, 5776)  
+         all_label_weights,    # (6, 4, 5776)  
          num_total_pos, 
-         num_total_neg) = get_anchor_target(anchor_list, gt_bboxes, img_metas, cfg.assigner, num_level_anchors)
-        
+         num_total_neg) = target_result
         # 计算损失:
         # 先组合一个batch所有图片的数据
         all_cls_scores = [s.permute(0,2,3,1).reshape(num_imgs, -1, self.cls_out_channels) for s in cls_scores]    

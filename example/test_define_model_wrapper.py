@@ -16,7 +16,8 @@ def _scatter(inputs, target_gpus, dim=0):
     
 class ModelWrapper(nn.Module):
     """如何手写一个并行计算模型： 参考pytorch的nn.parallel.data_parallel类
-    功能：一方面能够进行并行计算，另一方面能够对输入数据送入相应的device。
+    功能：一方面能够进行并行计算(且兼容cpu model, 单GPU model，data parallel model)
+    另一方面能够对输入数据送入相应的device(省去data.to(device))。
     
     args:
         model: 原始模型
@@ -63,8 +64,6 @@ class ModelWrapper(nn.Module):
         inputs = _scatter(inputs, device_ids, dim) if inputs else []
         kwargs = _scatter(kwargs, device_ids, dim) if kwargs else []
         
-    
-
     
     def replicate(self, inputs, kwargs, device_ids):
         """用来把模型复制多份到devices"""

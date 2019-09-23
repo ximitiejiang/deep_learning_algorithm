@@ -153,19 +153,19 @@ def dict_collate(batch):
     输出：result为dict(list), 每个value都分类放在同一list中 {'img':[imgs], 'label':[labels], 'scale':[scales],...}
     """
     result = {}
-    data = batch[0].values()
-    data = list(data)  # 取出数据用于检查类型
+#    value = batch[0].values()
+#    value = list(value)  # 取出数据用于检查类型
     stack_list = batch[0]['stack_list']
     for i, name in enumerate(batch[0].keys()):  # 第i个变量的堆叠
         
         if name in stack_list:  # 如果需要堆叠
             data_list = [sample[name] for sample in batch]
-            shape_stack = np.stack([data.shape for data in data_list], axis=0)
-            max_c, max_h, max_w =  np.max(shape_stack, axis=0)
+            shapes = np.stack([data.shape for data in data_list], axis=0)
+            max_c, max_h, max_w =  np.max(shapes, axis=0)
             stacked = torch.zeros(len(batch), max_c, max_h, max_w)  # b,c,h,w
             for dim in range(len(batch)):
-                da = data_list[dim]
-                stacked[dim,:da.shape[0],:da.shape[1],:da.shape[2]] = da
+                data = data_list[dim]
+                stacked[dim,:data.shape[0],:data.shape[1],:data.shape[2]] = data #
             result[name] = stacked
             
         else:  # 如果不需要堆叠: 则放入一个list,即 [tensor1, tensor2..]
@@ -221,39 +221,40 @@ def get_dataloader(dataset, dataloader_cfg):
         
 
 # %%
-#from model.detector_lib import OneStageDetector
+from model.detector_lib import OneStageDetector
 from model.alexnet_lib import AlexNet, AlexNet8
 from model.ssdvgg16_lib import SSDVGG16
 from model.head_lib import SSDHead
 
-def get_model(model_cfg):
-    """创建模型：如果创建集成模型(detector)，则需要传入根cfg，如果创建单模型，则需要传入该模型cfg_model
+def get_root_model(cfg):
+    """根模型创建：传入根cfg"""
+    root_models = {'one_stage_detector': OneStageDetector,
+                   'alexnet8' : AlexNet8,
+                   }
+    # 如果是classifier单模型的根模型
+    if cfg.get('backbone', None) is None:
+        return get_model(cfg.model)
+    # 如果是detector复合模型，送入根cfg
+    elif cfg.get('backbone', None) is not None:
+        model_name = cfg.model['type']
+        model_class = root_models[model_name]
+        model = model_class(cfg)
+        return model
+
+def get_model(cfg):
+    """创建模型：如果创建集成模型(detector)，则需要传入根cfg，
+    如果创建单模型，则需要传入该模型cfg_model
     """
     models = {
-#            'one_stage_detector': OneStageDetector,
             'alexnet8' : AlexNet8,
             'alexnet' : AlexNet,
-            'ssdvgg16' : SSDVGG16,
-            'ssdhead' : SSDHead}
+            'ssd_vgg16' : SSDVGG16,
+            'ssd_head' : SSDHead}
     
-    # 检测器主模型
-    if model_cfg.get('type', None) is None and model_cfg.task=='detector':   # 不包含type的detector
-        model_name = model_cfg.model['type']
-        model_class = models[model_name]
-        model = model_class(model_cfg)        # 不包含type的classifier
-        return model
-    # 分类器主模型
-    elif model_cfg.get('type', None) is None and model_cfg.task=='classifier':         
-        model_name = model_cfg.model.get('type')
-        model_class = models[model_name]
-        params = model_cfg.model.params
-        return model_class(**params)
-    #　所有子模型        
-    elif model_cfg.get('type', None) is not None:   # 否则就是直接创建model
-        model_name = model_cfg['type']
-        model_class = models[model_name]
-        params = model_cfg.params    
-        return model_class(**params)  # 其他模型的创建，传入的是解包的dict
+    model_name = cfg['type']
+    model_class = models[model_name]
+    params = cfg.params    
+    return model_class(**params)  # 其他模型的创建，传入的是解包的dict
 
 
 

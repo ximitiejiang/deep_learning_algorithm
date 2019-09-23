@@ -22,7 +22,6 @@ class AnchorGenerator():
     
     def get_base_anchors(self): 
         """生成单个特征图的base anchors
-        
         """
         w, h = self.base_size, self.base_size
         # 准备中心点坐标
@@ -46,12 +45,15 @@ class AnchorGenerator():
                                  x_ctr + 0.5 * (w_new - 1), 
                                  y_ctr + 0.5 * (h_new - 1)], axis=-1).round()  # (m*n, 4))
         
-        return torch.tensor(base_anchors)
+        return torch.tensor(base_anchors, dtype=torch.float32)  # 做类型转换为pytorch weight通用的float32(否则会因为Numpy原因变float64)
     
-    def grid_anchors(self, featmap_size, stride):
-        """生成单个特征图的网格anchors"""
+    def grid_anchors(self, featmap_size, stride, device='cuda'):
+        """生成单个特征图的网格anchors, 
+        注意：为了后边iou的计算在GPU进行，这里需要把grid anchor的输出放在cuda
+        """
         #TODO: 检查是否要送入device
-        base_anchors = self.base_anchors #(k, 4)
+        device = torch.device(device)
+        base_anchors = self.base_anchors.to(device) #(k, 4)
         # 生成原图上的网格坐标
         h, w = featmap_size
         x = np.arange(0, w) * stride  # (m,)
@@ -60,7 +62,7 @@ class AnchorGenerator():
         yy = np.tile(y.reshape(-1,1), (1, len(x))).reshape(-1) # (m*n,)
         # 基于网格坐标生成(xmin, ymin, xmax, ymax)的坐标平移矩阵
         shifts = np.stack([xx, yy, xx, yy], axis=-1)  # (m*n, 4)
-        shifts = torch.tensor(shifts)
+        shifts = torch.tensor(shifts).type_as(base_anchors).to(device)
         # 平移anchors: 相当于该组anchors跟每个平移坐标进行相加，
         # 也就相当于要取每一行坐标跟一组anchor运算，所以用坐标插入空轴而不是用anchor插入空轴
         all_anchors = base_anchors + shifts[:, None, :]   #(b,4)+(k,1,4)->(k, b, 4)

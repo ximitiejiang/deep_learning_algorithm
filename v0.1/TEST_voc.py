@@ -126,11 +126,15 @@ def voc_eval(result_file, dataset, iou_thr=0.5):
 if __name__ == '__main__':
 
     # for ssd
-#    config_path = './config/cfg_ssd300_vgg16_voc.py'   # 注意：cfg和模型需要匹配，因为不同数据集类别数不一样，  
-#    checkpoint_path = './weights/myssd/weight_4imgspergpu/epoch_24.pth'   
-##    checkpoint_path = './work_dirs/ssd300_voc/epoch_24.pth'
-##    checkpoint_path = './weights/mmdetection/ssd300_voc_vgg16_caffe_240e_20181221-2f05dd40.pth'
-#    out_file = './weights/myssd/weight_4imgspergpu/results_24.pkl'
+    config_path = './config/cfg_ssd300_vgg16_voc.py'   # 注意：cfg和模型需要匹配，因为不同数据集类别数不一样，  
+    checkpoint_path = './weights/myssd/weight_4imgspergpu/epoch_24.pth'   
+#    checkpoint_path = './work_dirs/ssd300_voc/epoch_24.pth'
+#    checkpoint_path = './weights/mmdetection/ssd300_voc_vgg16_caffe_240e_20181221-2f05dd40.pth'
+    out_file = './weights/myssd/weight_4imgspergpu/results_24.pkl'
+    cfg = Config.fromfile(config_path)
+    dataset = get_dataset(cfg.data.test, VOCDataset)
+    dataset_result(dataset, cfg, checkpoint_path, out_file)
+    voc_eval(out_file, dataset, iou_thr=0.5)
 
     # for m2det
 #    config_path = './config/cfg_m2det512_vgg16_mlfpn_voc.py'
@@ -151,10 +155,10 @@ if __name__ == '__main__':
 #    voc_eval(out_file, dataset, iou_thr=0.5)
     
     # for retinanet-4imgpergpu
-    config_path = './config/cfg_retinanet_r50_fpn_voc.py'
-    checkpoint_path = './weights/myretinanet/4imgpergpu/epoch_20.pth'
-    out_file = './weights/myretinanet/4imgpergpu/results_20.pkl'
-    cfg = Config.fromfile(config_path)
-    dataset = get_dataset(cfg.data.test, VOCDataset)
-    dataset_result(dataset, cfg, checkpoint_path, out_file)
-    voc_eval(out_file, dataset, iou_thr=0.5)
+#    config_path = './config/cfg_retinanet_r50_fpn_voc.py'
+#    checkpoint_path = './weights/myretinanet/4imgpergpu/epoch_20.pth'
+#    out_file = './weights/myretinanet/4imgpergpu/results_20.pkl'
+#    cfg = Config.fromfile(config_path)
+#    dataset = get_dataset(cfg.data.test, VOCDataset)
+#    dataset_result(dataset, cfg, checkpoint_path, out_file)
+#    voc_eval(out_file, dataset, iou_thr=0.5)
