@@ -12,7 +12,7 @@ from utils.transform import to_device
 from utils.visualization import vis_loss_acc
 from utils.tools import accuracy
 
-
+# %% 评估数据集
 def eval_dataset_cls(cfg_path, device=None):
     """分类问题的eval dataset: 
     等效于runner中的load_from + val，但可用来脱离runner进行独立的数据集验证
@@ -81,6 +81,7 @@ def eval_dataset_det(cfg_path, device=None):
     print('ACC on dataset: %.3f', n_correct/len(dataset))
 
 
+# %% 预测单张图片
 def predict_one_img_cls(img):
     """针对单个样本的预测：也是最精简的一个预测流程，因为不创建数据集，不进入batch_processor.
     直接通过model得到结果，且支持cpu/GPU预测。

@@ -339,6 +339,12 @@
     - 自定义了collate_fn，并
 
 
+### 关于如何获得anchor的统计数据
+
+1. 可以参考DSSD的论文和分析文章(https://blog.csdn.net/qq_35451572/article/details/80457552)其中提到了
+   通过聚类的方式来得到W/H的比例的一个结果
+
+
 ### 关于pytorch中数据筛选小技巧
 
 1. 筛选值：
@@ -351,6 +357,14 @@
     - none               -> values, inds = torch.max(), 
     - none               -> values, inds = torch.min()  # pytorch中对max,min进行了增强，不仅可以获得筛选值还能获得筛选序号，values, inds = torch.max(data, dim=0)
     - none               -> values, inds = torch.topk()
+
+
+### SSD物体检测算法的总结
+
+1. anchor系统的基本思想是什么？用anchor来提取gt的数据，并转化为labels和bbox_target，从而来训练神经网络这个万能函数y_p = f(img)
+   但为什么不直接用gt_label/gt_bbox来训练？
+   
+2. 为什么？   
 
 
 ### 其他一些犯过的错误
@@ -371,5 +385,5 @@
     
     - 逐iter查看分类损失和回归损失：一般分类损失较大(单图2~10之间，batch之和在20左右)，回归损失较小(单图1-2之间，batch之和在5左右)，总的loss在30以下。
       确保没有突然的激活变化。
-    
-    
+
+
