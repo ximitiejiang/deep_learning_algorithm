@@ -17,9 +17,11 @@ def vis_loss_acc(buffer_dict, title='result: '):
             loss(list): [loss1, loss2,..] or [[iter1, loss1], [iter2, loss2], ...]
             acc(list): [acc1, acc2,..] or [[iter1, acc1], [iter2, acc2], ...]
     """
-    accs = buffer_dict['acc']
+    accs = None
     losses = None
     lrs = None
+    if buffer_dict.get('acc', None) is not None:
+        accs = buffer_dict['acc']
     if buffer_dict.get('loss', None) is not None:
         losses = buffer_dict['loss']
     if buffer_dict.get('lr', None) is not None:
@@ -30,13 +32,14 @@ def vis_loss_acc(buffer_dict, title='result: '):
     else:
         prefix = title
     
+    
     if isinstance(accs[0], list) or isinstance(accs[0], tuple):  # 如果losses列表里边包含idx
         x = np.array(accs)[:,0]
         y_acc = np.array(accs)[:,1]
     else:  # 如果losses列表里边不包含idx只是单纯loss数值
         x = np.arange(len(accs))
         y_acc = np.array(accs)
-    # 绘制loss
+    # 绘制acc
     prefix += ' accs'
     fig = plt.figure()
     ax1 = fig.add_subplot(1,1,1)
@@ -148,6 +151,9 @@ def vis_activation_hist(data_list):
     激活值如果集中在左右两侧，则说明有经过激活函数后取值会越来越大，可能产生梯度爆炸或者梯度消失。
     激活值如果集中在中间，则说明激活分布有偏向，在输出表现力上受限，模型学习能力就不够。
     所以激活值应该在+-1之前区域较广泛分布，才是比较合理。
+    
+    使用方法：datalist.append(x)
+    
     Args:
         data_list(list): 表示激活函数输出的每一层的值，[d1, d2,..]每个元素为(b,c,h,w)
     """

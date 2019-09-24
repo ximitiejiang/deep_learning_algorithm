@@ -337,3 +337,39 @@
        而是在scatter函数中自定义处理data container的过程，以及data送入device的过程。
     
     - 自定义了collate_fn，并
+
+
+### 关于pytorch中数据筛选小技巧
+
+1. 筛选值：
+    - np.max() -> torch.max()
+    - np.min() -> torch.min()
+
+2. 筛选序号：
+    - np.where(data > k) -> torch.nonzeros(data > k)  # 为了获得筛选序号，numpy中有np.where()这种大杀器，在pytorch中则需要使用torch.nonzeros(data > k)这种组合方式达到相同效果
+    - np.argmax()        -> torch.argmax()    
+    - none               -> values, inds = torch.max(), 
+    - none               -> values, inds = torch.min()  # pytorch中对max,min进行了增强，不仅可以获得筛选值还能获得筛选序号，values, inds = torch.max(data, dim=0)
+    - none               -> values, inds = torch.topk()
+
+
+### 其他一些犯过的错误
+
+1. 一般会记得把img转换成float(), label转换成long(), 但往往忘了把weight权重转换成float()，而他会跟输出的loss相乘，所以一定要为float()
+2. 图片在transform做normlize时，通常提供一个mean,std，但往往忘了关注mean里边值的顺序是RGB还是BGR，需要注意这个顺序跟normlize时的img形式相关。
+   如果img是先做bgr2rgb再做normalize，则提供的mean必须是RGB顺序；而如果img是先做normalize再做bgr2rgb则提供的mean必须是BGR顺序。
+   通常来说，拿到的mean一般是RGB的，在自己的算法框架里边，一般也是先做bgr2rgb，所以要拿到的mean都用RGB形式。
+
+3. 第一次跑自己的ssd，直接就爆出cuda错误，单步查看loss发现发现损失爆炸了，loss太大可能的原因是我代码写错了，或者设置错了，
+   查了下整个模型的输出，发现每层的输出很正常，在没有bn的情况下一开始输出算合理，但到后边就慢慢变高，我突然想是不是lr太大，
+   查了下发现自己的lr设置成了0.01, 缺失有点大，于是改成0.001，就可以正常训练了。
+
+    合理的调试过程是：
+    
+    - 逐层查看激活输出的均值/方差：也可以绘制出每个激活层输出的分布图，没有bn的激活输出一般变化比较大，但也应该在+-几百之内，并且不能继续增加。
+      确保没有错误的层设置，导致激活值异常。如果均值方差偏移导致问题，那估计得加bn了。但如果初始化没问题加上有预训练权重，一般也能模型训练收敛。
+    
+    - 逐iter查看分类损失和回归损失：一般分类损失较大(单图2~10之间，batch之和在20左右)，回归损失较小(单图1-2之间，batch之和在5左右)，总的loss在30以下。
+      确保没有突然的激活变化。
+    
+    

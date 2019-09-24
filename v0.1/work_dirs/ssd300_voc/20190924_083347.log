@@ -1,0 +1,2 @@
+2019-09-24 08:33:47,550 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/deep_learning_algorithm/v0.1/work_dirs/ssd300_voc
+2019-09-24 08:33:47,551 - INFO - workflow: [('train', 1)], max: 24 epochs

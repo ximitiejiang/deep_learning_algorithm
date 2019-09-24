@@ -247,7 +247,15 @@ if __name__ == "__main__":
     out2 = conv(img)  # (10-3+2)/2 +1 = 5 (默认下取整，跟maxpool一样，只不过maxpool可以手动指定ceil mode，但conv不能手动指定)
     
     # 检查ssdvgg的输出是否正确
+    """ 这个batch的数据无法计算下去，主要是因为：padding之后变成(4, 3, 236, 300)
+    但mmdetection是从ori (375, 500, 3)变成img_shape (300, 300, 3)
+    
+    [{'ori_shape': (375, 500, 3), 'scale_shape': (225, 300, 3), 'pad_shape': (225, 300, 3), 'scale_factor': 0.6, 'flip': False}, 
+    {'ori_shape': (394, 500, 3), 'scale_shape': (236, 300, 3), 'pad_shape': (236, 300, 3), 'scale_factor': 0.6, 'flip': False}, 
+    {'ori_shape': (392, 500, 3), 'scale_shape': (235, 300, 3), 'pad_shape': (235, 300, 3), 'scale_factor': 0.6, 'flip': False}, 
+    {'ori_shape': (378, 500, 3), 'scale_shape': (227, 300, 3), 'pad_shape': (227, 300, 3), 'scale_factor': 0.6, 'flip': False}]
+    """
     model = SSDVGG16()
-    img = np.random.rand(8, 3, 300, 300)  # b,c,h,w
+    img = np.random.rand(4, 3, 236, 300)  # b,c,h,w
     img = torch.tensor(img).float()
     out3 = model(img)

@@ -72,15 +72,16 @@ def imresize(img, size, interpolation='bilinear', return_scale=False):
     size输入为(w,h), 注意这里图片尺寸是用w,h而不是h,w(计算机内部一般都用h,w，但描述图片尺寸惯例却是用w,h)
     """
     interp_codes = {
-    'nearest': cv2.INTER_NEAREST,
-    'bilinear': cv2.INTER_LINEAR,
-    'bicubic': cv2.INTER_CUBIC,
-    'area': cv2.INTER_AREA,
-    'lanczos': cv2.INTER_LANCZOS4}
+        'nearest': cv2.INTER_NEAREST,
+        'bilinear': cv2.INTER_LINEAR,
+        'bicubic': cv2.INTER_CUBIC,
+        'area': cv2.INTER_AREA,
+        'lanczos': cv2.INTER_LANCZOS4
+    }
     
     h, w = img.shape[:2]
     resized_img = cv2.resize(
-        img, size, interpolation=interp_codes[interpolation])
+        img, size, interpolation=interp_codes[interpolation])  # (h,w,c)
     if not return_scale:
         return resized_img
     else:
@@ -318,10 +319,10 @@ class ImgTransform():
         if self.mean is not None and self.norm:  # 标准化+归一化
             img = img / 255
             img = imnormalize(img, self.mean, self.std)
-        if self.mean is not None and not self.norm:  # 标准化
-            img = imnormalize(img, self.mean, self.std)
         if self.to_rgb:
             img = bgr2rgb(img)
+        if self.mean is not None and not self.norm:  # 标准化, 放在bgr2rgb之后做，从而提供的mean也必须是rgb顺序
+            img = imnormalize(img, self.mean, self.std)
         if self.scale is not None and self.keep_ratio: # 如果是固定比例缩放
             img, scale_factor = imrescale(img, self.scale, return_scale=True)
         elif self.scale is not None and not self.keep_ratio: #　如果不固定比例缩放

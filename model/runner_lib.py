@@ -43,8 +43,12 @@ class BatchDetector(BatchProcessor):
         if return_loss:
             losses = model(imgs, img_metas, 
                            gt_bboxes=gt_bboxes, 
-                           gt_labels=gt_labels, return_loss=True)  # 调用nn.module的__call__()函数，等效于调用forward()函数
-            loss = losses.mean()
+                           gt_labels=gt_labels, return_loss=True)  # 
+            # 损失缩减：先分别对分类和回归损失进行求和，然后把分类和回归损失再求和。
+            loss_sum = {}
+            for name, value in zip(losses.keys(), losses.values()):
+                loss_sum[name] = sum(data for data in value)
+            loss = sum(data for data in loss_sum.values())
             outputs = dict(loss=loss)
             
         return outputs
@@ -118,7 +122,7 @@ class Runner():
         self.trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
         self.valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
         
-#        data = self.trainset[0]
+        data = self.trainset[0]
         
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)
@@ -196,22 +200,22 @@ class Runner():
                                                self.device,
                                                return_loss=True,
                                                loss_fn=self.loss_fn_clf)
-                # 反向传播
+                # 反向传播: 注意随时检查梯度是否爆炸
                 outputs['loss'].backward()  # 更新反向传播, 用数值loss进行backward()      
                 self.optimizer.step()   
                 self.optimizer.zero_grad()       # 每个batch的梯度清零
+                # 存放结果
+                self.buffer['loss'].append(outputs.get('loss', 0))
+                self.buffer['acc'].append(outputs.get('acc1', 0))
+                self.buffer['lr'].append(self.current_lr()[0])
                 # 显示text
                 if (self.c_iter+1)%self.cfg.logger.interval == 0:
                     lr_str = ','.join(['{:.4f}'.format(lr) for lr in self.current_lr()]) # 用逗号串联学习率得到一个字符串
-                    log_str = 'Epoch [{}][{}/{}]\tloss: {:.4f}\tacc: {:.4f}\tlr: {}'.format(
-                            self.c_epoch+1, self.c_iter+1, len(self.dataloader),
-                            outputs['loss'], outputs['acc1'], lr_str)
+                    log_str = 'Epoch [{}][{}/{}]\tloss: {:.4f}\tacc: {:.4f}\tlr: {}'.format(self.c_epoch+1, 
+                            self.c_iter+1, len(self.dataloader), 
+                            self.buffer['loss'][-1].item(), self.buffer['acc'][-1], lr_str)
 
                     self.logger.info(log_str)
-                # 存放结果
-                self.buffer['loss'].append(outputs['loss'])
-                self.buffer['acc'].append(outputs['acc1'])
-                self.buffer['lr'].append(self.current_lr()[0])
             # 保存模型
             if self.c_epoch%self.cfg.save_checkpoint_interval == 0:
                 self.save_training(self.cfg.work_dir)            

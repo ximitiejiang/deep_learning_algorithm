@@ -53,10 +53,10 @@ def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list,
         all_labels = torch.stack(all_labels, dim=0)               # (b, n_anchor)
         all_label_weights = torch.stack(all_label_weights, dim=0) # (b, n_anchor)
         
-        num_total_pos = sum([inds.numel() for inds in all_pos_inds_list])
-        num_total_neg = sum([inds.numel() for inds in all_neg_inds_list])
+        num_batch_pos = sum([inds.numel() for inds in all_pos_inds_list])
+        num_batch_neg = sum([inds.numel() for inds in all_neg_inds_list])
 
-        return (all_bbox_targets, all_bbox_weights, all_labels, all_label_weights, num_total_pos, num_total_neg)
+        return (all_bbox_targets, all_bbox_weights, all_labels, all_label_weights, num_batch_pos, num_batch_neg)
 
 
 # %%

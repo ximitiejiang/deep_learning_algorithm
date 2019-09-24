@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from model.anchor_target_lib import get_anchor_target
 from model.anchor_generator_lib import AnchorGenerator
 from utils.init_weights import xavier_init
+from model.loss_func_lib import weighted_smooth_l1
 
 """待整理：
 小物体检测效果不好的原因;
@@ -77,8 +78,25 @@ def get_base_anchor_params(img_size, ratio_range, n_featmap, strides, ratios):
             anchor_scales,  # 
             anchor_ratios,  #
             centers)        # 
+
+def get_hard_negtive_sample_loss(loss_cls, labels, neg_pos_ratio):
+    """负样本挖掘：从中挖掘出分类损失中固定比例的，难样本的损失值作为负样本损失
+    既保证正负样本平衡，也保证对损失贡献大的负样本被使用
+    """    
+    pos_inds = torch.nonzero(labels > 0).reshape(-1)
+    neg_inds = torch.nonzero(labels == 0).reshape(-1)
+    num_pos_samples = pos_inds.shape[0]
+    num_neg_samples = neg_pos_ratio * num_pos_samples       # 计算需要的负样本个数
+    if num_neg_samples > neg_inds.shape[0]:  # 如果需要的负样本数超过现有负样本数，则负样本就取现有负样本数(一般不会出现这种情况)
+        num_neg_samples = neg_inds.shape[0]
+    topk_loss_cls_neg, _ = loss_cls[neg_inds].topk(num_neg_samples) # 找到负样本对应loss，从中提取需要的负样本个数的loss
+    loss_cls_pos = loss_cls[pos_inds]
+    loss_cls_neg = topk_loss_cls_neg
     
+    return loss_cls_pos, loss_cls_neg    # 
   
+    
+# %%    
 class SSDHead(nn.Module):
     """分类回归头：
     分类回归头的工作过程： 以下描述在维度上都省略b，因为b在整个模型过程不变，只讨论单张图的情况
@@ -149,8 +167,6 @@ class SSDHead(nn.Module):
             keep_anchor_indices = range(0, len(ratios[i])+1)
             anchor_generator.base_anchors = anchor_generator.base_anchors[keep_anchor_indices]
             self.anchor_generators.append(anchor_generator)
-        # 初始化权重
-        self.init_weights()
         
     def init_weights(self):
         for m in self.modules():
@@ -198,79 +214,71 @@ class SSDHead(nn.Module):
                                           target_means = self.target_means,
                                           target_stds = self.target_stds)
         # 解析target
-        (all_bbox_targets,     # (6, 4, 5776, 4)
-         all_bbox_weights,     # (6, 4, 5776, 4)
-         all_labels,           # (6, 4, 5776)  
-         all_label_weights,    # (6, 4, 5776)  
-         num_total_pos, 
-         num_total_neg) = target_result
+        (all_bbox_targets,     # (b, n_anchor, 4)
+         all_bbox_weights,     # (b, n_anchor, 4)
+         all_labels,           # (b, n_anchor)
+         all_label_weights,    # (b, n_anchor)
+         num_batch_pos, 
+         num_batch_neg) = target_result
         
-         # 计算损失:
+        # 调整特征和预测格式 
         all_cls_scores = [score.permute(0,2,3,1).reshape(
-                num_imgs, -1, self.cls_out_channels) for score in cls_scores]    #(6,)(b,c,h,w)->(b,,21)
-        all_cls_scores = torch.cat(all_cls_scores, dim=1)        # 从(6,)(4,84,38,38)...到(4, 8732, 21)
-#        all_labels = torch.cat(all_labels, dim=-1)               # 从(6,)(4,5776)到(4, 8732)
-#        all_label_weights = torch.cat(all_label_weights, dim=-1) # 从(6,)(4,5776)到(4, 8732)
+                num_imgs, -1, self.cls_out_channels) for score in cls_scores]    #(6,)(b,c,h,w)->(6,)(b,-1,21)
+        all_cls_scores = torch.cat(all_cls_scores, dim=1)                        #(6,)(b,-1,21)->(b, 8732, 21)
+
         
-        all_bbox_preds = [p.permute(0,2,3,1).reshape(num_imgs, -1, 4) for p in bbox_preds]
-        all_bbox_preds = torch.cat(all_bbox_preds, dim=1)        # 从(6,)(4,16,38,38)...到(4, 8732, 4)
-#        all_bbox_targets = torch.cat(all_bbox_targets, dim=1)    # 从(6,) (4, 5776, 4)到(4, 8732, 4)
-#        all_bbox_weights = torch.cat(all_bbox_weihts, dim=1)     # 从(6,) (4, 5776, 4)到(4, 8732, 4)
+        all_bbox_preds = [pred.permute(0,2,3,1).reshape(
+                num_imgs, -1, 4) for pred in bbox_preds]
+        all_bbox_preds = torch.cat(all_bbox_preds, dim=1)                        #(6,)(b,-1,4)...到(b, 8732, 4)
         
         all_loss_cls = []
         all_loss_reg = []
-        for _ in range(num_imgs):  # 分别计算每张图的损失
+        for i in range(num_imgs):  # 分别计算每张图的损失
             
-            self.get_one_img_losses()
+            loss_cls, loss_reg = self.get_one_img_losses(all_cls_scores[i],
+                                                         all_bbox_preds[i],
+                                                         all_labels[i],
+                                                         all_label_weights[i],
+                                                         all_bbox_targets[i],
+                                                         all_bbox_weights[i],
+                                                         num_batch_pos, cfg)
+            all_loss_cls.append(loss_cls)
+            all_loss_reg.append(loss_reg)
+        return dict(loss_cls = all_loss_cls, loss_reg = all_loss_reg)  # {(b,), (b,)} 每张图对应一个分类损失值和一个回归损失值。
             
-            # 计算分类损失
-            loss_cls = F.cross_entropy(all_cls_score[i], all_labels[i], reduction="none") * all_label_weights[i] # {(8732,21),(8732,)} *(8732,4)
             
-            # OHEM在线负样本挖掘：提取损失中数值最大的前k个，并保证正负样本比例1:3 
-            # (这样既保证正负样本平衡，也保证对损失贡献大的负样本被使用)
-            pos_inds = np.where(all_labels[i] > 0)
-            neg_inds = np.where(all_labels[i] == 0)
-            num_pos_samples = pos_inds.shape[0]
-            num_neg_samples = cfg.neg_pos_ratio * num_pos_samples
-            topk_loss_cls = loss_cls[neg_inds].sort()[0][num_neg_samples]
-            
-            # 计算平均损失
-#            num_total_samples = 
-#            loss_cls_pos_sum = 
-#            loss_cls_neg_sum = 
-            loss_cls = (loss_cls_pos_sum + loss_cls_neg_sum) / num_total_samples
-            
-            # 计算回归损失
-            loss_reg = weighted_smoothl1(all_bbox_preds[i],
-                                         all_bbox_targets[i],
-                                         all_bbox_weights[i],
-#                                         beta=,
-                                         avg_factor=num_total_samples)
-        
-        return dict(loss_cls=all_loss_cls, loss_reg = all_loss_reg)
-    
-    
-    def get_one_img_losses(self, cls_scores, bbox_preds, labels, bbox_targets, 
-                           bbox_weights, label_weights, cfg):
-        """计算单张图的损失
-        注意：基于损失可进行负样本挖掘，提取对损失贡献较大的负样本，来控制正负样本比例在1:3
-        从而解决检测问题的正负样本不平衡问题
+    def get_one_img_losses(self, cls_scores, bbox_preds, labels, label_weights, 
+                           bbox_targets, bbox_weights, num_total_samples, cfg):
+        """计算单张图的分类回归损失，需要解决3个问题：
+        1. 为什么要引入负样本算损失？
+        2. 为什么正负样本比例是1:3？
+        3. 为什么损失值的平均因子是正样本个数？也就是单张图的分类损失和回归损失都用整个batch的正样本anchor个数进行了平均。
+        args:
+            cls_scores: (n_anchor, 21)
+            bbox_preds: (n_anchor, 4)
+            labels: (n_anchor,)
+            label_weights: (n_anchor, )
+            bbox_targets: (n_anchor, 4)
+            bbox_weights: (n_anchor, 4)
+            num_total_samples: 正样本数
+            cfg
         """
-        # 分类损失
-        loss_cls = F.cross_entropy(cls_scores, labels, reduction='none') * label_weights
-        # OHEM在线负样本挖掘
-        pos_inds = torch.nonzeros()
-        neg_inds = torch.nonzeros()
-        num_pos_samples
-        num_neg_samples
-        topk_loss_cls = loss_cls
-        #分类平均损失
-        loss_cls = 
+        # 计算分类损失
+        loss_cls = F.cross_entropy(cls_scores, labels, reduction="none") # (8732)
+        loss_cls *= label_weights.float()  # (8732)
+        # OHEM在线负样本挖掘：提取损失中数值最大的前k个，并保证正负样本比例1:3 
+        loss_cls_pos, loss_cls_neg = get_hard_negtive_sample_loss(
+                loss_cls, labels, cfg.nms.neg_pos_ratio)
+        # 规约分类损失
+        loss_cls_pos = loss_cls_pos.sum()
+        loss_cls_neg = loss_cls_neg.sum()
+        loss_cls = (loss_cls_pos + loss_cls_neg) / num_total_samples
         
-        # 回归损失
-        loss_reg = weighted_smooth_l1(bbox_preds, bbox_targets, bbox_weights,
-                                      avg_factor)
-        
+        # 计算回归损失
+        loss_reg = weighted_smooth_l1(bbox_preds, bbox_targets,
+                                      bbox_weights,
+                                      beta=cfg.loss_reg.beta,
+                                      avg_factor=num_total_samples)  # ()
         return loss_cls, loss_reg
         
                 
@@ -297,7 +305,7 @@ class SSDHead(nn.Module):
         
         #
         for _ in range(num_imgs):  # 分别计算每张图的bbox预测
-        
+            self.get_one_img_bboxes()
         
         # 获得每层的grid-anchors
         featmap_sizes = [featmap.size() for featmap in cls_scores]
@@ -314,7 +322,7 @@ class SSDHead(nn.Module):
         return bbox_list
     
     
-    def get_one_img_bboxes():
+    def get_one_img_bboxes(self):
         """"对单张图进行预测：基于网络输出cls_score, bbox_pred需要做如下工作才能获得预测
         1. cls_score概率化：采用softmax()函数
         2. 对score进行过滤
