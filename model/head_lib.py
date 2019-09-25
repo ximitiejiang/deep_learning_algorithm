@@ -313,10 +313,10 @@ class SSDHead(nn.Module):
             
             img_shape = img_metas[img_id]['scale_shape']     # 这里传入scale_shape是用来clamp转换出来的bbox的坐标范围防止超出图片。
             scale_factor = img_metas[img_id]['scale_factor'] # scale factor直接判断
-            result_per_img = self.get_one_img_bboxes(cls_score_per_img, bbox_pred_per_img,
-                                                multi_layer_anchors, img_shape,
-                                                scale_factor, cfg)
-            result_list.append(result_per_img)
+            bbox_pred, label_pred = self.get_one_img_bboxes(cls_score_per_img, bbox_pred_per_img,
+                                                            multi_layer_anchors, img_shape,
+                                                            scale_factor, cfg)
+            result_list.append([bbox_pred, label_pred])
         return result_list  # (b,)(2,) 这里b=1, 也就是一个单元素list [bbox_score, label]
     
     

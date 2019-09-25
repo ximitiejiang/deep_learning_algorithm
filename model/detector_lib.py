@@ -66,7 +66,7 @@ class OneStageDetector(nn.Module):
         if self.cfg.neck:
             x = self.neck(x)
         outs = self.bbox_head(x)
-        # 计算bbox
+        # 计算bbox，label
         bbox_inputs = outs + (img_metas, self.cfg)
         bboxes, labels = self.bbox_head.get_bboxes(*bbox_inputs)        
         return bboxes, labels
