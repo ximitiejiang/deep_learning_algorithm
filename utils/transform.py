@@ -314,7 +314,7 @@ class ImgTransform():
         """
         ori_shape = img.shape  #(h,w,c)
         # 默认值
-        scale_factor = 1
+        scale_factor = [1, 1, 1, 1] # 假定
         # 所有变换
         if self.mean is not None and self.norm:  # 标准化+归一化
             img = img / 255

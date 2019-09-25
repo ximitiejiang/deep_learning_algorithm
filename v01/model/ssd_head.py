@@ -261,7 +261,7 @@ class SSDHead(nn.Module):
         ]
         result_list = []
         for img_id in range(len(img_metas)):
-            cls_score_list = [   # cls_scores([b,c,h,w],[],[],[],[],[]) -> img1([c,h,w],[],[],[],[],[]) + img2([],[],[],[],[],[]) 
+            cls_score_list = [   # (6,)(b,c,h,w) -> (6,) 
                 cls_scores[i][img_id].detach() for i in range(num_levels)
             ]
             bbox_pred_list = [   # bbox_preds([b,c,h,w],[],[],[],[],[]) -> img1([c,h,w],[],[],[],[],[]) + img2([],[],[],[],[],[])

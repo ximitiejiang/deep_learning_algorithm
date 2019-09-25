@@ -63,14 +63,13 @@ class OneStageDetector(nn.Module):
         # TODO: 测试过程只需要前向计算而不需要反向传播，是否可以缩减模型尺寸?
         # 特征提取
         x = self.backbone(imgs)
-        if self.neck is not None:
+        if self.cfg.neck:
             x = self.neck(x)
         outs = self.bbox_head(x)
         # 计算bbox
-        bbox_inputs = outs + (img_metas, self.cfg.test_cfg, rescale)
-        bbox_list = self.bbox_head.get_bboxes(**bbox_inputs)        
-        # TODO: bbox形式转换还需要增加
-        return bbox_list
+        bbox_inputs = outs + (img_metas, self.cfg)
+        bboxes, labels = self.bbox_head.get_bboxes(*bbox_inputs)        
+        return bboxes, labels
     
     
 

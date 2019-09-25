@@ -9,10 +9,10 @@ task = 'detector'
 gpus = 1
 parallel = False
 distribute = False                       
-n_epochs = 2
-imgs_per_core = 4               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
-workers_per_core = 2
-save_checkpoint_interval = 1     # 每多少个epoch保存一次epoch
+n_epochs = 10
+imgs_per_core = 8               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
+workers_per_core = 4
+save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
 work_dir = '/home/ubuntu/mytrain/ssd_vgg_voc/'
 resume_from = None               # 恢复到前面指定的设备
 load_from = None
@@ -23,7 +23,7 @@ lr = 0.001
 lr_processor = dict(
         type='list',
         params = dict(
-                step=[6, 8],       # 代表第2个(从1开始算)
+                step=[4, 8],       # 代表第2个(从1开始算)
                 lr = [0.001, 0.0001],
                 warmup_type='linear',
                 warmup_iters=500,
@@ -57,7 +57,8 @@ head = dict(
                 anchor_ratios = ([2],[2, 3],[2, 3],[2, 3],[2],[2]),
                 anchor_strides=(8, 16, 32, 64, 100, 300),
                 target_means=(.0, .0, .0, .0),
-                target_stds=(0.1, 0.1, 0.2, 0.2)))
+                target_stds=(0.1, 0.1, 0.2, 0.2),
+                neg_pos_ratio=3))
 
 assigner = dict(
         type='max_iou_assigner',
@@ -70,11 +71,14 @@ sampler = dict(
         type='posudo_sampler',
         params=dict(
                 ))
+
+neg_pos_ratio = 3  
 nms = dict(
-        type = 'nms',
-        neg_pos_ratio = 3, # 正负样本比例
+        type='nms',
+        score_thr=0.02,
+        max_per_img=200,
         params=dict(
-                iou_thr=0.45)) # nms过滤iou阈值
+                iou_thr=0.5)) # nms过滤iou阈值
 
 transform = dict(
         img_params=dict(
@@ -111,7 +115,9 @@ transform_val = dict(
         label_params=dict(
                 to_tensor=True,
                 to_onehot=None),
-        bbox_params=None)
+        bbox_params=dict(
+                to_tensor=True
+                ))
 
 data_root_path='/home/ubuntu/MyDatasets/voc/VOCdevkit/'
 trainset = dict(
@@ -146,7 +152,7 @@ trainloader = dict(
 valloader = dict(        
         params=dict(
                 shuffle=False,
-                batch_size=gpus * imgs_per_core if gpus>0 else imgs_per_core,
+                batch_size=1 * 1,  # 做验证时需要让batch_size=1???
                 num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
                 pin_memory=False,             # 数据送入GPU进行加速(默认False)
                 drop_last=False,

@@ -14,6 +14,8 @@ from model.anchor_target_lib import get_anchor_target
 from model.anchor_generator_lib import AnchorGenerator
 from utils.init_weights import xavier_init
 from model.loss_func_lib import weighted_smooth_l1
+from model.bbox_regression_lib import delta2bbox
+from model.nms_lib import nms_operation
 
 """待整理：
 小物体检测效果不好的原因;
@@ -136,6 +138,7 @@ class SSDHead(nn.Module):
                  anchor_strides=(8, 16, 32, 64, 100, 300),
                  target_means=(.0, .0, .0, .0),
                  target_stds=(0.1, 0.1, 0.2, 0.2),
+                 neg_pos_ratio=3,
                  **kwargs): # 增加一个多余变量，避免修改cfg, 里边有一个type变量没有用
         super().__init__()
         self.input_size = input_size
@@ -144,7 +147,7 @@ class SSDHead(nn.Module):
         self.anchor_strides = anchor_strides
         self.target_means = target_means
         self.target_stds = target_stds 
-
+        self.neg_pos_ratio = neg_pos_ratio
         # 创建分类分支，回归分支
         cls_convs = conv_head(in_channels, [num_anchor * num_classes for num_anchor in num_anchors])  # 分类分支目的：通道数变换为21*n_anchors
         reg_convs = conv_head(in_channels, [num_anchor * 4 for num_anchor in num_anchors])
@@ -241,14 +244,17 @@ class SSDHead(nn.Module):
                                                          all_label_weights[i],
                                                          all_bbox_targets[i],
                                                          all_bbox_weights[i],
-                                                         num_batch_pos, cfg)
+                                                         num_batch_pos, 
+                                                         self.neg_pos_ratio,
+                                                         cfg)
             all_loss_cls.append(loss_cls)
             all_loss_reg.append(loss_reg)
         return dict(loss_cls = all_loss_cls, loss_reg = all_loss_reg)  # {(b,), (b,)} 每张图对应一个分类损失值和一个回归损失值。
             
             
     def get_one_img_losses(self, cls_scores, bbox_preds, labels, label_weights, 
-                           bbox_targets, bbox_weights, num_total_samples, cfg):
+                           bbox_targets, bbox_weights, num_total_samples, 
+                           neg_pos_ratio, cfg):
         """计算单张图的分类回归损失，需要解决3个问题：
         1. 为什么要引入负样本算损失？
         2. 为什么正负样本比例是1:3？
@@ -282,57 +288,78 @@ class SSDHead(nn.Module):
         return loss_cls, loss_reg
         
                 
-    def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg, rescale=False):
+    def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg):
         """在测试时基于前向计算结果，计算bbox预测类别和预测坐标，此时前向计算后不需要算loss，直接计算bbox的预测
         Args:
-            cls_scores:(b,)(c,h,w)
-            bbox_preds:(b,)()
+            cls_scores(6, )(b, c, h, w): 按层分组
+            bbox_preds(6, )(b, c, h, w):按层分组
             img_metas:()
             cfg:()
         """
-        # 获得各个特征图尺寸: (6,)-(38,38)(19,19)(10,10)(5,5)(3,3)(1,1)
-        featmap_sizes = [featmap.shape[2:] for featmap in cls_scores]
-        num_imgs = len(img_metas)
-        # 先生成单张图的每个特征图的grid anchors, 并堆叠在一起
-        multi_layer_anchors = []
-        for i in range(len(featmap_sizes)):
-            anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i], self.anchor_strides[i])
-            multi_layer_anchors.append(anchors)  # (6,)(k, 4)
-        num_level_anchors = [len(an) for an in multi_layer_anchors]
-        multi_layer_anchors = torch.cat(multi_layer_anchors, dim=0)  # 堆叠(8732, 4)    
-        # 再复制生成一个batch size多张图的grid_anchors
-        anchor_list = [multi_layer_anchors for _ in range(len(img_metas))]  # (b,) (s,4)
-        
-        #
-        for _ in range(num_imgs):  # 分别计算每张图的bbox预测
-            self.get_one_img_bboxes()
-        
         # 获得每层的grid-anchors
         featmap_sizes = [featmap.size() for featmap in cls_scores]
+        num_imgs = len(img_metas)
+        num_levels = len(cls_scores)
         multi_layer_anchors = []
         for i in range(len(featmap_sizes)):
-            anchors = self.anchor_generators.grid_anchors(featmap_sizes[i], self.anchor_strides[i])
+            anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i][2:], self.anchor_strides[i])
             multi_layer_anchors.append(anchors)  # (6,)(k, 4)
-        # 分解所有输入为每张图的list形式
-        
         # 计算每张图的bbox预测
-        for j in img_metas:
-            bbox_list = self.get_one_img_bboxes()
+        result_list = []
+        for img_id in range(num_imgs):
+            # 去掉batch这个维度，生成单图数据：(6,)(b,c,h,w)->(6,)(c,h,w)
+            cls_score_per_img = [cls_scores[i][img_id].detach() for i in range(num_levels)]
+            bbox_pred_per_img = [bbox_preds[i][img_id].detach() for i in range(num_levels)]
             
-        return bbox_list
+            img_shape = img_metas[img_id]['scale_shape']     # 这里传入scale_shape是用来clamp转换出来的bbox的坐标范围防止超出图片。
+            scale_factor = img_metas[img_id]['scale_factor'] # scale factor直接判断
+            result_per_img = self.get_one_img_bboxes(cls_score_per_img, bbox_pred_per_img,
+                                                multi_layer_anchors, img_shape,
+                                                scale_factor, cfg)
+            result_list.append(result_per_img)
+        return result_list  # (b,)(2,) 这里b=1, 也就是一个单元素list [bbox_score, label]
     
     
-    def get_one_img_bboxes(self):
-        """"对单张图进行预测：基于网络输出cls_score, bbox_pred需要做如下工作才能获得预测
+    def get_one_img_bboxes(self, cls_scores, bbox_preds, multi_layer_anchors,
+                           img_shape, scale_factor, cfg):
+        """"对单张图进行预测：需要对每一特征图层分别处理，所以必须传入以level分组的数据
         1. cls_score概率化：采用softmax()函数
-        2. 对score进行过滤
         3. 对bbox坐标逆变换delta2bbox()
-        4. 进行nms过滤
+        4. 进行nms过滤: 只是把空的bbox过滤(score<0.02)；同时去除重叠bbox；对置信度大小没有管控
+        args:
+            cls_scores: (6,)(c,h,w)
+            bbox_preds: (6,)(c,h,w)
+            multi_layer_anchors: (6,)(k,4)
+            img_shape:
+            scale_factor:
+            cfg:
+            rescale:
         """
+        # 分别处理每一层特征层
+        multi_layer_bboxes = []
+        multi_layer_scores = []
+        for cls_score, bbox_pred, anchors in zip(cls_scores, bbox_preds, multi_layer_anchors):
+            cls_score = cls_score.permute(1, 2, 0).reshape(-1, self.num_classes) # (c,h,w)->(-1, 21)
+            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+            # 概率化
+            scores = F.softmax(cls_score, dim=1)
+            # 坐标化 
+            bboxes = delta2bbox(anchors, bbox_pred, self.target_means, self.target_stds, img_shape)
+            #保存
+            multi_layer_bboxes.append(bboxes)  
+            multi_layer_scores.append(scores)
+        # 堆叠 
+        multi_layer_bboxes = torch.cat(multi_layer_bboxes)  # (6,)(m, 4) -> (8732, 4)
+        multi_layer_scores = torch.cat(multi_layer_scores)  # (6,)(n, 21)-> (8732, 21)
+        # 训练是基于scale之后img进行的，而最终得到的bbox需要在原图显示，所以要缩放回原图比例
+        multi_layer_bboxes = multi_layer_bboxes / multi_layer_bboxes.new_tensor(scale_factor)  # (b,4)/(4,) = (b, 4)
+        # 进行nms, 同时生成标签
+        det_bboxes, det_labels = nms_operation(multi_layer_bboxes, multi_layer_scores, **cfg.nms)
         
-        pass
+        return det_bboxes, det_labels  # 坐标和置信度(k,5), 标签(k,)
+
     
-    
+        
 # %%    
 class RetinaHead(SSDHead):
     """retina head"""

@@ -6,6 +6,7 @@ Created on Thu Sep  5 12:47:36 2019
 @author: ubuntu
 """
 import numpy as np
+import os
 import torch
 import matplotlib.pyplot as plt
 import cv2
@@ -144,7 +145,7 @@ def vis_bbox(bboxes, img=None):
     
 
 # %%
-def vis_activation_hist(data_list):
+def vis_activation_hist(source):
     """用于查看激活层输出值的分布：
     参考：deep learning from scratch， p178
     激活层的输出一般称之为激活值，代表了特征在前向计算过程中是否正常，
@@ -157,9 +158,20 @@ def vis_activation_hist(data_list):
     Args:
         data_list(list): 表示激活函数输出的每一层的值，[d1, d2,..]每个元素为(b,c,h,w)
     """
+    from utils.tools import loadvar
+    if isinstance(source, str) and os.path.isfile(source):  # 如果传入一个文件路径，则打开
+        # TODO
+        data = loadvar()
+    elif isinstance(source, list):
+        data = source
+    else:
+        raise ValueError('source should be a path or a list.')
+    # 开始绘图
     plt.figure()
-    for i, li in enumerate(data_list):  # 提取每层
-        plt.subplot(2, len(data_list)/2+1, i+1)  # 2行
+    for i, li in enumerate(data):  # 提取每层
+        plt.subplot(2, len(data)/2+1, i+1)  # 2行
         plt.title(str(i+1)+"-layer")  
         plt.hist(li.flatten(), 30, range=(-3,3))  # 展平成(b*c*h*w,), 然后取30个区间, 由于有bn，所以只统计取值在中间的数。
     plt.show()
+    
+    

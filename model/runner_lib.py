@@ -18,68 +18,57 @@ from utils.checkpoint import load_checkpoint, save_checkpoint
 from utils.transform import to_device
     
 
-class BatchProcessor(): 
-    """batchProcessor独立出来，是为了让Runner更具有通用性：
-    1. 只跟顶层的self.model做计算，不接触model下面的子模型：从而简化使用。
-    """
-    def __call__(self):
-        raise NotImplementedError('BatchProcessor class is not callable.')
-
-
-class BatchDetector(BatchProcessor):    
-    def __call__(self, model, data, device, return_loss=True, **kwargs): # kwargs用来兼容分类时传入的loss_fn
-        # TODO: 是否可以把to_device集成到transform中或者collate_fn中或者model_wrapper的scatter中？
-        # 数据送入设备：注意数据格式问题改为在to_tensor中完成，数据设备问题改为在to_device完成
-        imgs = to_device(data['img'], device)
-        gt_bboxes = to_device(data['gt_bboxes'], device)
-        gt_labels = to_device(data['gt_labels'], device)
-        img_metas = data['img_meta']
-        # 计算模型输出
-        if not return_loss:
-            bbox_list = model(imgs, img_metas, 
-                              return_loss=False)
-            outputs = dict(bbox_list=bbox_list)
-            
-        if return_loss:
-            losses = model(imgs, img_metas, 
-                           gt_bboxes=gt_bboxes, 
-                           gt_labels=gt_labels, return_loss=True)  # 
-            # 损失缩减：先分别对分类和回归损失进行求和，然后把分类和回归损失再求和。
-            loss_sum = {}
-            for name, value in zip(losses.keys(), losses.values()):
-                loss_sum[name] = sum(data for data in value)
-            loss = sum(data for data in loss_sum.values())
-            outputs = dict(loss=loss)
-            
+def batch_detector(model, data, device, return_loss=True, **kwargs): # kwargs用来兼容分类时传入的loss_fn
+    # 数据送入设备：注意数据格式问题改为在to_tensor中完成，数据设备问题改为在to_device完成
+    imgs = to_device(data['img'], device)
+    gt_bboxes = to_device(data['gt_bboxes'], device)
+    gt_labels = to_device(data['gt_labels'], device)
+    img_metas = data['img_meta']
+    # 计算模型输出
+    if not return_loss:
+        bboxes, labels = model(imgs, img_metas, 
+                               return_loss=False)
+        outputs = dict(bbox=bboxes, label=labels)
         return outputs
+        
+    if return_loss:
+        losses = model(imgs, img_metas, 
+                       gt_bboxes=gt_bboxes, 
+                       gt_labels=gt_labels, return_loss=True)  # 
+        # 损失缩减：先分别对分类和回归损失进行求和，然后把分类和回归损失再求和。
+        loss_sum = {}
+        for name, value in zip(losses.keys(), losses.values()):
+            loss_sum[name] = sum(data for data in value)
+        loss = sum(data for data in loss_sum.values())
+        outputs = dict(loss=loss)
+        
+    return outputs
 
 
-class BatchClassifier(BatchProcessor):
-    """主要完成分类器的前向计算，生成outputs"""
-    def __call__(self, model, data, device, return_loss=True, loss_fn=None, **kwargs):
-        # 数据送入设备
-        img = to_device(data['img'], device)  # 由于model要送入device进行计算，且该计算只跟img相关，跟label无关，所以可以只送img到device
-        label = to_device(data['gt_labels'], device)
-        
-        outputs = {}
-        y_pred = model(img)
-        # 这里需要先组合label：分类问题中的一个batch多张图多个label等效于检测中的一张图多个bbox对应多个label                          
-        label = torch.cat(label, dim=0)               # (b,)
-        acc1 = accuracy(y_pred, label, topk=1)
-        outputs.update(acc1=acc1)
-        
-        if return_loss:
-            # 计算损失(!!!注意，一定要得到标量loss)
-            loss = loss_fn(y_pred, label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
-            outputs.update(loss=loss)
-        return outputs
+def batch_classifier(self, model, data, device, return_loss=True, loss_fn=None, **kwargs):
+    # 数据送入设备
+    img = to_device(data['img'], device)  # 由于model要送入device进行计算，且该计算只跟img相关，跟label无关，所以可以只送img到device
+    label = to_device(data['gt_labels'], device)
+    
+    outputs = {}
+    y_pred = model(img)
+    # 这里需要先组合label：分类问题中的一个batch多张图多个label等效于检测中的一张图多个bbox对应多个label                          
+    label = torch.cat(label, dim=0)               # (b,)
+    acc1 = accuracy(y_pred, label, topk=1)
+    outputs.update(acc1=acc1)
+    
+    if return_loss:
+        # 计算损失(!!!注意，一定要得到标量loss)
+        loss = loss_fn(y_pred, label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
+        outputs.update(loss=loss)
+    return outputs
 
 
 def get_batch_processor(cfg):
     if cfg.task == 'classifier':
-        return BatchClassifier()
+        return batch_classifier
     elif cfg.task == 'detector':
-        return BatchDetector()
+        return batch_detector
     else:
         raise ValueError('Wrong task input.')
 
@@ -122,7 +111,7 @@ class Runner():
         self.trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
         self.valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
         
-        data = self.trainset[0]
+#        data = self.trainset[0]
         
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)

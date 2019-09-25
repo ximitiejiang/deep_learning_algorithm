@@ -39,9 +39,9 @@ def multiclass_nms(multi_bboxes, multi_scores, score_thr, nms_cfg, max_num=-1):
         _scores = multi_scores[cls_inds, i]
         
         # debug function: after score_thr
-        if gl.get_value("DEBUG_NMS_SCORE_THR"):
-            data = torch.cat([_bboxes, _scores[:, None]], dim=1)
-            IO.save2pkl_checkidx([data], idx=i, path='./work_dirs/temp/after_score_thr.pkl')
+#        if gl.get_value("DEBUG_NMS_SCORE_THR"):
+#            data = torch.cat([_bboxes, _scores[:, None]], dim=1)
+#            IO.save2pkl_checkidx([data], idx=i, path='./work_dirs/temp/after_score_thr.pkl')
             
         cls_dets = torch.cat([_bboxes, _scores[:, None]], dim=1)  # bbox, score组合(n,5)
         cls_dets, _ = nms_op(cls_dets, **nms_cfg_)
@@ -49,8 +49,8 @@ def multiclass_nms(multi_bboxes, multi_scores, score_thr, nms_cfg, max_num=-1):
             (cls_dets.shape[0], ), i - 1, dtype=torch.long)
         
         # debug function: after nms
-        if gl.get_value("DEBUG_NMS_NMS_THR"):    
-            IO.save2pkl_checkidx([cls_dets], idx=i, path='./work_dirs/temp/after_nms_thr.pkl')
+#        if gl.get_value("DEBUG_NMS_NMS_THR"):    
+#            IO.save2pkl_checkidx([cls_dets], idx=i, path='./work_dirs/temp/after_nms_thr.pkl')
         
         bboxes.append(cls_dets)
         labels.append(cls_labels)

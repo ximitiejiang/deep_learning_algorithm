@@ -7,7 +7,7 @@ Created on Fri Sep 20 10:07:24 2019
 """
 import torch
 from model.anchor_assigner_sampler_lib import MaxIouAssigner, PseudoSampler
-
+from model.bbox_regression_lib import bbox2delta
 
 def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list,
                       img_metas_list, assigner_cfg, sampler_cfg, 
@@ -107,39 +107,3 @@ def get_one_img_anchor_target(anchors, gt_bboxes, gt_labels, img_metas,
     return bbox_targets, bbox_weights, labels, label_weights, pos_inds, neg_inds
 
 
-# %%
-def bbox2delta(prop, gt, means, stds):
-    """把proposal的anchor(k, 4)转化为相对于gt(k,4)的变化dx,dy,dw,dh
-    基本逻辑：由前面的卷积网络可以得到预测xmin,ymin,xmax,ymax，并转化成px,py,pw,ph.
-    此时存在一种变换dx,dy,dw,dh，可以让预测值变成gx',gy',gw',gh'且该值更接近gx,gy,gw,gh
-    所以目标就变成找到dx,dy,dw,dh，寻找的方式就是dx=(gx-px)/pw, dy=(gy-py)/ph, dw=log(gw/pw), dh=log(gh/ph)
-    因此卷积网络前向计算每次都得到xmin/ymin/xmax/ymax经过head转换成dx,dy,dw,dh，力图让loss最小使这个变换
-    最后测试时head计算得到dx,dy,dw,dh，就可以通过delta2bbox()反过来得到xmin,ymin,xmax,ymax
-    """
-    # 把xmin,ymin,xmax,ymax转换成x_ctr,y_ctr,w,h
-    px = (prop[...,0] + prop[...,2]) * 0.5
-    py = (prop[...,1] + prop[...,3]) * 0.5
-    pw = (prop[...,2] - prop[...,0]) + 1.0  
-    ph = (prop[...,3] - prop[...,1]) + 1.0
-    
-    gx = (gt[...,0] + gt[...,2]) * 0.5
-    gy = (gt[...,1] + gt[...,3]) * 0.5
-    gw = (gt[...,2] - gt[...,0]) + 1.0  
-    gh = (gt[...,3] - gt[...,1]) + 1.0
-    # 计算dx,dy,dw,dh
-    dx = (gx - px) / pw
-    dy = (gy - py) / ph
-    dw = torch.log(gw / pw)
-    dh = torch.log(gh / ph)
-    deltas = torch.stack([dx, dy, dw, dh], dim=-1) # (n, 4)
-    # 归一化
-    means = deltas.new_tensor(means).reshape(1,-1)   # (1,4)
-    stds = deltas.new_tensor(stds).reshape(1,-1)      # (1,4)
-    deltas = (deltas - means) / stds    # (n,4)-(1,4) / (1,4) -> (n,4) / (1,4) -> (n,4) 
-    
-    return deltas
-
-
-
-def delta2bbox():
-    pass   
