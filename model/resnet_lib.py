@@ -135,11 +135,11 @@ class Resnet(nn.Module):
         152: (Bottleneck, 4, (3, 8, 36, 3))
     }
     
-    def __init__(self, depth, pretrained=None, out_indices=[0,1,2,3], strides=(1, 2, 2, 2),
+    def __init__(self, depth, pretrained=None, out_indices=(0, 1, 2, 3), strides=(1, 2, 2, 2),
                  classify_classes=None):
         super().__init__()
         self.pretrained = pretrained
-        self.out_indices = out_indices  # 定义输出的layers
+        self.out_indices = out_indices  # 定义输出的layers, 但这里的layer不是层，而是一组block的意思，一共4个大的layers，这里说明每个大layer都要输出
         self.strides = strides   # 由于bottleneck的stride跟downsample没有直接相关，存在既有downsample且stride=1的情况，所以这里增加strides作为自定义输入。
         self.classify_classes = classify_classes  # 如果是分类模型则定义分类个数，并设置out_indices=-1就能单输出分类特征
         

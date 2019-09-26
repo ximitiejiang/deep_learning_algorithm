@@ -9,22 +9,22 @@ task = 'detector'
 gpus = 1
 parallel = False
 distribute = False                       
-n_epochs = 100
-imgs_per_core = 4                 # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
-workers_per_core = 2
-save_checkpoint_interval = 10     # 每多少个epoch保存一次epoch
-work_dir = '/home/ubuntu/mytrain/ssd_vgg_voc/'
-resume_from = None                # 恢复到前面指定的设备
+n_epochs = 1
+imgs_per_core = 4               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
+workers_per_core = 4
+save_checkpoint_interval = 1     # 每多少个epoch保存一次epoch
+work_dir = '/home/ubuntu/mytrain/fcos_resnet50_voc/'
+resume_from = None               # 恢复到前面指定的设备
 load_from = None
-load_device = 'cuda'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
+load_device = 'cuda'             # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
 
 lr = 0.001
 
 lr_processor = dict(
         type='list',
         params = dict(
-                step=[50, 80],       # 代表第2个(从1开始算)
-                lr = [0.0005, 0.0001],
+                step=[4, 8],       # 代表第2个(从1开始算)
+                lr = [0.001, 0.0001],
                 warmup_type='linear',
                 warmup_iters=500,
                 warmup_ratio=1./3))
@@ -38,15 +38,20 @@ model = dict(
         type='one_stage_detector')
         
 backbone = dict(
-        type='ssd_vgg16',
+        type='resnet',
         params=dict(
+                depth=50,
                 pretrained= '/home/ubuntu/.torch/models/vgg16_caffe-292e1171.pth',   # 这是caffe的模型，对应mean=[123.675, 116.28, 103.53], std=[1, 1, 1],  另外的pytorch的模型pretrained='/home/ubuntu/.torch/models/vgg16-397923af.pth', 对应mean, std需要先归一化再标准化
-                out_feature_indices=(22,34),
-                extra_out_feature_indices=(1,3,5,7),
-                l2_norm_scale=20.))
+                out_feature_indices=(0, 1, 2, 3),
+                strides=(1, 2, 2, 2)))
+
+neck = dict(
+        type='fpn',
+        params=dict(
+                ))
 
 head = dict(
-        type='ssd_head',
+        type='fcos_head',
         params=dict(
                 input_size=300,
                 num_classes=21,
@@ -124,10 +129,10 @@ trainset = dict(
         repeat=0,
         params=dict(
                 root_path=data_root_path, 
-                ann_file=[data_root_path + 'VOC2007/ImageSets/Main/trainval.txt',
-                          data_root_path + 'VOC2012/ImageSets/Main/trainval.txt'], #分为train.txt, val.txt, trainval.txt, test.txt
-                subset_path=[data_root_path + 'VOC2007/',
-                          data_root_path + 'VOC2012/'],
+                ann_file=[data_root_path + 'VOC2007/ImageSets/Main/trainval.txt'],
+#                          data_root_path + 'VOC2012/ImageSets/Main/trainval.txt'], #分为train.txt, val.txt, trainval.txt, test.txt
+                subset_path=[data_root_path + 'VOC2007/'],
+#                          data_root_path + 'VOC2012/'],
                 data_type='train'))
 valset = dict(
         type='voc',

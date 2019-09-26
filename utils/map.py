@@ -15,7 +15,10 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou'):
     """
 
     assert mode in ['iou', 'iof']
-
+    if bboxes1.shape[1] == 5:
+        bboxes1 = bboxes1[:, :4]
+    if bboxes2.shape[1] == 5:
+        bboxes2 = bboxes2[:, :4]
     bboxes1 = bboxes1.astype(np.float32)
     bboxes2 = bboxes2.astype(np.float32)
     rows = bboxes1.shape[0]

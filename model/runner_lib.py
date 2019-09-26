@@ -26,10 +26,8 @@ def batch_detector(model, data, device, return_loss=True, **kwargs): # kwargs用
     img_metas = data['img_meta']
     # 计算模型输出
     if not return_loss:
-        bboxes, labels = model(imgs, img_metas, 
-                               return_loss=False)
-        outputs = dict(bbox=bboxes, label=labels)
-        return outputs
+        bbox_cls = model(imgs, img_metas, return_loss=False)
+        return bbox_cls  # (n_class,)(k,5)
         
     if return_loss:
         losses = model(imgs, img_metas, 
@@ -131,6 +129,7 @@ class Runner():
         # 包装并行模型是在optimizer提取参数之后，否则可能导致无法提取，因为并行模型在model之下加了一层module壳
         if self.cfg.parallel and torch.cuda.device_count() > 1:
             self.model = nn.DataParallel(self.model)
+            self.logger.info('Operation will start in Parallel mode.')
         self.model.to(self.device)
         # 注意：恢复或加载是直接加载到目标设备，所以必须在模型传入设备之后进行，确保设备匹配
         # 加载模型权重和训练参数，从之前断开的位置继续训练

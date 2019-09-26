@@ -21,9 +21,23 @@ nms = dict(
 """
 
 def nms_operation(bboxes, scores, type, score_thr=0.02, max_per_img=200, params=None):
-    """对输出bbox坐标和bbox得分进行过滤，同时生成预测标签：
-    bbox坐标的过滤主要通过iou，bbox得分的过滤主要通过设置得分阈值
-    注意：这里采用的是对每一个类分别筛选，便于后续的分类别处理。
+    """ 这是nms wrapper, 对输出bbox坐标和bbox得分进行过滤，同时生成预测标签，且调用底层的nms函数。   
+    1. nms wrapper操作过程：
+        - bbox置信度的初筛(主要通过设置最低阈值)： 用于去除大部分空的bbox
+        - bbox坐标的过滤(主要通过nms): 用于去除大部分重叠的bbox
+        - bbox标签的获取：基于分类输出的列号来获得label
+    2. nms的基本原理：
+        - 
+    3. 理解nms函数调用过程
+        (1). 顶层：用python的nms wrapper获取数据，并根据设置来调用不同类型的nms函数
+        (2). 中间层：用cython定义不同类型的nms函数，包括cpu_nms, gpu_nms, cpu_soft_nms
+            - cython作为中间的粘合语言，既可以被python调用，又可以调用c/c++/cuda语言，
+              且cython不调用别的语言，pyx生成的代码亦可以比python执行速度快数倍。
+            - cython编写cpu版本的cpu_nms, cpu_soft_nms，由于变量优化，依然比python源码要快数倍
+        (3). 底层：用cuda编写_nms函数给gpu_nms来调用
+            - 编写.hpp头文件和.cu源文件，然后通过setup.py进行整体编译
+            - setup.py文件的执行过程：
+    
     args:
         bboxes:(n_anchors, 4)
         scores:(n_anchors, 21)
@@ -43,7 +57,7 @@ def nms_operation(bboxes, scores, type, score_thr=0.02, max_per_img=200, params=
         # 筛除大部分空bbox
         cls_inds = scores[:, i] > score_thr
         _bboxes = bboxes[cls_inds, :]    #(k, 4)
-        _scores = scores[cls_inds, :]    #(k, )
+        _scores = scores[cls_inds, i]    #(k, )只提取该类的score
         # 组合bbox和score
         bbox_and_score = torch.cat([_bboxes, _scores.reshape(-1, 1)], dim=1) # (n, 5)
         # 执行nms: 过滤重叠bbox
@@ -54,7 +68,7 @@ def nms_operation(bboxes, scores, type, score_thr=0.02, max_per_img=200, params=
         nmsed_labels.append(cls_labels)
     # 如果有输出结果
     if nmsed_bboxes:
-        nmsed_bboxes = torch.cat(nmsed_bboxes)
+        nmsed_bboxes = torch.cat(nmsed_bboxes).reshape(-1, 5)
         nmsed_labels = torch.cat(nmsed_labels)
         # 如果输出结果超过上线，则取得分最高的前一部分
         if nmsed_bboxes.shape[0] > max_per_img:
@@ -77,13 +91,7 @@ def get_nms_op(nms_type):
     return nms_func
 
 # %%
-"""如何创建cython代码加速nms计算
-1. 创建gpu_nms.pyx
-
-2. 创建gpu_nms.hpp
-
-
-3. 创建Makefile
+"""
 
 """
 
@@ -108,7 +116,9 @@ def nms(preds, iou_thr):
         device_id = None
         preds_np = preds   
     # 进行nms: 需要采用numpy送入函数
-    if device_id is not None:  # 如果是tensor
+    if preds_np.shape[0] == 0:
+        inds = []
+    elif device_id is not None:  # 如果是tensor
         inds = gpu_nms(preds_np, iou_thr, device_id=device_id)
         inds = preds.new_tensor(inds, dtype=torch.long)  # 恢复tensor
     elif device_id is None:    # 如果是numpy

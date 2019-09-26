@@ -9,7 +9,7 @@ Created on Sat Aug 10 17:22:46 2019
 #from utils.module_factory import registry, build_module
 
 import torch.nn as nn
-
+import numpy as np
     
 # %% onestage
 class OneStageDetector(nn.Module):
@@ -68,9 +68,30 @@ class OneStageDetector(nn.Module):
         outs = self.bbox_head(x)
         # 计算bbox，label
         bbox_inputs = outs + (img_metas, self.cfg)
-        bboxes, labels = self.bbox_head.get_bboxes(*bbox_inputs)        
-        return bboxes, labels
-    
+        bbox_results, label_results = self.bbox_head.get_bboxes(*bbox_inputs)     # (k, 5), (k,)    
+        
+        # 把结果格式转为numpy(因为后续做mAP评估都是在cpu端numpy方式评估)
+        if len(imgs) == 1:
+            bbox_results = bbox_results[0]
+            label_results = label_results[0]
+            
+            if bbox_results.shape[0] == 0:
+                bbox_results = np.zeros((0, 5), dtype=np.float32)
+            else:
+                bbox_results = bbox_results.cpu().numpy()
+                label_results = label_results.cpu().numpy()
+            # 把结果格式从(k, 5)->(20,)(c,5)
+            bbox_cls = []
+            for i in range(self.bbox_head.num_classes - 1): # 分成0-19, 因为预测时的负样本(0)已经被筛掉了
+                inds = label_results == i  # 获取第i类
+                bbox_cls.append(bbox_results[inds, :])
+            
+            return bbox_cls # (n_class,)(k, 5)  不在返回labels了，因为顺序就是labels的号
+        else:
+            raise ValueError('currently only one batch size supported for test.')
+
+def bbox2result():
+    """用来把(k,5)的单张图片结果转换成"""    
     
 
 # %% two stage

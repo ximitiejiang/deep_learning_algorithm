@@ -78,7 +78,7 @@ class SSDVGG16(nn.Module):
               1x1           (1024, )
         ------------------------------------------
         extra
-              1x1           ()
+              1x1           
               3x3
               1x1
               3x3
@@ -90,7 +90,6 @@ class SSDVGG16(nn.Module):
     arch_setting = {16: [2,2,3,3,3]}  # 16表示vgg16，后边list表示有5个blocks，每个blocks的卷积层数
     
     def __init__(self, 
-                 num_classes=2,
                  pretrained=None,
                  out_feature_indices=(22,34),
                  extra_out_feature_indices = (1, 3, 5, 7),
@@ -98,7 +97,6 @@ class SSDVGG16(nn.Module):
                  classify_classes=None):
         super().__init__()
         self.blocks = self.arch_setting[16]
-        self.num_classes = num_classes
         self.out_feature_indices = out_feature_indices
         self.extra_out_feature_indices = extra_out_feature_indices
         self.l2_norm_scale = l2_norm_scale

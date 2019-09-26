@@ -269,12 +269,13 @@ class SSDHead(nn.Module):
             num_total_samples: 正样本数
             cfg
         """
+        
         # 计算分类损失
         loss_cls = F.cross_entropy(cls_scores, labels, reduction="none") # (8732)
         loss_cls *= label_weights.float()  # (8732)
         # OHEM在线负样本挖掘：提取损失中数值最大的前k个，并保证正负样本比例1:3 
         loss_cls_pos, loss_cls_neg = get_hard_negtive_sample_loss(
-                loss_cls, labels, cfg.nms.neg_pos_ratio)
+                loss_cls, labels, neg_pos_ratio)
         # 规约分类损失
         loss_cls_pos = loss_cls_pos.sum()
         loss_cls_neg = loss_cls_neg.sum()
@@ -305,7 +306,8 @@ class SSDHead(nn.Module):
             anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i][2:], self.anchor_strides[i])
             multi_layer_anchors.append(anchors)  # (6,)(k, 4)
         # 计算每张图的bbox预测
-        result_list = []
+        bbox_results = [] 
+        label_results = []
         for img_id in range(num_imgs):
             # 去掉batch这个维度，生成单图数据：(6,)(b,c,h,w)->(6,)(c,h,w)
             cls_score_per_img = [cls_scores[i][img_id].detach() for i in range(num_levels)]
@@ -313,11 +315,12 @@ class SSDHead(nn.Module):
             
             img_shape = img_metas[img_id]['scale_shape']     # 这里传入scale_shape是用来clamp转换出来的bbox的坐标范围防止超出图片。
             scale_factor = img_metas[img_id]['scale_factor'] # scale factor直接判断
-            bbox_pred, label_pred = self.get_one_img_bboxes(cls_score_per_img, bbox_pred_per_img,
-                                                            multi_layer_anchors, img_shape,
-                                                            scale_factor, cfg)
-            result_list.append([bbox_pred, label_pred])
-        return result_list  # (b,)(2,) 这里b=1, 也就是一个单元素list [bbox_score, label]
+            bbox_result, label_result = self.get_one_img_bboxes(cls_score_per_img, bbox_pred_per_img,
+                                                                multi_layer_anchors, img_shape,
+                                                                scale_factor, cfg)
+            bbox_results.append(bbox_result)
+            label_results.append(label_result)
+        return bbox_results, label_results  
     
     
     def get_one_img_bboxes(self, cls_scores, bbox_preds, multi_layer_anchors,

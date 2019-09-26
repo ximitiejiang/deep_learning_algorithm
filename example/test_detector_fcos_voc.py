@@ -8,7 +8,7 @@ Created on Tue Sep  3 21:29:33 2019
 from model.runner_lib import Runner
 from utils.evaluation import eval_dataset_det
 
-def train_ssd(cfg_path):
+def train_fcos(cfg_path):
     
     runner = Runner(cfg_path = cfg_path)
     runner.train()    
@@ -19,10 +19,10 @@ if __name__ == "__main__":
     
     task = 'train'
     
-    cfg_path = './cfg_detector_ssdvgg16_voc.py'
+    cfg_path = './cfg_detector_fcos_resnet50_voc.py'
     
     if task == 'train':
-        train_ssd(cfg_path)
+        train_fcos(cfg_path)
     
     if task == 'eval':
         eval_dataset_det(cfg_path=cfg_path,

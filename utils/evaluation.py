@@ -64,7 +64,8 @@ from utils.map import eval_map
 
 def eval_dataset_det(cfg_path, 
                      load_from=None, 
-                     load_device=None):
+                     load_device=None,
+                     result_file=None):
     """检测问题的eval dataset: 
     为了便于eval，不必常去修改cfg里边的设置，直接在func里边添加2个参数即可
     """
@@ -85,25 +86,32 @@ def eval_dataset_det(cfg_path,
     # TODO: 如下两句的顺序
     load_checkpoint(model, cfg.load_from, device)
     model = model.to(device)
-    # 开始验证
-    model.eval()
-    all_bbox_list = []
-    for c_iter, data_batch in enumerate(dataloader):
-        with torch.no_grad():  # 停止反向传播，只进行前向计算
-            outputs = batch_detector(model, data_batch, device, return_loss=False)
-            bbox_pred = outputs['bbox']
-            label_pred = outputs['label']
-            all_bbox_list.append([bbox_pred, label_pred])
-    # 保存预测结果到文件
-    save2pkl(all_bbox_list, cfg.work_dir+'eval_result.pkl')
+    # 如果没有验证过
+    if result_file is None: 
+        # 开始验证
+        model.eval()
+        all_bbox_cls = []
+        for c_iter, data_batch in enumerate(dataloader):
+            with torch.no_grad():  # 停止反向传播，只进行前向计算
+                bbox_cls = batch_detector(model, data_batch, 
+                                          device, return_loss=False)
+                # 显示进度
+                if c_iter % 100 == 0:    
+                    print('%d / %d finished predict.'%(c_iter, len(dataset)))
+
+            all_bbox_cls.append(bbox_cls)  # (n_img,)(n_class,)(k,5) 
+        # 保存预测结果到文件
+        save2pkl(all_bbox_cls, cfg.work_dir+'eval_result.pkl')
+    # 如果有现成验证文件
+    else:
+        all_bbox_cls = loadvar(result_file)
     # 评估
-    voc_eval(all_bbox_list, dataset, iou_thr=0.5)
+    voc_eval(all_bbox_cls, dataset, iou_thr=0.5)
     
     
 
 def predict_one_img_det():
     pass
-
 
 
 def voc_eval(result_file, dataset, iou_thr=0.5):
@@ -115,33 +123,19 @@ def voc_eval(result_file, dataset, iou_thr=0.5):
         det_results = loadvar(result_file)  # 加载结果文件
     gt_bboxes = []
     gt_labels = []
-    gt_ignore = []
+    
     for i in range(len(dataset)):   # 读取测试集的所有gt_bboxes,gt_labels
-        ann = dataset.load_annotation_inds(i)
+        ann = dataset.parse_ann_info(i)
         bboxes = ann['bboxes']
         labels = ann['labels']
-        if 'bboxes_ignore' in ann:
-            ignore = np.concatenate([
-                np.zeros(bboxes.shape[0], dtype=np.bool),
-                np.ones(ann['bboxes_ignore'].shape[0], dtype=np.bool)
-            ])
-            gt_ignore.append(ignore)
-            bboxes = np.vstack([bboxes, ann['bboxes_ignore']])
-            labels = np.concatenate([labels, ann['labels_ignore']])
         gt_bboxes.append(bboxes)
         gt_labels.append(labels)
-    if not gt_ignore:
-        gt_ignore = gt_ignore
-    if hasattr(dataset, 'year') and dataset.year == 2007:
-        dataset_name = 'voc07'
-    else:
-        dataset_name = dataset.CLASSES
-        
+    # 调用mAP计算模块
+    dataset_name = 'voc'
     eval_map(
         det_results,        # (4952,) (20,) (n,5)
         gt_bboxes,          # (4952,) (n,4)
         gt_labels,          # (4952,) (n,)
-        gt_ignore=gt_ignore,
         scale_ranges=None,
         iou_thr=iou_thr,
         dataset=dataset_name,
