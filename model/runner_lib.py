@@ -173,7 +173,7 @@ class Runner():
         """
         return [group['lr'] for group in self.optimizer.param_groups]  # 取出每个group的lr返回list，大多数情况下，只有一个group
     
-    def train(self, vis=True):
+    def train(self, vis=False):
         """用于模型在训练集上训练"""
         self.model.train() # module的通用方法，可自动把training标志位设置为True
         self.lr_processor.set_base_lr_group()  # 设置初始学习率(直接从optimizer读取到：所以save model时必须保存optimizer) 
@@ -204,9 +204,14 @@ class Runner():
                             self.buffer['loss'][-1].item(), self.buffer['acc'][-1], lr_str)
 
                     self.logger.info(log_str)
+            
             # 保存模型
             if self.c_epoch%self.cfg.save_checkpoint_interval == 0:
                 self.save_training(self.cfg.work_dir)            
+            # 如果不需要显示loss/acc，则清除buffer
+            if not vis:
+                for key in self.buffer.keys():
+                    self.buffer[key] = [] 
             self.c_epoch += 1
         times = time.time() - start
         self.logger.info('training finished with times(s): {}'.format(times))

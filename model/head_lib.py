@@ -139,7 +139,7 @@ class SSDHead(nn.Module):
                  target_means=(.0, .0, .0, .0),
                  target_stds=(0.1, 0.1, 0.2, 0.2),
                  neg_pos_ratio=3,
-                 **kwargs): # 增加一个多余变量，避免修改cfg, 里边有一个type变量没有用
+                 **kwargs):
         super().__init__()
         self.input_size = input_size
         self.num_classes = num_classes
@@ -162,10 +162,11 @@ class SSDHead(nn.Module):
         # 创建anchor生成器
         self.anchor_generators = []
         for i in range(len(in_channels)):
-            anchor_generator = AnchorGenerator(base_sizes[i], scales[i], 
-                                               ratios[i], 
-                                               ctr=centers[i],
-                                               scale_major=False)
+            anchor_generator = AnchorGenerator(base_sizes[i],     # (8,16,32,64,128) 代表每个特征层的anchor基础尺寸 
+                                               scales[i],         # ()
+                                               ratios[i],         # () 
+                                               ctr=centers[i],    # ()
+                                               scale_major=False) # ()
             # 保留的anchor: 2*3的前4个(0-3), 2*5的前6个(0-5)
             keep_anchor_indices = range(0, len(ratios[i])+1)
             anchor_generator.base_anchors = anchor_generator.base_anchors[keep_anchor_indices]
@@ -364,9 +365,33 @@ class SSDHead(nn.Module):
     
         
 # %%    
+# ssd        
+#def __init__(self, 
+#             input_size=300,
+#             num_classes=21,
+#             in_channels=(512, 1024, 512, 256, 256, 256),
+#             num_anchors=(4, 6, 6, 6, 4, 4),
+#             anchor_size_ratio_range = (0.2, 0.9),
+#             anchor_ratios = ([2], [2, 3], [2, 3], [2, 3], [2], [2]),
+#             anchor_strides=(8, 16, 32, 64, 100, 300),
+#             target_means=(.0, .0, .0, .0),
+#             target_stds=(0.1, 0.1, 0.2, 0.2),
+#             neg_pos_ratio=3,
+#             **kwargs): 
+       
+    
 class RetinaHead(SSDHead):
     """retina head"""
-    def __init__(self):
+    def __init__(self, 
+                 input_size,
+                 num_classes=21,
+                 in_channels=256,
+                 base_scale=4,
+                 loss_cls_cfg,
+                 loss_reg_cfg,
+                 **kwargs):
+        
+        anchor_scales
         super().__init__()
         
     

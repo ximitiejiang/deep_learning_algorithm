@@ -30,3 +30,21 @@ def weighted_smooth_l1(pred, target, weight, beta=1.0, avg_factor=None):
         avg_factor = torch.sum(weight > 0).float().item() / 4 + 1e-6
     loss = smooth_l1_loss(pred, target, beta, reduction='none')
     return torch.sum(loss * weight) / avg_factor  # 这里修改了下让输出是一个tensor标量
+
+
+def py_sigmoid_focal_loss(pred,
+                          target,
+                          weight=None,
+                          gamma=2.0,
+                          alpha=0.25,
+                          reduction='mean',
+                          avg_factor=None):
+    pred_sigmoid = pred.sigmoid()
+    target = target.type_as(pred)
+    pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
+    focal_weight = (alpha * target + (1 - alpha) *
+                    (1 - target)) * pt.pow(gamma)
+    loss = F.binary_cross_entropy_with_logits(
+        pred, target, reduction='none') * focal_weight
+    loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
+    return loss
