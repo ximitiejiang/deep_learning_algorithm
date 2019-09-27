@@ -156,7 +156,14 @@ class VOCDataset(BasePytorchDataset):
             gt_bboxes = self.bbox_transform(gt_bboxes, scale_shape, scale_factor, flip)
             # label transform
             gt_labels = self.label_transform(gt_labels)
+        else:
+            ori_shape = None
+            scale_shape = None
+            pad_shape = None
+            scale_factor = None
+            flip = None
         # 组合img_meta
+        
         img_meta = dict(ori_shape = ori_shape,
                         scale_shape = scale_shape,
                         pad_shape = pad_shape,

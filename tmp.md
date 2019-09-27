@@ -446,4 +446,16 @@
    - 方式2：固定一个尺寸最大范围，然后通过padding的方式让图片的宽高成为某个数字的倍数，比如32的倍数，这样能够保证在划分网格的时候不会产生除不尽的情况。
      比如retinanet， fcos。
 
-3. 
+3. ssd的缺点和改进
+   参考：https://blog.csdn.net/u010725283/article/details/79115477/
+    - ssd的缺点：就是对小目标的检测效果不够好，根本原因是浅层特征的语义信息太少，产生误检。
+    - 改进实例DSSD
+        (1). 采用更深的网络resnet101来代替vgg16，这样浅层的特征来自于更深的网络，相应就有更多语义信息
+                    out[0]          out[1]          out[2]          out[3]          out[4]          out[5]
+            ssd     depth=13        depth=20        depth=22        depth=24        depth=26        depth=27
+                    size=(38,38)    size=(38,38)    size=(38,38)    size=(38,38)    size=(38,38)    size=(38,38)
+                    
+            dssd    depth=23        depth=101       depth=104        depth=24        depth=26        depth=27
+                    size=(38,38)    size=(38,38)    size=(38,38)    size=(38,38)    size=(38,38)    size=(38,38)
+        (2). 采用？？？卷积来进行特征融合，让浅层特征也能包含更多的语义信息。
+        
