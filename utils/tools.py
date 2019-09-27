@@ -67,6 +67,26 @@ def loadvar(path):
 
 
 # %%
+from utils.visualization import vis_loss_acc
+def parse_log(path, show=True):
+    """解析log文件"""
+    with open(path) as f:
+        lines = f.readlines()
+        data_dict = {'loss': [],
+                     'acc': []}
+        lines = lines[2:]
+        for line in lines:
+            loss = float(line.split('\t')[-3].split(' ')[-1])
+            acc = float(line.split('\t')[-2].split(' ')[-1])
+            data_dict['loss'].append(loss)
+            data_dict['acc'].append(acc)
+    
+    if show:
+        vis_loss_acc(data_dict)
+    return data_dict
+
+
+# %%
 
 if __name__ == "__main__":
     path = '/home/ubuntu/mytrain/test.pkl'

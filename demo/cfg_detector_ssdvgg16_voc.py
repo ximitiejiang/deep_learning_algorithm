@@ -40,7 +40,7 @@ model = dict(
 backbone = dict(
         type='ssd_vgg16',
         params=dict(
-                pretrained= '/home/ubuntu/.torch/models/vgg16_caffe-292e1171.pth',   # 这是caffe的模型，对应mean=[123.675, 116.28, 103.53], std=[1, 1, 1],  另外的pytorch的模型pretrained='/home/ubuntu/.torch/models/vgg16-397923af.pth', 对应mean, std需要先归一化再标准化
+                pretrained= '/home/ubuntu/MyWeights/vgg16_caffe-292e1171.pth',   # 这是caffe的模型，对应mean=[123.675, 116.28, 103.53], std=[1, 1, 1],  另外的pytorch的模型pretrained='/home/ubuntu/.torch/models/vgg16-397923af.pth', 对应mean, std需要先归一化再标准化
                 out_feature_indices=(22,34),
                 extra_out_feature_indices=(1,3,5,7),
                 l2_norm_scale=20.))

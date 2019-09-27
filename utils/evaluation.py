@@ -59,7 +59,7 @@ def predict_one_img_cls(img, cfg_path):
 
 # %% 检测问题
 from model.runner_lib import batch_detector
-from utils.tools import save2pkl, loadvar
+from utils.tools import save2pkl, loadvar, get_time_str
 from utils.map import eval_map
 
 def eval_dataset_det(cfg_path, 
@@ -101,7 +101,8 @@ def eval_dataset_det(cfg_path,
 
             all_bbox_cls.append(bbox_cls)  # (n_img,)(n_class,)(k,5) 
         # 保存预测结果到文件
-        save2pkl(all_bbox_cls, cfg.work_dir+'eval_result.pkl')
+        filename = get_time_str() + '_eval_result.pkl'
+        save2pkl(all_bbox_cls, cfg.work_dir + filename)
     # 如果有现成验证文件
     else:
         all_bbox_cls = loadvar(result_file)
