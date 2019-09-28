@@ -10,6 +10,7 @@ import os
 import torch
 import matplotlib.pyplot as plt
 import cv2
+from utils.colors import COLORS
 
 # %%
 def vis_loss_acc(buffer_dict, title='result: '):
@@ -91,10 +92,10 @@ def vis_loss_acc(buffer_dict, title='result: '):
 # %%
 def vis_img_bbox(img, bboxes, labels, class_names=None,
         thickness=1, font_scale=0.5):
-    """简化版显示img,bboxes,labels
-    img
-    bboxes
-    labels
+    """简化版显示img,bboxes,labels(无法筛选score置信度)
+    img: (h,w,c)
+    bboxes: (m, 4)
+    labels: (m, )
     """
     from utils.colors import COLORS
     # 准备颜色
@@ -142,7 +143,200 @@ def vis_bbox(bboxes, img=None):
         right_bottom = (bbox[2], bbox[3])
         cv2.rectangle(img, left_top, right_bottom, (0,255,0), thickness=1)
     cv2.imshow('bboxes', img)
+
+
+def vis_all_opencv(img, bboxes, labels, scores, score_thr=0, class_names=None, 
+                    instance_colors=None, thickness=1, font_scale=0.6,
+                    show=True, win_name='cam', wait_time=0, saveto=None): # 如果输出到文件中则指定路径
+    """Draw bboxes and class labels (with scores) on an image.
+
+    Args:
+        img (str or ndarray): The image to be displayed.
+        bboxes (ndarray): Bounding boxes (with scores), shaped (n, 4) or
+            (n, 5).
+        labels (ndarray): Labels of bboxes.
+        class_names (list[str]): Names of each classes.
+        score_thr (float): Minimum score of bboxes to be shown.
+        bbox_color (str or tuple or :obj:`Color`): Color of bbox lines.
+        text_color (str or tuple or :obj:`Color`): Color of texts.
+        thickness (int): Thickness of lines.
+        font_scale (float): Font scales of texts.
+        show (bool): Whether to show the image.
+        win_name (str): The window name.
+        wait_time (int): Value of waitKey param.
+        out_file (str or None): The filename to write the image.
+    """
+    assert bboxes.ndim == 2
+    assert labels.ndim == 1
+    assert bboxes.shape[0] == labels.shape[0]
+    assert bboxes.shape[1] == 4 or bboxes.shape[1] == 5
+#    img = imread(img)
+
+    if score_thr > 0:
+#        assert bboxes.shape[1] == 5
+#        scores = bboxes[:, -1]
+        inds = scores > score_thr
+        bboxes = bboxes[inds, :]
+        labels = labels[inds]
     
+    color_list = []
+    for color in COLORS.values():
+        color_list.append(color)
+    color_list.pop(-1) # the last one is white, reserve for text only, not for bboxes
+    random_colors = np.stack(color_list, axis=0)  # (7,3)
+    random_colors = np.tile(random_colors, (12,1))[:len(class_names),:]  # (84,3) -> (20,3)or(80,3)
+
+    for bbox, label in zip(bboxes, labels):
+        bbox_int = bbox.astype(np.int32)
+        left_top = (bbox_int[0], bbox_int[1])
+        right_bottom = (bbox_int[2], bbox_int[3])
+        cv2.rectangle(                  # 画方框
+            img, left_top, right_bottom, random_colors[label].tolist(), 
+            thickness=thickness)
+        label_text = class_names[       # 准备文字
+            label] if class_names is not None else 'cls {}'.format(label)
+        if len(bbox) > 4:
+            label_text += ': {:.02f}'.format(bbox[-1])
+            
+        txt_w, txt_h = cv2.getTextSize(
+            label_text, cv2.FONT_HERSHEY_DUPLEX, font_scale, thickness = 1)[0]
+        cv2.rectangle(                  # 画文字底色方框
+            img, (bbox_int[0], bbox_int[1]), 
+            (bbox_int[0] + txt_w, bbox_int[1] - txt_h - 4), 
+            random_colors[label].tolist(), -1)  # -1为填充，正整数为边框thickness
+        cv2.putText(
+            img, label_text, (bbox_int[0], bbox_int[1] - 2),     # 字体选择cv2.FONT_HERSHEY_DUPLEX, 比cv2.FONT_HERSHEY_COMPLEX好一点
+            cv2.FONT_HERSHEY_DUPLEX, font_scale, [255,255,255])  # 字体白色
+        
+    if saveto is not None:
+        cv2.imwrite(saveto, img)
+    if show:
+        cv2.imshow(win_name, img)
+
+
+def vis_all(img, bboxes, labels=None, scores=None, score_thr=0, class_names=None,
+             instance_colors=None, alpha=1., linewidth=1.5, ax=None, saveto=None):
+    """另外一个图片+bbox显示的代码
+    注意，该img输入为hwc/bgr(因为在test环节用这种格式较多)，如果在train等环节使用，
+    就需要把img先从chw/rgb转成hwc/bgr
+    Args:
+        img (ndarray): (h,w,c), BGR and the range of its value is
+            :math:`[0, 255]`. If this is :obj:`None`, no image is displayed.
+        bbox (ndarray): An array of shape :math:`(R, 4)`, where
+            :math:`R` is the number of bounding boxes in the image.
+            Each element is organized
+            by :math:`(x_{min}, y_{min}, x_{max}, y_{max})` in the second axis.
+        label (ndarray): An integer array of shape :math:`(R,)`.
+            The values correspond to id for label names stored in
+            :obj:`class_names`. This is optional.
+        score (~numpy.ndarray): A float array of shape :math:`(R,)`.
+             Each value indicates how confident the prediction is.
+             This is optional.
+        score_thr(float): A float in (0, 1), bboxes scores with lower than
+            score_thr will be skipped. if 0 means all bboxes will be shown.
+        class_names (iterable of strings): Name of labels ordered according
+            to label ids. If this is :obj:`None`, labels will be skipped.
+        instance_colors (iterable of tuples): List of colors.
+            Each color is RGB format and the range of its values is
+            :math:`[0, 255]`. The :obj:`i`-th element is the color used
+            to visualize the :obj:`i`-th instance.
+            If :obj:`instance_colors` is :obj:`None`, the red is used for
+            all boxes.
+        alpha (float): The value which determines transparency of the
+            bounding boxes. The range of this value is :math:`[0, 1]`.
+        linewidth (float): The thickness of the edges of the bounding boxes.
+        ax (matplotlib.axes.Axis): The visualization is displayed on this
+            axis. If this is :obj:`None` (default), a new axis is created.
+
+    Returns:
+        ~matploblib.axes.Axes:
+        Returns the Axes object with the plot for further tweaking.
+
+    """
+    if labels is not None and not len(bboxes) == len(labels):
+        raise ValueError('The length of label must be same as that of bbox')
+    if scores is not None and not len(bboxes) == len(scores):
+        raise ValueError('The length of score must be same as that of bbox')
+    
+    if score_thr > 0:                      # 只显示置信度大于阀值的bbox
+        score_id = scores > score_thr
+        # 获得scores, bboxes
+        scores = scores[score_id]
+        bboxes = bboxes[score_id]
+        labels = labels[score_id]
+        
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+    if img is not None:
+        img = img[...,[2,1,0]]         # hwc/bgr to rgb
+        ax.imshow(img.astype(np.uint8))
+    # If there is no bounding box to display, visualize the image and exit.
+    if len(bboxes) == 0:
+        return ax
+    
+    # instance_colors可以等于list: [255,0,0]
+    # 也可等于None
+    # 否则等于随机7种颜色之一
+    color_list = []
+    for color in COLORS.values():
+        color_list.append(color)
+    color_list.pop(-1) # 去除白色，用于文字颜色
+    random_colors = np.stack(color_list, axis=0)  # (7,3)
+    if class_names is None:
+        color_len =1
+    else:
+        color_len = len(class_names)
+    random_colors = np.tile(random_colors, (12,1))[:color_len,:]  # (84,3) -> (20,3)or(80,3)
+    
+    if instance_colors is None:
+        instance_colors = random_colors
+#        instance_colors = np.zeros((len(bbox), 3), dtype=np.float32)
+#        instance_colors[:, 0] = 255
+    else:
+        assert len(instance_colors) == 3, 'instance_colors should be a list [n1,n2,n3].'
+        instance_colors = np.tile(instance_colors, (color_len, 1))
+#    instance_colors = np.array(instance_colors)
+
+    for i, bb in enumerate(bboxes):        # xyxy to xywh
+        xy = (bb[0], bb[1])
+        height = bb[3] - bb[1]
+        width = bb[2] - bb[0]
+        # 先定义默认颜色        
+        color = instance_colors[0] / 255  # 默认用第一个颜色红色[255,0,255]作为常规显示图片和bbox, 但要归一到（0-1）来表示颜色
+        
+        caption = []
+        if labels is not None and class_names is not None:
+            lb = labels[i]
+            caption.append(class_names[lb])
+            color = instance_colors[lb] /255     # 如果有标签，则按标签类别定义颜色
+        if scores is not None:
+            sc = scores[i]
+            caption.append('{:.2f}'.format(sc))
+        ax.add_patch(plt.Rectangle(
+            xy, width, height, fill=False,
+            edgecolor=color, linewidth=linewidth, alpha=alpha))
+
+        if len(caption) > 0:
+            ax.text(bb[0], bb[1]-2,     # 改到左下角点(xmin,ymin,xmax,ymax) ->(xmin,ymax)
+                    ': '.join(caption),
+                    style='italic',
+                    color = 'white',  # 默认是白色字体
+                    bbox={'facecolor': color, 'alpha': 0.5, 'pad': 0}) 
+                    #文字底色跟边框颜色一样，透明度=1表示不透明，边空1
+    if saveto is not None:
+        plt.savefig(saveto)
+    return ax
+
+
+def vis_dataset_one_class(dataset, class_name, saveto=None, show=None):
+    """显示一个数据集中某一个类的所有图片：先生成带bbox的图片，然后拼接图片成一张
+    可用来检查某一类图片的总体特征，比如小物体类型的比例。
+    """
+    pass
+  
+    
+
 
 # %%
 def vis_activation_hist(source):

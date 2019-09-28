@@ -81,12 +81,12 @@ class OneStageDetector(nn.Module):
                 bbox_results = bbox_results.cpu().numpy()
                 label_results = label_results.cpu().numpy()
             # 把结果格式从(k, 5)->(20,)(c,5)
-            bbox_cls = []
-            for i in range(self.bbox_head.num_classes - 1): # 分成0-19, 因为预测时的负样本(0)已经被筛掉了
-                inds = label_results == i  # 获取第i类
-                bbox_cls.append(bbox_results[inds, :])
+            bbox_det = []
+            for i in range(self.bbox_head.num_classes - 1): # 因为预测时的负样本(0)已经被筛掉了，所以这里只找20类range(20)
+                inds = label_results == i + 1    # 注意：从数据集出来到训练以及预测的标签取值范围永远是1-20
+                bbox_det.append(bbox_results[inds, :])
             
-            return bbox_cls # (n_class,)(k, 5)  不在返回labels了，因为顺序就是labels的号
+            return bbox_det # (n_class,)(k, 5)  不在返回labels了，因为顺序就是labels的号
         else:
             raise ValueError('currently only one batch size supported for test.')
 

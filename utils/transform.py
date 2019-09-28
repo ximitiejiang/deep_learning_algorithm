@@ -208,7 +208,8 @@ def imnormalize(img, mean, std):
     img = img.astype(np.float32)  # 为避免uint8与float的计算冲突，在计算类transform都增加类型转换
     mean = np.array(mean).reshape(-1)
     std = np.array(std).reshape(-1)
-    return (img - mean) / std    # (h,w,3)-(3,)/(3,)=(h,w,3)
+    img = (img - mean) / std    # (h,w,3)-(3,)/(3,)=(h,w,3)
+    return img.astype(np.float32)
 
 
 def imdenormalize(img, mean, std):

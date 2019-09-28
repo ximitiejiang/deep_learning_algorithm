@@ -26,8 +26,8 @@ def batch_detector(model, data, device, return_loss=True, **kwargs): # kwargs用
     img_metas = data['img_meta']
     # 计算模型输出
     if not return_loss:
-        bbox_cls = model(imgs, img_metas, return_loss=False)
-        return bbox_cls  # (n_class,)(k,5)
+        bbox_det = model(imgs, img_metas, return_loss=False)
+        return bbox_det  # (n_class,)(k,5)
         
     if return_loss:
         losses = model(imgs, img_metas, 

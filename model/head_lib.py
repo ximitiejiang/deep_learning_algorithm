@@ -387,11 +387,10 @@ class RetinaHead(SSDHead):
                  num_classes=21,
                  in_channels=256,
                  base_scale=4,
-                 loss_cls_cfg,
-                 loss_reg_cfg,
+                 loss_cls_cfg=None,
+                 loss_reg_cfg=None,
                  **kwargs):
         
-        anchor_scales
         super().__init__()
         
     

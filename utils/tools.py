@@ -11,6 +11,20 @@ import time
 import six
 import pickle
 
+# %%
+"""创建一个装饰器，用来统计每个函数的运行时间
+使用方法：    
+@timeit
+def func(*args, **kwargs):        
+"""
+def timeit(func):
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+    
+
+# %%
+
 def accuracy(y_pred, label, topk=1):
     """pytorch tensor版本的精度计算：由于都是未概率化的数据，
     y_pred(b, n_classes)，tensor为未概率化的数据

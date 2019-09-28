@@ -5,9 +5,11 @@ Created on Tue Sep  3 21:29:33 2019
 
 @author: ubuntu
 """
+import cv2
 from model.runner_lib import Runner
-from utils.evaluation import eval_dataset_det
+from utils.evaluation import eval_dataset_det, predict_one_img_det
 from utils.tools import parse_log
+from utils.dataset_classes import get_classes
 
 def train_ssd(cfg_path):
     
@@ -18,7 +20,7 @@ def train_ssd(cfg_path):
     
 if __name__ == "__main__":
     
-    task = 'eval'
+    task = 'test'
     
     cfg_path = './cfg_detector_ssdvgg16_voc.py'
     
@@ -35,9 +37,14 @@ if __name__ == "__main__":
     
     if task == 'load':
         
-        
         eval_dataset_det(cfg_path=cfg_path,
                          load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_11.pth',
                          load_device='cuda',
-                         result_file='/home/ubuntu/mytrain/ssd_vgg_voc/eval_result.pkl')
+                         result_file='/home/ubuntu/mytrain/ssd_vgg_voc/20190928_084133_eval_result.pkl')
     
+    if task == 'test':
+        img = cv2.imread('../test/1.jpg')
+        predict_one_img_det(img, cfg_path,                         
+                            load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_11.pth',
+                            load_device='cuda',
+                            class_names = get_classes('voc'))
