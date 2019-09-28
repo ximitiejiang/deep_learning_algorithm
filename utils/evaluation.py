@@ -7,11 +7,13 @@ Created on Sun Sep 22 22:15:27 2019
 """
 import torch
 import numpy as np
+import cv2
 from utils.prepare_training import get_config, get_dataset, get_dataloader, get_root_model
 from utils.checkpoint import load_checkpoint
 from utils.transform import to_device, ImgTransform
-from utils.visualization import vis_loss_acc, vis_img_bbox, vis_all
+from utils.visualization import vis_loss_acc, vis_img_bbox, vis_all_opencv
 from utils.tools import accuracy
+from utils.dataset_classes import get_classes
 
 # %% 分类问题
 def eval_dataset_cls(cfg_path, device=None):
@@ -129,20 +131,49 @@ def predict_one_img_det(img, cfg_path, load_from=None, load_device=None,
     with torch.no_grad():
         bbox_det = model(**img_data, return_loss=False)  # (n_class,)(k,5)
     # 整理成显示需要的形式
-    labels = [np.full((bbox.shape[0],), i, dtype=np.int32) for i, bbox in enumerate(bbox_det)] # 用i作为label填充(1~20)
+    labels = [np.full((bbox.shape[0],), i, dtype=np.int32) for i, bbox in enumerate(bbox_det)] # 用i作为label填充，由于要获取class name,这里label改成0-19
     labels = np.concatenate(labels, axis=0)  # (m, )
     bboxes = np.concatenate(bbox_det, axis=0)  # (m,5)
-    scores = bboxes[:, -1]
+    scores = bboxes[:, -1]   # (m,)
     
     if show:
-        vis_all(img, bboxes, labels, class_names)
-    
-    return bboxes, scores, labels   # (m, 5) (m, ) (m, )
+        vis_all_opencv(img, bboxes, scores, labels, class_names=class_names, score_thr=0.5)
+    return bboxes, scores, labels    # (m, 5) (m, ) (m, )
 
 
-def predict_imgs_det(img_list, cfg_path, load_from=None, load_device=None, show=True):
-    pass
+def predict_imgs_det(img_list, cfg_path, load_from=None, load_device=None, 
+                     show=True, class_names=None):
+    bbox_list = []
+    score_list = []
+    label_list = []
+    new_img_list = []
+    for img in img_list:
+        bboxes, scores, labels = predict_one_img_det(
+                img, cfg_path, load_from, load_device, show=False)
+        new_img = vis_all_opencv(img.copy(), bboxes, scores, labels, 
+                                 show=False)
+        new_img_list.append(new_img)
+        bbox_list.append(bboxes)
+        score_list.append(scores)
+        label_list.append(labels)
+    return new_img_list, bbox_list, score_list, label_list
     
+
+def predict_video_det():
+    """对视频或者摄像头数据进行预测"""
+    camera = cv2.VideoCapture(args.camera_id)
+
+    print('Press "Esc", "q" or "Q" to exit.')
+    while True:
+        ret_val, img = camera.read()
+        result = inference_detector(model, img)
+
+        ch = cv2.waitKey(1)
+        if ch == 27 or ch == ord('q') or ch == ord('Q'):
+            break
+
+        show_result(
+            img, result, model.CLASSES, score_thr=args.score_thr, wait_time=1)
 
 
 # %% 一些support函数
@@ -164,7 +195,7 @@ def img_loader(img, cfg):
                     flip = flip)
     
     data = dict(imgs = img,
-                img_metas = [img_meta])  # 注意这里需要放入list中模拟dataloader效果
+                img_metas = [img_meta])  # 注意这里需要放入list中模拟dataloader的collate效果
     return data
     
 

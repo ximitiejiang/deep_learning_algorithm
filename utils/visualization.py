@@ -105,7 +105,6 @@ def vis_img_bbox(img, bboxes, labels, class_names=None,
     color_list.pop(-1) # the last one is white, reserve for text only, not for bboxes
     color_list = color_list * 12  # 循环加长到84，可以显示80类的coco
     random_colors = np.stack(color_list, axis=0)  # (7,3)
-#    random_colors = np.tile(random_colors, (12,1))[:len(class_names),:]
     # 开始绘制
     for bbox, label in zip(bboxes, labels):
         bbox_int = bbox.astype(np.int32)
@@ -145,11 +144,10 @@ def vis_bbox(bboxes, img=None):
     cv2.imshow('bboxes', img)
 
 
-def vis_all_opencv(img, bboxes, labels, scores, score_thr=0, class_names=None, 
+def vis_all_opencv(img, bboxes, scores, labels, class_names=None, score_thr=0, 
                     instance_colors=None, thickness=1, font_scale=0.6,
                     show=True, win_name='cam', wait_time=0, saveto=None): # 如果输出到文件中则指定路径
-    """Draw bboxes and class labels (with scores) on an image.
-
+    """采用opencv作为底层显示img/bbox/labels
     Args:
         img (str or ndarray): The image to be displayed.
         bboxes (ndarray): Bounding boxes (with scores), shaped (n, 4) or
@@ -212,9 +210,11 @@ def vis_all_opencv(img, bboxes, labels, scores, score_thr=0, class_names=None,
         cv2.imwrite(saveto, img)
     if show:
         cv2.imshow(win_name, img)
+    return img
 
 
-def vis_all(img, bboxes, labels=None, scores=None, score_thr=0, class_names=None,
+
+def vis_all_pyplot(img, bboxes, scores=None, labels=None, class_names=None, score_thr=0, 
              instance_colors=None, alpha=1., linewidth=1.5, ax=None, saveto=None):
     """另外一个图片+bbox显示的代码
     注意，该img输入为hwc/bgr(因为在test环节用这种格式较多)，如果在train等环节使用，
@@ -327,6 +327,7 @@ def vis_all(img, bboxes, labels=None, scores=None, score_thr=0, class_names=None
     if saveto is not None:
         plt.savefig(saveto)
     return ax
+
 
 
 def vis_dataset_one_class(dataset, class_name, saveto=None, show=None):
