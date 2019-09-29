@@ -61,7 +61,7 @@ class FPN(nn.Module):
     def __init__(self, 
                  in_channels=(256, 512, 1024, 2048),
                  out_channels=256,
-                 use_levels=(1, 2, 3),  # 表示作用在哪几层，默认4层都是，但新的FPN只使用了1,2,3层
+                 use_levels=(1, 2, 3),  # 表示作用在哪几层，默认4层都是，但新的FPN只使用了1,2,3层，0层丢弃
                  num_outs=5,
                  extra_convs_on_inputs=True  # 表示extra输出是把input作为输入，而不是把fpn某一层的输出作为输入(会影响extra conv的输入层数)
                  ):
