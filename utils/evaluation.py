@@ -82,10 +82,9 @@ def eval_dataset_det(cfg_path,
     
     dataset = get_dataset(cfg.valset, cfg.transform_val)
     dataloader = get_dataloader(dataset, cfg.valloader)
-    model = get_root_model(cfg)
     
+    model = get_root_model(cfg)
     device = torch.device(cfg.load_device)
-
     load_checkpoint(model, cfg.load_from, device)
     model = model.to(device)
     # 如果没有验证过
@@ -112,68 +111,37 @@ def eval_dataset_det(cfg_path,
     voc_eval(all_bbox_cls, dataset, iou_thr=0.5)
     
     
-def predict_one_img_det(img, cfg_path, load_from=None, load_device=None, 
-                        show=True, class_names=None):
-    # 准备验证所用的对象
-    cfg = get_config(cfg_path)
-    # 为了便于eval，不必常去修改cfg里边的设置，直接在func里边添加2个参数即可
-    if load_from is not None:
-        cfg.load_from = load_from
-    if load_device is not None:
-        cfg.load_device = load_device
-    model = get_root_model(cfg)
-    device = torch.device(cfg.load_device)
-    load_checkpoint(model, cfg.load_from, device)
-    model = model.to(device)
-    # 图片变换
-    img_data = img_loader(img, cfg)
-    # 计算
-    with torch.no_grad():
-        bbox_det = model(**img_data, return_loss=False)  # (n_class,)(k,5)
-    # 整理成显示需要的形式
-    labels = [np.full((bbox.shape[0],), i, dtype=np.int32) for i, bbox in enumerate(bbox_det)] # 用i作为label填充，由于要获取class name,这里label改成0-19
-    labels = np.concatenate(labels, axis=0)  # (m, )
-    bboxes = np.concatenate(bbox_det, axis=0)  # (m,5)
-    scores = bboxes[:, -1]   # (m,)
-    
-    if show:
-        vis_all_opencv(img, bboxes, scores, labels, class_names=class_names, score_thr=0.5)
-    return bboxes, scores, labels    # (m, 5) (m, ) (m, )
+class Predictor():
+    """用于对图片进行预测计算，生成待显示的数据
+    src: 可以输入img or img_list
+    """
+    def __init__(self, cfg_path, load_from=None, load_device=None):
+        # 准备验证所用的对象
+        self.cfg = get_config(cfg_path)
+        # 为了便于eval，不必常去修改cfg里边的设置，直接在func里边添加2个参数即可
+        if load_from is not None:
+            self.cfg.load_from = load_from
+        if load_device is not None:
+            self.cfg.load_device = load_device
+        self.model = get_root_model(self.cfg)
+        self.device = torch.device(self.cfg.load_device)
+        load_checkpoint(self.model, self.cfg.load_from, self.device)
+        self.model = self.model.to(self.device)
 
+    def __call__(self, src):
+        if isinstance(src, np.ndarray):
+            src = [src]
+        for img in src:
+            img_data = img_loader(img, self.cfg)
+            with torch.no_grad():
+                bbox_det = self.model(**img_data, return_loss=False)  # (n_class,)(k,5)
+                # 整理成显示需要的形式
+                labels = [np.full((bbox.shape[0],), i, dtype=np.int32) for i, bbox in enumerate(bbox_det)] # 用i作为label填充，由于要获取class name,这里label改成0-19
+                labels = np.concatenate(labels, axis=0)  # (m, )
+                bboxes = np.concatenate(bbox_det, axis=0)  # (m,5)
+                scores = bboxes[:, -1]   # (m,)
+                yield (img, bboxes, scores, labels)
 
-def predict_imgs_det(img_list, cfg_path, load_from=None, load_device=None, 
-                     show=True, class_names=None):
-    bbox_list = []
-    score_list = []
-    label_list = []
-    new_img_list = []
-    for img in img_list:
-        bboxes, scores, labels = predict_one_img_det(
-                img, cfg_path, load_from, load_device, show=False)
-        new_img = vis_all_opencv(img.copy(), bboxes, scores, labels, 
-                                 show=False)
-        new_img_list.append(new_img)
-        bbox_list.append(bboxes)
-        score_list.append(scores)
-        label_list.append(labels)
-    return new_img_list, bbox_list, score_list, label_list
-    
-
-def predict_video_det():
-    """对视频或者摄像头数据进行预测"""
-    camera = cv2.VideoCapture(args.camera_id)
-
-    print('Press "Esc", "q" or "Q" to exit.')
-    while True:
-        ret_val, img = camera.read()
-        result = inference_detector(model, img)
-
-        ch = cv2.waitKey(1)
-        if ch == 27 or ch == ord('q') or ch == ord('Q'):
-            break
-
-        show_result(
-            img, result, model.CLASSES, score_thr=args.score_thr, wait_time=1)
 
 
 # %% 一些support函数

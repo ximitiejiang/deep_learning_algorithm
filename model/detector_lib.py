@@ -43,7 +43,7 @@ class OneStageDetector(nn.Module):
         if return_loss:
             return self.forward_train(imgs, img_metas, **kwargs)
         else:
-            return self.forward_test(imgs, img_metas, rescale=False, **kwargs)  # TODO: 是否可以去掉rescale
+            return self.forward_test(imgs, img_metas, **kwargs)
         
     def forward_train(self, imgs, img_metas, gt_bboxes, gt_labels):
         """训练过程的前向计算的底层函数"""
@@ -57,7 +57,7 @@ class OneStageDetector(nn.Module):
         losses = self.bbox_head.get_losses(*loss_inputs)
         return losses
         
-    def forward_test(self, imgs, img_metas, rescale=False, **kwargs):
+    def forward_test(self, imgs, img_metas, **kwargs):
         """测试过程的前向计算的底层函数: 只支持单张图片，如果多张图片则需要自定义循环
         """
         # TODO: 测试过程只需要前向计算而不需要反向传播，是否可以缩减模型尺寸?

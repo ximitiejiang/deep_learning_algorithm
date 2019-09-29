@@ -337,6 +337,39 @@ def vis_dataset_one_class(dataset, class_name, saveto=None, show=None):
     pass
   
     
+# %%
+
+def vis_cam(src, predictor, class_names=None, score_thr=None):
+    """用于对摄像头数据进行检测
+    args:
+        src: int(表示cam_id) or str(表示video文件路径)
+        predictor: 表示预测计算器，用来创建模型，计算显示需要的输出(img, bboxes, scores, labels)
+    """
+    # 如果是int则为cam_id, 如果是str则为video path
+    if isinstance(src, (int, str)):
+        if isinstance(src, int):
+            cam_id = src
+            capture = cv2.VideoCapture(cam_id)
+        elif isinstance(src, str):
+            capture = cv2.VideoCapture(src)
+        assert capture.isOpened(), 'Cannot capture source'
+    # 循环预测
+    print('Press "Esc", "q" or "Q" to exit.')
+    while True:
+        ret, img = capture.read()
+        # 检查是否正确返回
+        if not ret:  # failure to read or run to end frame
+            cv2.destroyAllWindows()
+            capture.release()
+            break
+        # 检查是否有按键中断
+        ch = cv2.waitKey(1)
+        if ch == 27 or ch == ord('q') or ch == ord('Q'):
+            break
+        # 返回迭代器
+        for results in predictor(img):
+            vis_all_opencv(*results, class_names, score_thr)
+                
 
 
 # %%

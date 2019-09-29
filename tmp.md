@@ -395,7 +395,16 @@
    多张图则为(n_imgs,)(n_class,)(k, 5)的形式，也就是4个维度(n, c, k, 5)，只不过用list嵌套list嵌套array的形式表示了。
    这种数据格式提供给mAP函数接口，就可以就算模型针对某个验证数据集的mAP了。
 
+### 关于训练完成以后的任务
 
+1. 模型训练完成以后，会有如下任务
+    - 评估数据集： 由于需要创建dataset/dataloader，所以采用独立函数eval_dataset_det()
+    
+    - 测试单张图片：无需创建数据集，但需要处理单图，所以统一用一个predictor类，初始化时创建模型，调用时计算输出
+    
+    - 测试多张图片：借用单张图片的predictor，以迭代器输出结果，再用vis_all显示
+    
+    - 测试摄像头和视频：借用单图predictor计算单帧，集成到vis_cam中
 
 
 ### 训练进行时突然报错，训练无法进行，验证也无法进行，然后定位到dataloader, 报错内容是OSError:[Errno 12] Cannot allocate memory
