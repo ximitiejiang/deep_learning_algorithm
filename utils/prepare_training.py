@@ -221,14 +221,16 @@ def get_dataloader(dataset, dataloader_cfg):
 from model.detector_lib import OneStageDetector
 from model.alexnet_lib import AlexNet, AlexNet8
 from model.ssdvgg16_lib import SSDVGG16
-from model.head_lib import SSDHead
+from model.head_lib import SSDHead, RetinaHead, FCOSHead
 
 models = {
         'one_stage_detector': OneStageDetector,
         'alexnet8' : AlexNet8,
         'alexnet' : AlexNet,
         'ssd_vgg16' : SSDVGG16,
-        'ssd_head' : SSDHead}
+        'ssd_head' : SSDHead,
+        'retina_head': RetinaHead,
+        'fcos_head': FCOSHead}
 
 def get_root_model(cfg):
     """根模型创建：传入根cfg"""
@@ -249,7 +251,6 @@ def get_model(cfg):
     model_class = models[model_name]
     params = cfg.params    
     return model_class(**params)  # 其他模型的创建，传入的是解包的dict
-
 
 
 

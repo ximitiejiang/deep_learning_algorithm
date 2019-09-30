@@ -156,9 +156,9 @@ def get_one_img_point_target(points, regress_ranges, gt_bboxes, gt_labels):
     areas = (gt_bboxes[:, 2] - gt_bboxes[:, 0] + 1) * (gt_bboxes[:, 3] - gt_bboxes[:, 1] + 1) # (m,)
 
     # 计算每个point与每个gt bbox的对应样本的l,r,t,b
-    l, r, t, b = calc_lrtb(points, gt_bboxes)
+    left, right, top, bottom = calc_lrtb(points, gt_bboxes)
     # 得到每个point针对每个gt bbox的target，然后再筛选
-    bbox_targets = torch.stack([l,r,t,b], dim=-1) # (k, m, 4)
+    bbox_targets = torch.stack([left,right,top,bottom], dim=-1) # (k, m, 4)
     
     # 1. 判断point是否在gt bbox中
     inside_gt_bbox_mask = bbox_targets.min(dim=-1)[0] > 0  # 取l,r,t,b中最小值>0，则说明l,r,t,b4个值都大于0，必在bbox内

@@ -90,8 +90,6 @@ class OneStageDetector(nn.Module):
         else:
             raise ValueError('currently only one batch size supported for test.')
 
-def bbox2result():
-    """用来把(k,5)的单张图片结果转换成"""    
     
 
 # %% two stage

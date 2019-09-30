@@ -79,8 +79,6 @@ def eval_map(det_results,
         print_map_summary(mean_ap, eval_result, dataset)
     
     return mean_ap, eval_results
-    
-        
 
 
 def get_one_class_results(class_id, det_results, gt_bboxes, gt_labels):
@@ -140,8 +138,8 @@ def average_precision(recalls, precisions, mode):
     """
     recalls = recalls.reshape(1, -1)
     precisions = precisions.reshape(1, -1)
-    recall_x = np.concatenate([np.zeros((1,1)), recalls, np.ones((1,1))])     # 在前面加0，后边加1，组成x坐标 
-    precision_y = np.concatenate([np.zeros((1,1)), recalls, np.zeros((1,1))]) # 在前面加0，后边加0
+    recall_x = np.concatenate([np.zeros((1,1)), recalls, np.ones((1,1))])     # 在前面加0，后边加1，组成x坐标(因为recall开始是) 
+    precision_y = np.concatenate([np.zeros((1,1)), recalls, np.zeros((1,1))]) # 在前面加0，后边加0，组成y坐标()
     
                 
 def print_map_summary(mean_ap, results, dataset=None):   

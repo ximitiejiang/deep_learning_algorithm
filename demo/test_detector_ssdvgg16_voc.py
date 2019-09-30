@@ -27,7 +27,6 @@ if __name__ == "__main__":
     if task == 'train':  # 模型训练
         train_ssd(cfg_path)
     
-    
     if task == 'eval':  # 数据集评估
         parse_log('/home/ubuntu/mytrain/ssd_vgg_voc/20190926_181047.log')
         

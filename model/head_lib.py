@@ -455,7 +455,7 @@ class FCOSHead(nn.Module):
         return cls_scores, bbox_preds, centernesses  # (5,)(b, 20*4, h, w)代表每个中心点样本的20个类别置信度, (5,)(b, 1, h, w)代表, (5,)(4, 4, h, w)
     
     
-    def get_losses(cls_scores, bbox_preds, centernesses, 
+    def get_losses(self, cls_scores, bbox_preds, centernesses, 
                    gt_bboxes, gt_labels, img_metas, cfg):
         """计算损失：先获得target，然后基于样本和target计算损失
         注意：对FCOS的loss可以一次性把一个batch的loss一起算出来，这是更高效的算法

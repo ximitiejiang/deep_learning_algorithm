@@ -7,13 +7,11 @@ Created on Sun Sep 22 22:15:27 2019
 """
 import torch
 import numpy as np
-import cv2
 from utils.prepare_training import get_config, get_dataset, get_dataloader, get_root_model
 from utils.checkpoint import load_checkpoint
 from utils.transform import to_device, ImgTransform
-from utils.visualization import vis_loss_acc, vis_img_bbox, vis_all_opencv
+from utils.visualization import vis_loss_acc
 from utils.tools import accuracy
-from utils.dataset_classes import get_classes
 
 # %% 分类问题
 def eval_dataset_cls(cfg_path, device=None):
@@ -112,7 +110,7 @@ def eval_dataset_det(cfg_path,
     
     
 class Predictor():
-    """用于对图片进行预测计算，生成待显示的数据
+    """用于对图片(非数据集的情况)进行预测计算，生成待显示的数据
     src: 可以输入img or img_list
     """
     def __init__(self, cfg_path, load_from=None, load_device=None):
