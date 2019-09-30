@@ -58,6 +58,7 @@ def get_logger(logger_cfg):
 from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
 from dataset.voc_dataset import VOCDataset
 from dataset.ants_bees_dataset import AntsBeesDataset
+from dataset.widerface_dataset import WIDERFaceDataset
 from utils.transform import ImgTransform, BboxTransform, LabelTransform
 
 class RepeatDataset(object):
@@ -83,7 +84,8 @@ def get_dataset(dataset_cfg, transform_cfg):
     datasets = {'cifar10' : Cifar10Dataset,
                 'cifar100' : Cifar100Dataset,
                 'voc':VOCDataset,
-                'antsbees': AntsBeesDataset}
+                'antsbees': AntsBeesDataset,
+                'widerface': WIDERFaceDataset}
     img_transform = None
     label_transform = None
     bbox_transform = None    
