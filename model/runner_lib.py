@@ -109,7 +109,7 @@ class Runner():
         self.trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
         self.valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
         
-#        data = self.trainset[0]
+        data = self.trainset[91]
         
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)

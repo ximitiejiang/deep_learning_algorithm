@@ -29,7 +29,7 @@ class AnchorGenerator():
             x_ctr, y_ctr = 0.5 * (w - 1), 0.5 * (h - 1) 
         else:
             x_ctr, y_ctr = self.ctr
-        # 准备宽高的比例: ratio=h/w=2则h=sqrt(2)*h0, w=1/sqrt(2) * w0
+        # 准备宽高的比例: ratio=r则h=sqrt(r)*base_size, w=1/sqrt(r) * base_size，从而h/w=r
         h_ratios = np.sqrt(self.ratios) #(n,)
         w_ratios = 1 / h_ratios         #(n,)
         # 计算变换后的w', h'

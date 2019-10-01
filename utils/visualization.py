@@ -403,3 +403,83 @@ def vis_activation_hist(source):
     plt.show()
     
     
+# %%
+from tqdm import tqdm
+def vis_dataset_bbox_area(cfg_path):
+    """用于统计一个数据集的所有bbox的面积值，以及对bbox的w,h进行：
+    """    
+    from utils.prepare_training import get_config, get_dataset
+    cfg = get_config(cfg_path)
+    cfg.trainset.params.ann_file = [cfg.trainset.params.ann_file[0]]   # 先只用voc07
+    
+    trainset = get_dataset(cfg.trainset, cfg.transform)
+    class_names = trainset.CLASSES
+    
+    ws  = []
+    hs = []
+    areas = []
+    labels = []
+    for data in tqdm(trainset):
+        img_meta = data['img_meta']
+        gt_labels = data['gt_labels']
+        gt_bboxes = data['gt_bboxes']
+        w = gt_bboxes[:, 2] - gt_bboxes[:, 0]
+        h = gt_bboxes[:, 3] - gt_bboxes[:, 1]
+        area = w * h
+        
+        ws.extend(w)
+        hs.extend(h)
+        areas.extend(area)
+        labels.extend(gt_labels)    
+        
+    ws = np.array([w.item() for w in ws])   # (k,)
+    hs = np.array([h.item() for h in hs])   # (k,)
+    areas = np.array([area.item() for area in areas])   # (k,)
+    labels = np.array([label.item() for label in labels]) # (k,)
+    
+    # 先绘制总的分布图
+    plt.figure()
+    plt.title('all')
+    plt.hist(areas, 30, range=(0,90000))
+    plt.show()
+    
+    # 再分别绘制每个类的hist
+    plt.figure()
+    for class_id in range(1, 21):  # 假定20类
+        inds = labels == class_id
+        class_areas = areas[inds]
+        plt.subplot(4, 5, class_id)
+        plt.title(class_names[class_id - 1])
+        plt.hist(class_areas, 30, range=(0, 90000))
+    plt.show()
+    
+    # 然后计算size = sqrt(area), 绘制size的scatter
+    plt.figure()
+    plt.title('w and h scatter')
+    plt.scatter(ws, hs)
+    
+    # 然后对横坐标w,纵坐标h的size尺寸做聚类
+    data = np.concatenate([ws[:, None], hs[:, None]], axis=1)
+    centers = kmean(data, k=5)
+    plt.scatter(centers[:, 0], centers[:, 1], s=50, c='r')
+    
+    plt.show()
+    
+    
+
+def kmean(data, k):
+    """进行二维数据的聚类分析
+    args:
+        data: (m,2)分别是w,h，所以是二维坐标上的聚类
+        k: 聚类个数
+    return
+        centers: (k,2) k个聚类中心坐标
+    """
+    from sklearn.cluster import KMeans
+    _kmean = KMeans(n_clusters = k)
+    _kmean.fit(data)
+    centers = _kmean.cluster_centers_
+    return centers
+    
+    
+    

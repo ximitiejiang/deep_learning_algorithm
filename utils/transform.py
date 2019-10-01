@@ -317,11 +317,11 @@ class ImgTransform():
         # 默认值
         scale_factor = [1, 1, 1, 1] # 假定
         # 所有变换
+        if self.to_rgb:
+            img = bgr2rgb(img)
         if self.mean is not None and self.norm:  # 标准化+归一化
             img = img / 255
             img = imnormalize(img, self.mean, self.std)
-        if self.to_rgb:
-            img = bgr2rgb(img)
         if self.mean is not None and not self.norm:  # 标准化, 放在bgr2rgb之后做，从而提供的mean也必须是rgb顺序
             img = imnormalize(img, self.mean, self.std)
         if self.scale is not None and self.keep_ratio: # 如果是固定比例缩放

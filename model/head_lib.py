@@ -78,9 +78,9 @@ def get_base_anchor_params(img_size, ratio_range, n_featmap, strides, ratios):
     anchor_scales = [(1., np.sqrt(max_sizes[i]/min_sizes[i])) for i in range(len(max_sizes))]  # 定义anchor缩放比例: 开根号是因为
     centers = [((strides[i] - 1)/2., (strides[i] - 1)/2.) for i in range(len(strides))]   # 定义anchor中心点坐标
     return (base_sizes,     # (30, 60, 112, 165, 217, 270)
-            anchor_scales,  # 
-            anchor_ratios,  #
-            centers)        # 
+            anchor_scales,  # ((1, 1.41),(1, 1.49),(1,1.2), (1, 1.16), (1, 1.12),(1, 1.09))
+            anchor_ratios,  # (1, 1/2, 2, 1/3, 3)
+            centers)        # ((3.5,3.5),(7.5,7.5),(15.5,15.5),(31.5,31.5),(49.5,49.5),(149.5,149.5))
 
 def get_hard_negtive_sample_loss(loss_cls, labels, neg_pos_ratio):
     """负样本挖掘：从中挖掘出分类损失中固定比例的，难样本的损失值作为负样本损失
