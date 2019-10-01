@@ -303,8 +303,10 @@ class SSDHead(nn.Module):
         num_imgs = len(img_metas)
         num_levels = len(cls_scores)
         multi_layer_anchors = []
+        device = cls_scores[0].device
         for i in range(len(featmap_sizes)):
-            anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i][2:], self.anchor_strides[i])
+            anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i][2:], 
+                                            self.anchor_strides[i], device=device)
             multi_layer_anchors.append(anchors)  # (6,)(k, 4)
         # 计算每张图的bbox预测
         bbox_results = [] 

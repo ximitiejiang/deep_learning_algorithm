@@ -47,12 +47,11 @@ class AnchorGenerator():
         
         return torch.tensor(base_anchors, dtype=torch.float32)  # 做类型转换为pytorch weight通用的float32(否则会因为Numpy原因变float64)
     
-    def grid_anchors(self, featmap_size, stride, device='cuda'):
+    def grid_anchors(self, featmap_size, stride, device=torch.device('cuda')):
         """生成单个特征图的网格anchors, 
         注意：为了后边iou的计算在GPU进行，这里需要把grid anchor的输出放在cuda
         """
         #TODO: 检查是否要送入device
-        device = torch.device(device)
         base_anchors = self.base_anchors.to(device) #(k, 4)
         # 生成原图上的网格坐标
         h, w = featmap_size

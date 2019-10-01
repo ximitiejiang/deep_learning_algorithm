@@ -109,14 +109,15 @@ class Runner():
         self.trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
         self.valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
         
-        data = self.trainset[91]
+#        data = self.trainset[91]
         
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)
         self.valloader = get_dataloader(self.valset, self.cfg.valloader)
         # 创建模型并初始化
+        if self.cfg.load_from is not None or self.cfg.resume_from is not None:
+            self.cfg.backbone.params.pretrained = None  # 如果load_from或resume_from，则不加载pretrained
         self.model = get_root_model(self.cfg)
-        
         # 创建损失函数
         self.loss_fn_clf = get_loss_fn(self.cfg.loss_clf)
         if self.cfg.get('loss_reg', None) is not None:
