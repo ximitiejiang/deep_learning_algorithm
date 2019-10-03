@@ -8,7 +8,7 @@ Created on Tue Sep  3 21:29:33 2019
 import cv2
 from model.runner_lib import Runner
 from utils.evaluation import eval_dataset_det, Predictor
-from utils.tools import parse_log
+from utils.tools import parse_log, timer
 from utils.dataset_classes import get_classes
 from utils.visualization import vis_all_opencv, vis_all_pyplot, vis_cam
 
@@ -45,8 +45,9 @@ if __name__ == "__main__":
         predictor = Predictor(cfg_path,                         
                               load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_11.pth',
                               load_device='cpu')
-        for results in predictor([img]):
-            vis_all_pyplot(*results, class_names=get_classes('voc'), score_thr=0.2)
+        with timer('predict one img'):
+            for results in predictor([img]):
+                vis_all_pyplot(*results, class_names=get_classes('voc'), score_thr=0.2)
     
     if task == 'video': # 测试视频预测结果：注意方法稍有不同，vis_cam需要传入一个predictor
         src = 0  # src可以等于int(cam_id), str(video path), list(img_list)

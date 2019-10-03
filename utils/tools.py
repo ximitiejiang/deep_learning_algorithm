@@ -10,6 +10,7 @@ import os
 import time
 import six
 import pickle
+from contextlib import ContextDecorator
 
 # %%
 """创建一个装饰器，用来统计每个函数的运行时间
@@ -17,12 +18,42 @@ import pickle
 @timeit
 def func(*args, **kwargs):        
 """
-def timeit(func):
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
-    return wrapper
-    
 
+class timer(ContextDecorator):
+    """继承上下文管理装饰器实现一个双功能计时器，既可对函数计时，也可对代码块计时。
+    继承的ContextDecorator实现了一个内部__call__()已生成了一个装饰器，内部建立上下文语义。
+    所以该类是用__call__实现了装饰器计时功能，然后用上下文管理器实现代码块计时。
+    
+    time库的两个函数: time.time()返回的1970开始计时后的float秒数.
+    time.localtime(time.time())返回struct(year,month,day,hour,min,sec,xx,xx,xx)共9个int数.
+    使用方式1:
+        @timer('id1')
+        def fun()
+    使用方式2:
+        with timer('id2'):
+    """
+    def __init__(self, time_id):
+        self.time_id = time_id
+    
+    def __enter__(self):        # 上下文管理器：with执行前执行
+        self.start = time.time()
+        
+    def __exit__(self, *args):  # 上下文管理器：with执行后执行。
+        elapse = time.time() - self.start
+        print('timer: %s elapse %.3f seconds.'%(self.time_id, elapse))
+
+
+@timer('aa')
+def hello(sec):
+    for i in range(5):
+        time.sleep(sec)
+
+def hello2(sec):
+    with timer('position1'):
+        for i in range(5):
+            time.sleep(sec)
+    
+    
 # %%
 
 def accuracy(y_pred, label, topk=1):
@@ -103,7 +134,5 @@ def parse_log(path, show=True):
 # %%
 
 if __name__ == "__main__":
-    path = '/home/ubuntu/mytrain/test.pkl'
-    num = [torch.tensor([1,2,3]), torch.tensor([4,5,6])]
-    save2pkl(num, path, False)
-    aa = loadvar(path)
+    hello(1)
+    hello2(2)
