@@ -13,14 +13,10 @@ import pickle
 from contextlib import ContextDecorator
 
 # %%
-"""创建一个装饰器，用来统计每个函数的运行时间
-使用方法：    
-@timeit
-def func(*args, **kwargs):        
-"""
 
 class timer(ContextDecorator):
     """继承上下文管理装饰器实现一个双功能计时器，既可对函数计时，也可对代码块计时。
+    参考：https://www.jb51.net/article/153872.htm
     继承的ContextDecorator实现了一个内部__call__()已生成了一个装饰器，内部建立上下文语义。
     所以该类是用__call__实现了装饰器计时功能，然后用上下文管理器实现代码块计时。
     

@@ -222,6 +222,7 @@ from model.detector_lib import OneStageDetector
 from model.alexnet_lib import AlexNet, AlexNet8
 from model.ssdvgg16_lib import SSDVGG16
 from model.head_lib import SSDHead, RetinaHead, FCOSHead
+from model.fcn_head import FCN8sHead
 
 models = {
         'one_stage_detector': OneStageDetector,
@@ -230,7 +231,8 @@ models = {
         'ssd_vgg16' : SSDVGG16,
         'ssd_head' : SSDHead,
         'retina_head': RetinaHead,
-        'fcos_head': FCOSHead}
+        'fcos_head': FCOSHead,
+        'fcn8s_head': FCN8sHead}
 
 def get_root_model(cfg):
     """根模型创建：传入根cfg"""

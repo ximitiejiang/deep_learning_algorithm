@@ -13,7 +13,7 @@ class FCN8sHead(nn.Module):
     def __init__(self, 
                  last_channels=512, 
                  num_classes=21, 
-                 n_layers):
+                 n_layers=3):
         super().__init__()
         # 卷积分割头
         self.conv_seg = nn.Sequential(

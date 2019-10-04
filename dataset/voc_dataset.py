@@ -34,20 +34,23 @@ class VOCDataset(BasePytorchDataset):
                  root_path=None,
                  ann_file=None,
                  subset_path=None,
-                 seg_prefix=None,
                  img_transform=None,
                  label_transform=None,
                  bbox_transform=None,
                  aug_transform=None,
+                 seg_transform=None,
                  data_type=None,
+                 with_seg=None,
                  with_difficult=False):
         self.with_difficult = with_difficult
+        self.with_seg = with_seg
         self.data_type = data_type
         # 变换函数
         self.img_transform = img_transform
         self.label_transform = label_transform
         self.bbox_transform = bbox_transform
         self.aug_transform = aug_transform
+        self.seg_transform = seg_transform
         
         self.ann_file = ann_file
         self.subset_path = subset_path
@@ -71,6 +74,7 @@ class VOCDataset(BasePytorchDataset):
             for img_id in img_ids:
                 img_file = self.subset_path[i] + 'JPEGImages/{}.jpg'.format(img_id)
                 xml_file = self.subset_path[i] + 'Annotations/{}.xml'.format(img_id)
+                seg_file = self.subset_path[i] + 'SegmentationObject/{}.png'.format(img_id)
                 # 解析xml文件
                 # TODO: 这部分解析是否可去除，原本只是为了获得img的w,h,在img_transform里边已经搜集
                 tree = ET.parse(xml_file)
@@ -80,6 +84,12 @@ class VOCDataset(BasePytorchDataset):
                 height = int(size.find('height').text) 
                 
                 img_anns.append(dict(img_id=img_id, img_file=img_file, xml_file=xml_file, width=width, height=height))
+                # 补充segment file路径信息
+                segmented = int(root.find('segmented').text)
+                if segmented:
+                    img_anns[-1].update(seg_file=seg_file)
+                else:
+                    img_anns[-1].update(seg_file=None)
         return img_anns
     
     def parse_ann_info(self, idx):
@@ -164,12 +174,6 @@ class VOCDataset(BasePytorchDataset):
             scale_factor = None
             flip = None
         
-        # TODO: 增加分割数据
-        if self.seg_prefix:
-            gt_seg = cv2.imread()   # jpg换成png就是分割数据
-            gt_seg = self.seg_transform()
-            
-        
         # 组合img_meta
         img_meta = dict(ori_shape = ori_shape,
                         scale_shape = scale_shape,
@@ -181,7 +185,14 @@ class VOCDataset(BasePytorchDataset):
                     img_meta = img_meta,
                     gt_bboxes = gt_bboxes,
                     gt_labels = gt_labels,
-                    stack_list = ['img'])
+                    stack_list = ['img','gt_seg'])
+        
+        # TODO: 增加分割数据
+        if self.with_seg and img_info['seg_file'] is not None:
+            seg_path = self.img_anns[idx]['seg_file']
+            gt_seg = cv2.imread(seg_path)   # (h,w,3)
+            gt_seg = self.seg_transform(gt_seg)
+            data.update(gt_seg = gt_seg)
         # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片
         while True:
             if len(gt_bboxes) == 0:
