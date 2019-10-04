@@ -19,6 +19,8 @@ def eval_map(det_results,
     通过设置iou_thr的阈值来评估在预测结果大于某个iou阈值情况下的所有类的平均精度
     最常见的是评估iou_thr=0.5的平均精度，也就是iou>0.5为预测正确，否则为预测错误(也是voc数据集的评测标准)
     更严苛的是评估iou(0.05-0.95)之间的平均精度(比如coco数据集的评测标准)
+    计算map过程：先基于预测结果计算tp,fp,然后基于tp,fp计算recalls, precisions， 然后计算单类ap，最后计算所有类的mAP
+    
     args:
         det_results: (n_imgs, )(n_classes, )(k, 5)，是按照img数量，嵌套类别数量，嵌套每个类别的box预测(4列坐标和1列置信度，类别顺序就代表标签)
         gt_bboxes: (n_imgs, )(k, 4)
@@ -39,7 +41,7 @@ def eval_map(det_results,
         # 计算单图单类的统计结果
         tpfp = []
         for j in range(num_imgs):
-            tpfp.append(tpfp_default(det_cls[j], gt_bboxes_cls[j], iou_thr))
+            tpfp.append(tpfp(det_cls[j], gt_bboxes_cls[j], iou_thr))
         tp, fp = tuple(zip(*tpfp))  # tp格式(n_imgs,)(1,k),k表示该图有k个预测det
         # 计算总共的gt bboxes个数
         num_gts = 0
@@ -96,7 +98,7 @@ def get_one_class_results(class_id, det_results, gt_bboxes, gt_labels):
     return det_results_cls, gt_bboxes_cls  # (n_imgs,)(k,5),  (n_imgs,)(k, 4)
 
 
-def tpfp_default(det_bboxes, gt_bboxes, iou_thr):
+def tpfp(det_bboxes, gt_bboxes, iou_thr):
     """统计单张图的两组bboxes下，真阳性样本和假阳性样本的数量
     tpfp代表true positive, false positive, 表示对真阳性和假阳性的统计
     args:

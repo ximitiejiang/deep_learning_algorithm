@@ -34,6 +34,7 @@ class VOCDataset(BasePytorchDataset):
                  root_path=None,
                  ann_file=None,
                  subset_path=None,
+                 seg_prefix=None,
                  img_transform=None,
                  label_transform=None,
                  bbox_transform=None,
@@ -162,8 +163,14 @@ class VOCDataset(BasePytorchDataset):
             pad_shape = None
             scale_factor = None
             flip = None
-        # 组合img_meta
         
+        # TODO: 增加分割数据
+        if self.seg_prefix:
+            gt_seg = cv2.imread()   # jpg换成png就是分割数据
+            gt_seg = self.seg_transform()
+            
+        
+        # 组合img_meta
         img_meta = dict(ori_shape = ori_shape,
                         scale_shape = scale_shape,
                         pad_shape = pad_shape,

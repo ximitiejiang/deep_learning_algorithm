@@ -10,15 +10,20 @@ import torch
 
 # %%
 class AnchorGenerator():
-    """生成base anchors和grid anchors"""
-    def __init__(self, base_size, scales, ratios, ctr=None, scale_major=False):
+    """生成base anchors和grid anchors
+    其中base anchor的生成方式，可以通过基础参数计算得到，也可以直接提供base anchor(比如线下通过kmean获得的base anchor)
+    """
+    def __init__(self, base_size=None, scales=None, ratios=None, ctr=None, 
+                 scale_major=False, base_anchors=None):
         self.base_size = base_size
         self.scales = np.array(scales)
         self.ratios = np.array(ratios)
         self.scale_major = scale_major
         self.ctr = ctr
-        
-        self.base_anchors = self.get_base_anchors()
+        if base_anchors is None:
+            self.base_anchors = self.get_base_anchors()  # 采用常规的方式生成base anchors
+        else:
+            self.base_anchors = base_anchors   # 提供通过kmean生成的base anchors
     
     def get_base_anchors(self): 
         """生成单个特征图的base anchors
@@ -50,7 +55,7 @@ class AnchorGenerator():
     def grid_anchors(self, featmap_size, stride, device=torch.device('cuda')):
         """生成单个特征图的网格anchors
         """
-        #TODO: 检查是否要送入device
+        #确保生成的anchor跟特征结果在同一device
         base_anchors = self.base_anchors.to(device) #(k, 4)
         # 生成原图上的网格坐标
         h, w = featmap_size

@@ -109,6 +109,7 @@ def eval_dataset_det(cfg_path,
     voc_eval(all_bbox_cls, dataset, iou_thr=0.5)
     
     
+from utils.tools import timer    
 class Predictor():
     """用于对图片(非数据集的情况)进行预测计算，生成待显示的数据
     src: 可以输入img or img_list
@@ -132,7 +133,8 @@ class Predictor():
         for img in src:
             img_data = img_loader(img, self.cfg)
             with torch.no_grad():
-                bbox_det = self.model(**img_data, return_loss=False)  # (n_class,)(k,5)
+                with timer('predict one img'):  # 检测一张图片的时间
+                    bbox_det = self.model(**img_data, return_loss=False)  # (n_class,)(k,5)
                 # 整理成显示需要的形式
                 labels = [np.full((bbox.shape[0],), i, dtype=np.int32) for i, bbox in enumerate(bbox_det)] # 用i作为label填充，由于要获取class name,这里label改成0-19
                 labels = np.concatenate(labels, axis=0)  # (m, )

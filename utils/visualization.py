@@ -127,21 +127,37 @@ def vis_img_bbox(img, bboxes, labels, class_names=None,
         cv2.putText(
             img, label_text, (bbox_int[0], bbox_int[1] - 2),     # 字体选择cv2.FONT_HERSHEY_DUPLEX, 比cv2.FONT_HERSHEY_COMPLEX好一点
             cv2.FONT_HERSHEY_DUPLEX, font_scale, [255,255,255])
-    cv2.imshow('result', img)  
+    cv2.imshow('result', img)
+    return img
 
 
 def vis_bbox(bboxes, img=None):
-    """绘制一组bboxes(n,4): (xmin,ymin,xmax,ymax)"""
+    """绘制一组bboxes, (n,4) or (n,2): 
+    如果是2-points模式，输入bboxes为(xmin,ymin,xmax,ymax)
+    如果是wh模式，输入bboxes为(w, h)
+    """
     if img is None:
-        img = np.zeros((300, 300)).astype(np.uint8)
+        img = 255 * np.zeros((500, 500, 3)).astype(np.uint8)  # 必须设置成3通道，否则无法显示颜色的线条；必须设置成uint8否则无法被opencv显示。
+    x_ctr = img.shape[1] / 2
+    y_ctr = img.shape[0] / 2
+    
     if isinstance(bboxes, torch.Tensor):
         bboxes = bboxes.numpy()
-    bboxes_int = bboxes.astype(np.int32)
-    for bbox in bboxes_int:
-        left_top = (bbox[0], bbox[1])
-        right_bottom = (bbox[2], bbox[3])
-        cv2.rectangle(img, left_top, right_bottom, (0,255,0), thickness=1)
+    bboxes = bboxes.astype(np.int32)
+    # 如果是4点模式，则绘制bbox在真实位置
+    if bboxes.shape[1] == 4:
+        for bbox in bboxes:
+            left_top = (bbox[0], bbox[1])
+            right_bottom = (bbox[2], bbox[3])
+            cv2.rectangle(img, left_top, right_bottom, (0,255,0), thickness=1)
+    # 如果是宽高模式，则绘制bbox在图片中心
+    elif bboxes.shape[1] == 2:  
+        for bbox in bboxes:
+            left_top = (int(x_ctr - bbox[0] / 2), int(y_ctr - bbox[1] / 2))
+            right_bottom = (int(x_ctr + bbox[0] / 2), int(y_ctr + bbox[1] / 2))
+            cv2.rectangle(img, left_top, right_bottom, [0, 255, 0], thickness=1)
     cv2.imshow('bboxes', img)
+    return img
 
 
 def vis_all_opencv(img, bboxes, scores, labels, class_names=None, score_thr=0, 
@@ -211,7 +227,6 @@ def vis_all_opencv(img, bboxes, scores, labels, class_names=None, score_thr=0,
     if show:
         cv2.imshow(win_name, img)
     return img
-
 
 
 def vis_all_pyplot(img, bboxes, scores=None, labels=None, class_names=None, score_thr=0, 
@@ -481,5 +496,9 @@ def kmean(data, k):
     centers = _kmean.cluster_centers_
     return centers
     
+
+if __name__ == '__main__':
+    bboxes = np.array([[20,30], [50,70], [100,200],[200,300]])
     
+    vis_bbox(bboxes)    
     
