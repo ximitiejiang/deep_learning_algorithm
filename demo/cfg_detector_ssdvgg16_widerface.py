@@ -125,16 +125,16 @@ trainset = dict(
         params=dict(
                 root_path=data_root_path, 
                 ann_file=[data_root_path + 'train.txt'], #分为train.txt, val.txt, trainval.txt, test.txt
-                subset_path=[data_root_path + 'WIDER_train/'],
-                data_type='train'))
+                img_prefix=[data_root_path + 'WIDER_train/'],
+                ))
 valset = dict(
         type='widerface',
         repeat=0,
         params=dict(
                 root_path=data_root_path, 
                 ann_file=[data_root_path + 'val.txt'],   #注意只有2007版本有test.txt，到2012版取消了。
-                subset_path=[data_root_path + 'WIDER_val/'],                         
-                data_type='test'))
+                img_prefix=[data_root_path + 'WIDER_val/'],                         
+                ))
 
 trainloader = dict(
         params=dict(

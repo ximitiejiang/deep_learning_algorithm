@@ -106,17 +106,17 @@ trainset = dict(
                 root_path=data_root_path, 
                 ann_file=[data_root_path + 'VOC2007/ImageSets/Main/trainval.txt',
                           data_root_path + 'VOC2012/ImageSets/Main/trainval.txt'], #分为train.txt, val.txt, trainval.txt, test.txt
-                subset_path=[data_root_path + 'VOC2007/',
+                img_prefix=[data_root_path + 'VOC2007/',
                           data_root_path + 'VOC2012/'],
-                data_type='train'))
+                ))
 valset = dict(
         type='voc',
         repeat=0,
         params=dict(
                 root_path=data_root_path, 
                 ann_file=[data_root_path + 'VOC2007/ImageSets/Main/test.txt'],
-                subset_path=[data_root_path + 'VOC2007/'],                         #注意只有2007版本有test.txt，到2012版取消了。
-                data_type='test'))
+                img_prefix=[data_root_path + 'VOC2007/'],                         #注意只有2007版本有test.txt，到2012版取消了。
+                ))
 
 trainloader = dict(
         params=dict(

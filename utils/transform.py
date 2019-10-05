@@ -390,18 +390,63 @@ class BboxTransform():
 
 
 class SegmentTransform():
-    """分割变换: seg(h, w, 3), 需要基于img的变换结果进行变换，主要收到scale, flip的影响
+    """对语义分割图semantic segmentation(一般是png图片)进行预处理：seg(h, w, 3), 主要收到scale, flip, pad的影响
     """
-    def __init__(self, to_tensor=None):
+
+    def __init__(self, to_tensor, size_divisor=None):
         self.to_tensor = to_tensor
-    
-    def __call__(self, seg, scale_factor, flip):
-        gt_seg = seg * scale_factor
+        self.size_divisor = size_divisor
+
+    def __call__(self, img, scale, flip=False, keep_ratio=True):
+        if keep_ratio:
+            img = imrescale(img, scale, interpolation='nearest')  # 
+        else:
+            img = imresize(img, scale, interpolation='nearest')
         if flip:
-            gt_seg
+            img = imflip(img)
+        if self.size_divisor is not None:
+            img = impad_to_multiple(img, self.size_divisor)
         if self.to_tensor:
-            gt_seg = to_tensor(gt_seg)
-        return gt_seg
+            img = to_tensor(img)
+        return img
+
+
+class MaskTransform():
+    """对mask进行变化。
+    注意：mask跟segment map的区别，两者都是用来做分割任务的训练数据。
+    其中segment map是voc中用来做语义分割或者实例分割的png完整图片。
+    而mask是coco中用来做分割的一组数据，并不是图片。
+    """
+    def __init__(self, to_tensor):
+        self.to_tensor = to_tensor
+        
+    def __call__(self, masks, pad_shape, scale_factor, flip=False):
+        # aspect ratio unchanged
+        if isinstance(scale_factor, float):
+            masks = [
+                imrescale(mask, scale_factor, interpolation='nearest')
+                for mask in masks
+            ]
+        # aspect ratio changed
+        else:
+            w_ratio, h_ratio = scale_factor[:2]
+            if masks:
+                h, w = masks[0].shape[:2]
+                new_h = int(np.round(h * h_ratio))
+                new_w = int(np.round(w * w_ratio))
+                new_size = (new_w, new_h)
+                masks = [
+                    imresize(mask, new_size, interpolation='nearest')
+                    for mask in masks
+                ]
+        if flip:
+            masks = [mask[:, ::-1] for mask in masks]
+        padded_masks = [
+            impad(mask, pad_shape[:2], pad_val=0) for mask in masks
+        ]
+        padded_masks = np.stack(padded_masks, axis=0)
+        return padded_masks
+
     
 """
 from albumentations import (
