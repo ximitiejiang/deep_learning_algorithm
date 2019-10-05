@@ -8,20 +8,27 @@ Created on Fri Aug 16 18:40:47 2019
 import numpy as np
 import cv2
 import xml.etree.ElementTree as ET
+from PIL import Image
 
 from dataset.base_dataset import BasePytorchDataset
 
 class VOCDataset(BasePytorchDataset):
     """VOC数据集：用于物体分类和物体检测
     2007版+2012版数据总数16551(5011 + 11540), 可以用2007版做小数据集试验。
-    主要涉及3个文件夹：ImageSets/Main/文件夹中包含.txt文件作为ann_file存放图片名称列表。
-                        (一般包含有所有类别的train.txt, val.txt, trainval.txt, test.txt，也包含有每种类别的，所以可以抽取其中几种做少类别二分类或多分类数据集)
-                      JPEGImages/文件夹包含.jpg文件，基于图片名称列表进行调用
-                      Annotations/文件夹包含.xml文件，基于图片名称列表进行调用
+    主要涉及3个文件夹：
+        - ImageSets:  txt主体索引文件
+                * main: 所有图片名索引，以及每一类的图片名索引(可用来做其中某几类的训练)
+                * Segmentation: 所有分割图片名索引
+        - Annotations: xml标注文件(label,bbox)
+        - JPEGImages: jpg图片文件(img)
+        - labels: txt标签文件
+        - SegmentationClass: png语义分割文件(mask)
+        - SegmentationObject: png实例分割文件(seg)
     输入：
-        root_path
-        ann_file
-        subset_path
+        root_path: 根目录
+        ann_file: 标注文件xml目录
+        subset_path: 子数据集目录，比如2007， 2012
+        seg_prefix: 分割数据目录，从而识别是用语义分割数据还是用实例分割数据
         difficult: 困难bbox(voc中有部分bbox有标记为困难，比如比较密集的bbox，当前手段较难分类和回归)，一般忽略
     """
     
@@ -34,16 +41,17 @@ class VOCDataset(BasePytorchDataset):
                  root_path=None,
                  ann_file=None,
                  subset_path=None,
+                 seg_prefix=None,
                  img_transform=None,
                  label_transform=None,
                  bbox_transform=None,
                  aug_transform=None,
                  seg_transform=None,
                  data_type=None,
-                 with_seg=None,
                  with_difficult=False):
+        
         self.with_difficult = with_difficult
-        self.with_seg = with_seg
+        self.seg_prefix = seg_prefix
         self.data_type = data_type
         # 变换函数
         self.img_transform = img_transform
@@ -74,7 +82,7 @@ class VOCDataset(BasePytorchDataset):
             for img_id in img_ids:
                 img_file = self.subset_path[i] + 'JPEGImages/{}.jpg'.format(img_id)
                 xml_file = self.subset_path[i] + 'Annotations/{}.xml'.format(img_id)
-                seg_file = self.subset_path[i] + 'SegmentationObject/{}.png'.format(img_id)
+                seg_file = self.subset_path[i] + self.seg_prefix + '{}.png'.format(img_id)
                 # 解析xml文件
                 # TODO: 这部分解析是否可去除，原本只是为了获得img的w,h,在img_transform里边已经搜集
                 tree = ET.parse(xml_file)
@@ -86,7 +94,7 @@ class VOCDataset(BasePytorchDataset):
                 img_anns.append(dict(img_id=img_id, img_file=img_file, xml_file=xml_file, width=width, height=height))
                 # 补充segment file路径信息
                 segmented = int(root.find('segmented').text)
-                if segmented:
+                if segmented:   # 只有在包含segmented这个flag时，才存入seg file的路径，否则存入None
                     img_anns[-1].update(seg_file=seg_file)
                 else:
                     img_anns[-1].update(seg_file=None)
@@ -188,10 +196,12 @@ class VOCDataset(BasePytorchDataset):
                     stack_list = ['img','gt_seg'])
         
         # TODO: 增加分割数据
-        if self.with_seg and img_info['seg_file'] is not None:
+        if self.seg_prefix is not None and img_info['seg_file'] is not None:
             seg_path = self.img_anns[idx]['seg_file']
-            gt_seg = cv2.imread(seg_path)   # (h,w,3)
-            gt_seg = self.seg_transform(gt_seg)
+            gt_seg = cv2.imread(seg_path)   # (h,w,3) or (h,w,3)
+            gt_seg = self.seg_transform(gt_seg.squeeze(), scale_factor, flip)
+            gt_seg = imrescale(gt_seg, seg_scale_factor, interpolation='nearest')
+            gt_seg = gt_seg[None, ...]
             data.update(gt_seg = gt_seg)
         # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片
         while True:

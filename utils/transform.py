@@ -349,31 +349,9 @@ class ImgTransform():
             img = to_tensor(img)
         return (img, ori_shape, scale_shape, pad_shape, scale_factor, flip)
 
-    
-class BboxTransform():
-    """Bbox变换类: 这个变换比较特殊，他需要基于img_transform的结果进行变换。
-    所以初始化时不输入什么参数，而在call的时候输入所有变换参数。
-    注意：bbox的变换顺序需要跟img一致，由于img是先scale再flip，所以bbox也采用先scale再flip
-    因此输入用于flip的shape也应该是scale之后的shape
-    """
-    def __init__(self, to_tensor=None):
-        self.to_tensor = to_tensor
-        
-    def __call__(self, bboxes, img_shape, scale_factor, flip):
-        gt_bboxes = bboxes * scale_factor
-        
-        if flip:
-            gt_bboxes = bbox_flip(gt_bboxes, img_shape, flip_type='h')
-        gt_bboxes[:, 0::2] = np.clip(gt_bboxes[:, 0::2], 0, img_shape[1])
-        gt_bboxes[:, 1::2] = np.clip(gt_bboxes[:, 1::2], 0, img_shape[0])
-        
-        if self.to_tensor:
-            gt_bboxes = to_tensor(gt_bboxes)
-        return gt_bboxes
-
 
 class LabelTransform():
-
+    """标签变换：通常不受别的变换影响"""
     def __init__(self, to_tensor=None, to_onehot=None):
         self.to_tensor = to_tensor
         self.to_onehot = to_onehot
@@ -387,6 +365,43 @@ class LabelTransform():
             label = to_tensor(label)
             
         return label
+    
+    
+class BboxTransform():
+    """Bbox变换类: bboxes(m, 4), 这个变换比较特殊，需要基于img_transform的结果进行变换。
+    所以初始化时不输入什么参数，而在call的时候输入所有变换参数。
+    注意：bbox的变换顺序需要跟img一致，由于img是先scale再flip，所以bbox也采用先scale再flip
+    因此输入用于flip的shape也应该是scale之后的shape
+    """
+    def __init__(self, to_tensor=None):
+        self.to_tensor = to_tensor
+        
+    def __call__(self, bboxes, img_shape, scale_factor, flip):
+        gt_bboxes = bboxes * scale_factor   # (m, 4) * (4,) -> (m, 4)
+        
+        if flip:
+            gt_bboxes = bbox_flip(gt_bboxes, img_shape, flip_type='h')
+        gt_bboxes[:, 0::2] = np.clip(gt_bboxes[:, 0::2], 0, img_shape[1])
+        gt_bboxes[:, 1::2] = np.clip(gt_bboxes[:, 1::2], 0, img_shape[0])
+        
+        if self.to_tensor:
+            gt_bboxes = to_tensor(gt_bboxes)
+        return gt_bboxes
+
+
+class SegmentTransform():
+    """分割变换: seg(h, w, 3), 需要基于img的变换结果进行变换，主要收到scale, flip的影响
+    """
+    def __init__(self, to_tensor=None):
+        self.to_tensor = to_tensor
+    
+    def __call__(self, seg, scale_factor, flip):
+        gt_seg = seg * scale_factor
+        if flip:
+            gt_seg
+        if self.to_tensor:
+            gt_seg = to_tensor(gt_seg)
+        return gt_seg
     
 """
 from albumentations import (
@@ -420,7 +435,7 @@ class AugmentTransform():
 
 from utils.visualization import vis_img_bbox
 from utils.tools import get_time_str
-def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_names=None,show=False,save=None):
+def transform_inv(img, bboxes=None, labels=None, seg=None, mean=None, std=None, class_names=None,show=False,save=None):
     """图片和bbox的逆变换和显示，为了简化处理，不做scale/flip的逆变换，这样便于跟bbox统一比较
     注意，逆变换过程需要注意的地方很多，尽可能用这个函数完成。
     args:

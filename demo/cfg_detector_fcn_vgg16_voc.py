@@ -124,19 +124,20 @@ trainset = dict(
         repeat=0,
         params=dict(
                 root_path=data_root_path, 
-                ann_file=[data_root_path + 'VOC2007/ImageSets/Main/trainval.txt',
-                          data_root_path + 'VOC2012/ImageSets/Main/trainval.txt'], #分为train.txt, val.txt, trainval.txt, test.txt
+                ann_file=[data_root_path + 'VOC2007/ImageSets/Segmentation/trainval.txt',  # 分为train.txt, val.txt, trainval.txt, test.txt
+                          data_root_path + 'VOC2012/ImageSets/Segmentation/trainval.txt'], # 注意，分割任务的ann file需要采用纯分割的ann file
                 subset_path=[data_root_path + 'VOC2007/',
                           data_root_path + 'VOC2012/'],
-                with_seg=True,
+                seg_prefix='SegmentationClass/',     # 识别是用SegmentationClass还是用SegmentationObject
                 data_type='train'))
 valset = dict(
         type='voc',
         repeat=0,
         params=dict(
                 root_path=data_root_path, 
-                ann_file=[data_root_path + 'VOC2007/ImageSets/Main/test.txt'],   #注意只有2007版本有test.txt，到2012版取消了。
-                subset_path=[data_root_path + 'VOC2007/'],                         
+                ann_file=[data_root_path + 'VOC2007/ImageSets/Segmentation/test.txt'],   #注意只有2007版本有test.txt，到2012版取消了。
+                subset_path=[data_root_path + 'VOC2007/'],  
+                seg_prefix='SegmentationClass/',                       
                 data_type='test'))
 
 trainloader = dict(
