@@ -238,8 +238,12 @@ def to_tensor(data):
     if isinstance(data, float): # python3中只有一种浮点数类型float，没有其他类型
         return torch.FloatTensor([data])
     
-    if isinstance(data, np.ndarray):  # numpy to tensor
+    if isinstance(data, np.ndarray) and data.ndim >= 3:  # img numpy to tensor
         return torch.from_numpy(data)
+    
+    if isinstance(data, np.ndarray) and data.ndim == 2:  # seg numpy to tensor
+        return torch.LongTensor(data)
+    
     if isinstance(data, torch.Tensor): # tensor to tensor
         return data
     if isinstance(data, list):   # list to tensor (注意字符串不能转tensor)
@@ -279,7 +283,38 @@ def get_dataset_norm_params(dataset):
     mean = np.mean(all_means, axis=0)
     std = np.mean(all_stds, axis=0)   # 注意这里是求所有图片的平均std, 而不是std的std
     return mean, std
-    
+
+
+from utils.colors import get_pallete    
+def label2color(img, pallete='voc'):
+    """用于把标签mask转换为颜色
+    ags:
+        img: (h, w), 其中的每个像素值为0~20,代表某一类别。
+        pallete: (m, 3)
+    """
+    colors = get_pallete(pallete)
+    h, w = img.shape
+    new_img = np.zeros((h, w, 3))
+    for i in range(h):
+        for j in range(w):
+            new_img[i, j, :] = colors[int(img[i, j])]
+    return new_img
+
+# TODO: 待完成，待确认pallete是BGR还是RGB
+def color2label(img, pallete='voc'):
+    """用于把segment的bgr颜色转换为标签代码, 其中
+    args:
+        img: (h, w, 3)分割图片，其中通道c顺序为bgr顺序
+        pallete: (m,3)为颜色调色板
+    """
+    colors = get_pallete(pallete)
+    h, w = img.shape[:2]
+    new_img = np.zeros((h, w))
+    for i in range(h):
+        for j in range(w):
+            pass
+    return new_img
+
     
 # %% 变换类
 class ImgTransform():
@@ -389,23 +424,35 @@ class BboxTransform():
         return gt_bboxes
 
 
-class SegmentTransform():
+class SegTransform():
     """对语义分割图semantic segmentation(一般是png图片)进行预处理：seg(h, w, 3), 主要收到scale, flip, pad的影响
     """
 
-    def __init__(self, to_tensor, size_divisor=None):
+    def __init__(self, to_tensor=None, scale=None, keep_ratio=None, size_divisor=None, seg_scale_factor=None):
         self.to_tensor = to_tensor
+        self.scale = scale
+        self.keep_ratio = keep_ratio
         self.size_divisor = size_divisor
+        self.seg_scale_factor = seg_scale_factor
 
-    def __call__(self, img, scale, flip=False, keep_ratio=True):
-        if keep_ratio:
-            img = imrescale(img, scale, interpolation='nearest')  # 
-        else:
-            img = imresize(img, scale, interpolation='nearest')
+    def __call__(self, img, flip):
+        # 缩放
+        if self.scale is not None and self.keep_ratio: # 如果是固定比例缩放
+            img = imrescale(img, self.scale, interpolation='nearest', return_scale=False)
+        elif self.scale is not None and not self.keep_ratio: #　如果不固定比例缩放
+            img = imresize(img, self.scale, interpolation='nearest', return_scale=False)
+        # 翻转
         if flip:
             img = imflip(img)
+        # pad
         if self.size_divisor is not None:
             img = impad_to_multiple(img, self.size_divisor)
+        # 忽略标签中的255，把他用0代替，作为背景
+        img[img == 255] = 0
+        # 额外一个seg scale
+        if self.seg_scale_factor is not None:
+            img = imrescale(img, self.seg_scale_factor, interpolation='nearest')
+        # tensor
         if self.to_tensor:
             img = to_tensor(img)
         return img
@@ -480,21 +527,22 @@ class AugmentTransform():
 
 from utils.visualization import vis_img_bbox
 from utils.tools import get_time_str
-def transform_inv(img, bboxes=None, labels=None, seg=None, mean=None, std=None, class_names=None,show=False,save=None):
+def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_names=None,show=False,save=None):
     """图片和bbox的逆变换和显示，为了简化处理，不做scale/flip的逆变换，这样便于跟bbox统一比较
     注意，逆变换过程需要注意的地方很多，尽可能用这个函数完成。
     args:
-        img: (c,h,w)
+        img: (c,h,w), 可以是img or segmap
         bboxes: (n,4)
         labels: (n)
     """
     # 为了便于计算时广播，变换成一维array
-    mean = np.array(mean).reshape(-1)
-    std = np.array(std).reshape(-1)
+    if mean is not None:
+        mean = np.array(mean).reshape(-1)
+        std = np.array(std).reshape(-1)
     # tensor to array, to cpu
     if isinstance(img, torch.Tensor):
         img = img.cpu()
-    img = img.numpy()
+        img = img.numpy()
     if bboxes is not None:
         if isinstance(bboxes, torch.Tensor):
             bboxes = bboxes.cpu()

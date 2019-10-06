@@ -59,7 +59,7 @@ from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
 from dataset.voc_dataset import VOCDataset
 from dataset.ants_bees_dataset import AntsBeesDataset
 from dataset.widerface_dataset import WIDERFaceDataset
-from utils.transform import ImgTransform, BboxTransform, LabelTransform
+from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform, MaskTransform
 
 class RepeatDataset(object):
 
@@ -83,24 +83,33 @@ def get_dataset(dataset_cfg, transform_cfg):
     """
     datasets = {'cifar10' : Cifar10Dataset,
                 'cifar100' : Cifar100Dataset,
-                'voc':VOCDataset,
+                'voc' : VOCDataset,
                 'antsbees': AntsBeesDataset,
                 'widerface': WIDERFaceDataset}
     img_transform = None
     label_transform = None
-    bbox_transform = None    
+    bbox_transform = None
+    aug_transform = None
+    mask_transform = None
+    seg_transform = None
     
     if transform_cfg.get('img_params') is not None:
         img_p = transform_cfg['img_params']
         img_transform = ImgTransform(**img_p)
-        # 只要创建了img transform，就自动创建label transform，且必然跟img transform同步执行(因为包含to tensor操作) 
+    if transform_cfg.get('label_params') is not None:    
         label_p = transform_cfg['label_params']
         label_transform = LabelTransform(**label_p)
     if transform_cfg.get('bbox_params') is not None:        
         # 且由于bbox_transform比较特殊，大部分变换参数取决于img_transform，因此在call的时候输入
         bbox_p = transform_cfg['bbox_params']
         bbox_transform = BboxTransform(**bbox_p)
-    
+    if transform_cfg.get('seg_params') is not None:
+        seg_p = transform_cfg['seg_params']
+        seg_transform = SegTransform(**seg_p)
+    if transform_cfg.get('mask_params') is not None:
+        mask_p = transform_cfg['mask_params']
+        mask_transform = MaskTransform(**mask_p)
+        
     dataset_name = dataset_cfg.get('type')
     dataset_class = datasets[dataset_name]
     params = dataset_cfg.get('params', None)
@@ -109,7 +118,10 @@ def get_dataset(dataset_cfg, transform_cfg):
     dset = dataset_class(**params, 
                          img_transform=img_transform,
                          label_transform=label_transform,
-                         bbox_transform=bbox_transform)    
+                         bbox_transform=bbox_transform,
+                         aug_transform=aug_transform,
+                         seg_transform=seg_transform,
+                         mask_transform=mask_transform)    
     if repeat:
         return RepeatDataset(dset, repeat)
     else:
@@ -159,12 +171,22 @@ def dict_collate(batch):
     for i, name in enumerate(batch[0].keys()):  # 第i个变量的堆叠
         if name in stack_list:  # 如果需要堆叠
             data_list = [sample[name] for sample in batch]
-            shapes = np.stack([data.shape for data in data_list], axis=0)
-            max_c, max_h, max_w =  np.max(shapes, axis=0)
-            stacked = torch.zeros(len(batch), max_c, max_h, max_w)  # b,c,h,w
-            for dim in range(len(batch)):
-                data = data_list[dim]
-                stacked[dim,:data.shape[0],:data.shape[1],:data.shape[2]] = data #
+            shapes = np.stack([data.shape for data in data_list], axis=0) # (k, 3) or (k, 2)
+            # 如果是3维img的堆叠
+            if len(shapes[0]) == 3:   
+                max_c, max_h, max_w = np.max(shapes, axis=0)
+                stacked = data_list[0].new_zeros(len(batch), max_c, max_h, max_w)  # b,c,h,w
+                for dim in range(len(batch)):
+                    data = data_list[dim]
+                    stacked[dim,:data.shape[0], :data.shape[1], :data.shape[2]] = data #
+            # 如果是二维seg的堆叠
+            elif len(shapes[0]) == 2: 
+                max_h, max_w = np.max(shapes, axis=0)
+                stacked = data_list[0].new_zeros(len(batch), max_h, max_w)  # b, h, w
+                for dim in range(len(batch)):
+                    data = data_list[dim]
+                    stacked[dim, :data.shape[0], :data.shape[1]] = data
+                    
             result[name] = stacked
         else:  # 如果不需要堆叠: 则放入一个list,即 [tensor1, tensor2..]
             result[name] = [sample[name] for sample in batch]
@@ -218,17 +240,20 @@ def get_dataloader(dataset, dataloader_cfg):
         
 
 # %%
-from model.detector_lib import OneStageDetector
+from model.detector_lib import OneStageDetector, Segmentator
 from model.alexnet_lib import AlexNet, AlexNet8
 from model.ssdvgg16_lib import SSDVGG16
+from model.fcnvgg16_lib import FCNVGG16
 from model.head_lib import SSDHead, RetinaHead, FCOSHead
 from model.fcn_head import FCN8sHead
 
 models = {
         'one_stage_detector': OneStageDetector,
+        'segmentator' : Segmentator,
         'alexnet8' : AlexNet8,
         'alexnet' : AlexNet,
         'ssd_vgg16' : SSDVGG16,
+        'fcn_vgg16' : FCNVGG16,
         'ssd_head' : SSDHead,
         'retina_head': RetinaHead,
         'fcos_head': FCOSHead,

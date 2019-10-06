@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 import xml.etree.ElementTree as ET
 from PIL import Image
-
+from utils.transform import imrescale
 from dataset.base_dataset import BasePytorchDataset
 
 class VOCDataset(BasePytorchDataset):
@@ -22,7 +22,7 @@ class VOCDataset(BasePytorchDataset):
         - Annotations: xml标注文件(label,bbox)
         - JPEGImages: jpg图片文件(img)
         - labels: txt标签文件(没用到)
-        - SegmentationClass: png语义分割文件(mask)
+        - SegmentationClass: png语义分割文件(seg)
         - SegmentationObject: png实例分割文件(seg)
     输入：
         root_path: 根目录
@@ -48,6 +48,7 @@ class VOCDataset(BasePytorchDataset):
                  label_transform=None,
                  bbox_transform=None,
                  aug_transform=None,
+                 mask_transform=None,
                  seg_transform=None):
         
         self.ann_file = ann_file
@@ -154,62 +155,66 @@ class VOCDataset(BasePytorchDataset):
     def __getitem__(self, idx):
         """虽然ann中有解析出difficult的情况，但这里简化统一没有处理difficult的情况，只对标准数据进行输出。
         """
-        # 如果是检测任务：提供的是jpg
-        if self.seg_prefix is None:
-            # 读取图片
-            img_info = self.img_anns[idx]
-            img_path = img_info['img_file']
-            
-            img = cv2.imread(img_path)
-            
-            # 读取bbox, label
-            ann_dict = self.parse_ann_info(idx)
-            gt_bboxes = ann_dict['bboxes']
-            gt_labels = ann_dict['labels']
-    
-            # aug transform
-            if self.aug_transform is not None:
-                img, gt_bboxes, gt_labels = self.aug_transform(img, gt_bboxes, gt_labels)
-            # basic transform
-            if self.img_transform is not None:    
-                # img transform
-                img, ori_shape, scale_shape, pad_shape, scale_factor, flip = self.img_transform(img)
-                # bbox transform: 传入的是scale_shape而不是ori_shape        
-                gt_bboxes = self.bbox_transform(gt_bboxes, scale_shape, scale_factor, flip)
-                # label transform
-                gt_labels = self.label_transform(gt_labels)
-            else:
-                ori_shape = None
-                scale_shape = None
-                pad_shape = None
-                scale_factor = None
-                flip = None
-            
-            # 组合img_meta
-            img_meta = dict(ori_shape = ori_shape,
-                            scale_shape = scale_shape,
-                            pad_shape = pad_shape,
-                            scale_factor = scale_factor,
-                            flip = flip)
-            # 组合数据: 注意img_meta数据无法堆叠，尺寸不一的img也不能堆叠，所以需要在collate_fn中自定义处理方式
-            data = dict(img = img,
-                        img_meta = img_meta,
-                        gt_bboxes = gt_bboxes,
-                        gt_labels = gt_labels,
-                        stack_list = ['img','gt_seg'])
+        data = {}
+        ori_shape = None
+        scale_shape = None
+        pad_shape = None
+        scale_factor = None
+        flip = None
+        # 读取图片
+        img_info = self.img_anns[idx]
+        img_path = img_info['img_file']
+        img = cv2.imread(img_path)
+        
+        # 读取bbox, label
+        ann_dict = self.parse_ann_info(idx)
+        gt_bboxes = ann_dict['bboxes']
+        gt_labels = ann_dict['labels']
+
+        # aug transform
+        if self.aug_transform is not None:
+            img, gt_bboxes, gt_labels = self.aug_transform(img, gt_bboxes, gt_labels)
+        # basic transform
+        if self.img_transform is not None:    
+            # img transform
+            img, ori_shape, scale_shape, pad_shape, scale_factor, flip = self.img_transform(img)
+        # bbox transform: 传入的是scale_shape而不是ori_shape        
+        if self.bbox_transform is not None:
+            gt_bboxes = self.bbox_transform(gt_bboxes, scale_shape, scale_factor, flip)
+        # label transform
+        if self.label_transform is not None:
+            gt_labels = self.label_transform(gt_labels)
+        
+        # 组合img_meta
+        img_meta = dict(ori_shape = ori_shape,
+                        scale_shape = scale_shape,
+                        pad_shape = pad_shape,
+                        scale_factor = scale_factor,
+                        flip = flip)
+        # 组合数据: 注意img_meta数据无法堆叠，尺寸不一的img也不能堆叠，所以需要在collate_fn中自定义处理方式
+        data.update(img = img,
+                    img_meta = img_meta,
+                    gt_bboxes = gt_bboxes,
+                    gt_labels = gt_labels,
+                    stack_list = ['img'])
         
         # 如果是分割任务，提供的是分割png，所以用的是seg_transform, 而不是mask_transform
+        # 分割任务不关心bbox，所以
         if self.seg_prefix is not None and img_info['seg_file'] is not None:
             
+            # 需要传入seg_scale_factor ???
             seg_path = self.img_anns[idx]['seg_file']
-            img = cv2.imread(seg_path)   # (h,w,3) or (h,w,3)
-            img = self.seg_transform(img.squeeze(), scale_factor, flip)
-            gt_seg = imrescale(gt_seg, seg_scale_factor, interpolation='nearest')
-            gt_seg = gt_seg[None, ...]
-            data.update(gt_seg = gt_seg)
+#            seg = cv2.imread(seg_path)   # (h,w,3)
+            seg = Image.open(seg_path)   # 采用PIL.Image读入图片可以直接得到用0-20类别值作为像素值的数据(还包括255白色边框)
+            seg = np.asarray(seg)  # (h,w)
+            seg = self.seg_transform(seg, flip)  # 类似于对img的变换，只需输入seg，额外一个从img transform来的参数，保证与img一致
+            # seg的额外scale比例因子
+#            seg = seg[None, ...]
+            data.update(seg = seg)
+            data['stack_list'].append('seg')
         # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片
         while True:
-            if len(gt_bboxes) == 0:
+            if self.bbox_transform is not None and len(gt_bboxes) == 0:  # 确保seg时可以跳过
                 idx = np.random.choice(len(self.img_anns))
                 self.__getitem__(idx)
             return data

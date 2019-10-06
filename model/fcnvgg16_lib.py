@@ -11,9 +11,9 @@ from utils.init_weights import common_init_weights
 class FCNVGG16(VGG):
     """分割模型FCN8s, FCN16s, FCN32s的backbone"""
     def __init__(self, 
-                 depth, 
-                 pretrained, 
-                 out_indices=(17, 24, 32)):
+                 depth=16, 
+                 pretrained=None, 
+                 out_indices=(16, 23, 30)):
         self.depth = depth
         self.pretrained = pretrained
         self.out_indices = out_indices

@@ -50,7 +50,7 @@ class VGG(nn.Module):
         19: (2, 2, 4, 4, 4)
     }
     
-    def __init__(self, depth, pretrained=None, classify_classes=10):
+    def __init__(self, depth, pretrained=None, classify_classes=None):
         super().__init__()
         self.pretrained = pretrained
         blocks = self.arch_settings[depth]
@@ -68,14 +68,15 @@ class VGG(nn.Module):
         # 自适应平均池化
         self.avgpool = nn.AdaptiveAvgPool2d(output_size=(7, 7))
         # 分类层
-        self.classifier = nn.Sequential(
-                nn.Linear(out_channels*7*7, 4096),
-                nn.ReLU(inplace=True),
-                nn.Dropout(p=0.5),
-                nn.Linear(4096, 4096),
-                nn.ReLU(inplace=True),
-                nn.Dropout(p=0.5),
-                nn.Linear(4096, classify_classes))
+        if classify_classes is not None:
+            self.classifier = nn.Sequential(
+                    nn.Linear(out_channels*7*7, 4096),
+                    nn.ReLU(inplace=True),
+                    nn.Dropout(p=0.5),
+                    nn.Linear(4096, 4096),
+                    nn.ReLU(inplace=True),
+                    nn.Dropout(p=0.5),
+                    nn.Linear(4096, classify_classes))
         
         self.init_weights()
     

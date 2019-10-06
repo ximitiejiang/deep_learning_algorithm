@@ -22,14 +22,13 @@ def train_fcn(cfg_path):
     
 if __name__ == "__main__":
     
-    task = 'pre'
-    cfg_path = './cfg_detector_fcn_vgg16_voc.py'
+    task = 'train'
+    cfg_path = './cfg_segmentator_fcn_vgg16_voc.py'
     
     if task == 'pre':
         cfg = get_config(cfg_path)
         trainset = get_dataset(cfg.trainset, cfg.transform)
-        for i in range(len(trainset)):
-            data = trainset[i]
+        data = trainset[1]
 
     
     if task == 'train':  # 模型训练

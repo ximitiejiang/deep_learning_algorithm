@@ -43,6 +43,18 @@ def batch_detector(model, data, device, return_loss=True, **kwargs): # kwargs用
     return outputs
 
 
+def batch_segmentator(model, data, device, return_loss=True, **kwargs):
+    imgs = to_device(data['img'], device)
+    segs = to_device(data['seg'], device)
+    if not return_loss:
+        outs = model(imgs, segs, return_loss=False)
+        return outs
+    if return_loss:
+        loss = model(imgs, segs, return_loss=True)
+        return loss
+    
+    
+
 def batch_classifier(self, model, data, device, return_loss=True, loss_fn=None, **kwargs):
     # 数据送入设备
     img = to_device(data['img'], device)  # 由于model要送入device进行计算，且该计算只跟img相关，跟label无关，所以可以只送img到device
@@ -67,6 +79,8 @@ def get_batch_processor(cfg):
         return batch_classifier
     elif cfg.task == 'detector':
         return batch_detector
+    elif cfg.task == 'segmentator':
+        return batch_segmentator
     else:
         raise ValueError('Wrong task input.')
 

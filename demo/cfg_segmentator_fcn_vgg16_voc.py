@@ -5,15 +5,15 @@ Created on Mon Sep  2 11:31:23 2019
 
 @author: ubuntu
 """
-task = 'detector'
+task = 'segmentator'
 gpus = 1
 parallel = False
 distribute = False                       
-n_epochs = 100
+n_epochs = 10
 imgs_per_core = 4                 # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
 workers_per_core = 2
-save_checkpoint_interval = 10     # 每多少个epoch保存一次epoch
-work_dir = '/home/ubuntu/mytrain/fcn_vgg16_voc/'
+save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
+work_dir = '/home/ubuntu/mytrain/fcn_vgg_voc/'
 resume_from = None                # 恢复到前面指定的设备
 load_from = None
 load_device = 'cuda'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
@@ -23,7 +23,7 @@ lr = 0.001
 lr_processor = dict(
         type='list',
         params = dict(
-                step=[50, 80],       # 代表第2个(从1开始算)
+                step=[5, 8],       # 代表第2个(从1开始算)
                 lr = [0.0005, 0.0001],
                 warmup_type='linear',
                 warmup_iters=500,
@@ -35,88 +35,68 @@ logger = dict(
                 interval=1)
 
 model = dict(
-        type='one_stage_detector')
+        type='segmentator')
         
 backbone = dict(
         type='fcn_vgg16',
         params=dict(
-                pretrained= '/home/ubuntu/MyWeights/vgg16-397923af.pth',   # 这是caffe的模型，对应mean=[123.675, 116.28, 103.53], std=[1, 1, 1],  另外的pytorch的模型pretrained='/home/ubuntu/.torch/models/vgg16-397923af.pth', 对应mean, std需要先归一化再标准化
-                out_feature_indices=(22,34),
-                extra_out_feature_indices=(1,3,5,7),
-                l2_norm_scale=20.))
+                depth=16,
+                pretrained= '/home/ubuntu/MyWeights/vgg16-397923af.pth',   # pytorch的模型
+                out_indices=(16, 23, 30)))
 
 head = dict(
-        type='fcn_head',
+        type='fcn8s_head',
         params=dict(
-                input_size=300,
+                in_channels=(256, 512, 512),
                 num_classes=21,
-                in_channels=(512, 1024, 512, 256, 256, 256),
-                num_anchors=(4, 6, 6, 6, 4, 4),
-                anchor_size_ratio_range=(0.2, 0.9),
-                anchor_ratios = ([2],[2, 3],[2, 3],[2, 3],[2],[2]),
-                anchor_strides=(8, 16, 32, 64, 100, 300),
-                target_means=(.0, .0, .0, .0),
-                target_stds=(0.1, 0.1, 0.2, 0.2),
-                neg_pos_ratio=3))
-
-assigner = dict(
-        type='max_iou_assigner',
-        params=dict(
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.5,
-                min_pos_iou=0.))
-
-sampler = dict(
-        type='posudo_sampler',
-        params=dict(
-                ))
-
-neg_pos_ratio = 3  
-nms = dict(
-        type='nms',
-        score_thr=0.02,
-        max_per_img=200,
-        params=dict(
-                iou_thr=0.5)) # nms过滤iou阈值
+                featmap_sizes=(60, 30, 15),
+                out_size=480,
+                out_layer=0,
+                upsample_method='interpolate'))
 
 transform = dict(
         img_params=dict(
-                mean=[123.675, 116.28, 103.53],  # 基于RGB顺序: 由于采用caffe的backbone模型，所以图片归一化参数基于caffe
-                std=[1, 1, 1],
-                norm=False,     # 归一化img/255
+                mean=[0.485, 0.456, 0.406],  # 基于RGB顺序: 基于归一化之后进行，所以norm要等于True
+                std=[0.229, 0.224, 0.225],
+                norm=True,     # 归一化img/255
                 to_rgb=True,    # bgr to rgb
                 to_tensor=True, # numpy to tensor 
                 to_chw=True,    # hwc to chw
                 flip_ratio=None,
-                scale=(300, 300),  # 选择300的小尺寸
+                scale=(480, 480),  # 选择300的小尺寸
                 size_divisor=None,
                 keep_ratio=False),  # ssd需要统一到方形300,300，不能按比例
-        label_params=dict(
+        label_params=None,
+        bbox_params=None,
+        aug_params=None,
+        mask_params=None,
+        seg_params=dict(
                 to_tensor=True,
-                to_onehot=None),
-        bbox_params=dict(
-                to_tensor=True
-                ),
-        aug_params=None)
-
+                scale=(480,480),
+                keep_ratio=False,
+                size_divisor=None,
+                seg_scale_factor=None))
+        
 transform_val = dict(
         img_params=dict(
-                mean=[123.675, 116.28, 103.53],  # 基于RGB顺序: 由于采用caffe的backbone模型，所以图片归一化参数基于caffe
-                std=[1, 1, 1],
-                norm=False,
+                mean=[0.485, 0.456, 0.406],  # 基于RGB顺序: 基于归一化之后进行，所以norm要等于True
+                std=[0.229, 0.224, 0.225],
+                norm=True,     # 归一化img/255
                 to_rgb=True,    # bgr to rgb
                 to_tensor=True, # numpy to tensor 
                 to_chw=True,    # hwc to chw
                 flip_ratio=None,
-                scale=(300, 300),  # [w,h]
+                scale=(480, 480),  # [w,h]
                 size_divisor=None,
                 keep_ratio=False),
-        label_params=dict(
+        label_params=None,
+        bbox_params=None,
+        seg_params=dict(
                 to_tensor=True,
-                to_onehot=None),
-        bbox_params=dict(
-                to_tensor=True
-                ))
+                scale=(480,480),
+                keep_ratio=False,
+                size_divisor=None,
+                seg_scale_factor=None))
 
 data_root_path='/home/ubuntu/MyDatasets/voc/VOCdevkit/'
 trainset = dict(
@@ -173,9 +153,3 @@ loss_clf = dict(
                 reduction='mean'
                 ))
 
-loss_reg = dict(
-        type='smooth_l1',
-        beta=1.,
-        params=dict(
-                reduction='mean'
-                ))
