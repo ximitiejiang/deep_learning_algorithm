@@ -382,8 +382,12 @@ def vis_cam(src, predictor, class_names=None, score_thr=None):
         if ch == 27 or ch == ord('q') or ch == ord('Q'):
             break
         # 返回迭代器
-        for results in predictor(img):
-            vis_all_opencv(*results, class_names, score_thr)
+        if predictor.type == 'det':
+            for results in predictor(img):
+                vis_all_opencv(*results, class_names, score_thr)
+        elif predictor.type == 'seg':
+            for result in predictor(img):
+                cv2.imshow('seg', result)
                 
 
 

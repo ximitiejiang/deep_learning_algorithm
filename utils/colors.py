@@ -28,7 +28,8 @@ def color2value(color_str):
 
 def get_pallete(pallete):
     pallete_dict = {'voc': voc_pallete,
-                    'city': city_pallete,}
+                    'city': city_pallete,
+                    'ade': ade_pallete}
     return pallete_dict[pallete]
     
 """voc调色板：21种颜色对应21个类别0-20，其中0为背景，1-20为20个分类"""
@@ -75,7 +76,9 @@ city_pallete = np.array([[128,  64, 128],
                        [  0,   0, 230],
                        [119,  11,  32]])
 
-
+ade_pallete = np.array([])
+    
+    
 if __name__ == "__main__":
     pass
     

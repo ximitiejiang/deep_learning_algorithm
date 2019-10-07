@@ -13,50 +13,6 @@ from utils.transform import to_device, ImgTransform
 from utils.visualization import vis_loss_acc
 from utils.tools import accuracy
 
-# %% 分类问题
-def eval_dataset_cls(cfg_path, device=None):
-    """分类问题的eval dataset: 
-    等效于runner中的load_from + val，但可用来脱离runner进行独立的数据集验证
-    """
-    # 准备验证所用的对象
-    cfg = get_config(cfg_path)
-    dataset = get_dataset(cfg.valset, cfg.transform_val)
-    dataloader = get_dataloader(dataset, cfg.valloader)
-    model = get_root_model(cfg)
-    if device is None:
-        device = torch.device(cfg.load_device)
-    # TODO: 如下两句的顺序
-    load_checkpoint(model, cfg.load_from, device)
-    model = model.to(device)
-    # 开始验证
-    buffer = {'acc': []}
-    n_correct = 0
-    model.eval()
-    for c_iter, data_batch in enumerate(dataloader):
-        with torch.no_grad():  # 停止反向传播，只进行前向计算
-            img = to_device(data_batch['img'], device)
-            label = to_device(data_batch['gt_labels'], device)
-            
-            y_pred = model(img)
-            label = torch.cat(label, dim=0)
-            acc1 = accuracy(y_pred, label, topk=1)
-            buffer['acc'].append(acc1)
-        # 计算总体精度
-        n_correct += buffer['acc'][-1] * len(data_batch['gt_labels'])
-    
-    vis_loss_acc(buffer, title='eval dataset')
-    print('ACC on dataset: %.3f', n_correct/len(dataset))
-
-
-def predict_one_img_cls(img, cfg_path):
-    """针对单个样本的预测：
-    直接通过model得到结果，且支持cpu/GPU预测。
-    注意：需要训练完成后，或在cfg中设置load_from，也就是model先加载训练好的参数文件。
-    """
-    pass
-    
-    
-
 # %% 检测问题
 from model.runner_lib import batch_detector
 from utils.tools import save2pkl, loadvar, get_time_str
@@ -110,11 +66,12 @@ def eval_dataset_det(cfg_path,
     
     
 from utils.tools import timer    
-class Predictor():
+class DetPredictor():
     """用于对图片(非数据集的情况)进行预测计算，生成待显示的数据
     src: 可以输入img or img_list
     """
     def __init__(self, cfg_path, load_from=None, load_device=None):
+        self.type = 'det' # 用来判断是什么类型的预测器
         # 准备验证所用的对象
         self.cfg = get_config(cfg_path)
         # 为了便于eval，不必常去修改cfg里边的设置，直接在func里边添加2个参数即可
@@ -143,7 +100,82 @@ class Predictor():
                 yield (img, bboxes, scores, labels)
 
 
+# %% 分割模型的评估
+from utils.transform import label2color
 
+class SegPredictor(DetPredictor):
+    """分割预测器"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'seg'
+        
+    def __call__(self, src):
+        if isinstance(src, np.ndarray):
+            src = [src]
+        for img in src:
+            img_data = img_loader(img, self.cfg)
+            with torch.no_grad():
+                with timer('seg one img'):
+                    seg = self.model(**img_data, return_loss=False)  # (1,21,480,480)
+                    pred = torch.argmax(seg.squeeze(), dim=0).cpu().data.numpy()  # (h, w)为每个像素的类别(0-20)
+                pred_img = label2color(pred, 'voc')   # (h,w,3)这一步不算是分割的时间，但转换耗时较长，影响cam实时显示
+                yield pred_img
+                
+                
+                
+# %% 分类问题
+def eval_dataset_cls(cfg_path, device=None):
+    """分类问题的eval dataset: 
+    等效于runner中的load_from + val，但可用来脱离runner进行独立的数据集验证
+    """
+    # 准备验证所用的对象
+    cfg = get_config(cfg_path)
+    dataset = get_dataset(cfg.valset, cfg.transform_val)
+    dataloader = get_dataloader(dataset, cfg.valloader)
+    model = get_root_model(cfg)
+    if device is None:
+        device = torch.device(cfg.load_device)
+    # TODO: 如下两句的顺序
+    load_checkpoint(model, cfg.load_from, device)
+    model = model.to(device)
+    # 开始验证
+    buffer = {'acc': []}
+    n_correct = 0
+    model.eval()
+    for c_iter, data_batch in enumerate(dataloader):
+        with torch.no_grad():  # 停止反向传播，只进行前向计算
+            img = to_device(data_batch['img'], device)
+            label = to_device(data_batch['gt_labels'], device)
+            
+            y_pred = model(img)
+            label = torch.cat(label, dim=0)
+            acc1 = accuracy(y_pred, label, topk=1)
+            buffer['acc'].append(acc1)
+        # 计算总体精度
+        n_correct += buffer['acc'][-1] * len(data_batch['gt_labels'])
+    
+    vis_loss_acc(buffer, title='eval dataset')
+    print('ACC on dataset: %.3f', n_correct/len(dataset))
+
+
+class ClsPredictor(DetPredictor):
+    """分类问题的单图或多图预测器"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'cls'
+    
+    # TODO: 待完成   
+    def __call__(self, src):
+        if isinstance(src, np.ndarray):
+            src = [src]
+        for img in src:
+            img_data = img_loader(img, self.cfg)
+            with torch.no_grad():
+                cls_score = self.model(**img_data, return_loss=False)  # (1,21,480,480)
+                pred = torch.argmax(cls_score.squeeze(), dim=0).cpu().data.numpy()  # (h, w)为每个像素的类别(0-20)
+                yield pred
+                
+                
 # %% 一些support函数
     
 def img_loader(img, cfg):

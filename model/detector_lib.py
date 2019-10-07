@@ -114,11 +114,11 @@ class Segmentator(nn.Module):
             self.neck.init_weights()
         self.seg_head.init_weights()
     
-    def forward(self, imgs, segs, return_loss=True, **kwargs):
+    def forward(self, imgs, return_loss=True, **kwargs):
         if return_loss:
-            return self.forward_train(imgs, segs, **kwargs)
+            return self.forward_train(imgs, **kwargs)
         else:
-            return self.forward_test(imgs, segs, **kwargs)
+            return self.forward_test(imgs, **kwargs)
     
     def forward_train(self, imgs, segs, **kwargs):
         x = self.backbone(imgs)
@@ -130,7 +130,7 @@ class Segmentator(nn.Module):
         loss_dict = self.seg_head.get_losses(*loss_inputs)
         return loss_dict
     
-    def forward_test(self, imgs, segs, **kwargs):
+    def forward_test(self, imgs, **kwargs):
         x = self.backbone(imgs)
         if self.cfg.neck:
             x = self.neck(x)

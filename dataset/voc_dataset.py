@@ -53,7 +53,7 @@ class VOCDataset(BasePytorchDataset):
         
         self.ann_file = ann_file
         self.img_prefix = img_prefix
-        self.seg_prefix = seg_prefix
+        self.seg_prefix = seg_prefix if seg_prefix is not None else ''
         self.with_difficult = with_difficult
         self.with_mask = with_mask # 对voc没有用，但对类似coco的数据集有用
         # 变换函数

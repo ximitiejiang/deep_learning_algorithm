@@ -207,7 +207,7 @@
 1. 现象：如果模型和数据送入GPU，dataloader会调用dataset的__getitem__函数获取数据进行堆叠，
    此时如果在__getitem__里边有自定义断点，会造成系统警告且暂停训练。
 2. 解决方案：取消断点后模型训练/验证就正常了。而如果想要调试__getitem__里边的语法，可以设置
-   额外的语句img, label = dataset[0]来进入__getitem__，或者next(iter(dataloader))
+   额外的语句img, label = dataset[0]来进入__getitem__进行调试。
 
 
 ### 关于预训练模型的加载
@@ -338,7 +338,7 @@
        因此在mmdetection中无需增加data.to()这步手动操作，同时也无需手动去除data container的外壳，
        而是在scatter函数中自定义处理data container的过程，以及data送入device的过程。
     
-    - 自定义了collate_fn，并
+    - 自定义了collate_fn
 
 
 ### 关于如何获得anchor的统计数据

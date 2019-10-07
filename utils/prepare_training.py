@@ -14,6 +14,44 @@ import numpy as np
 
 from utils.tools import get_time_str
 
+from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
+from dataset.voc_dataset import VOCDataset
+from dataset.ants_bees_dataset import AntsBeesDataset
+from dataset.widerface_dataset import WIDERFaceDataset
+from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform, MaskTransform
+
+from model.detector_lib import OneStageDetector, Segmentator
+from model.alexnet_lib import AlexNet, AlexNet8
+from model.ssdvgg16_lib import SSDVGG16
+from model.fcnvgg16_lib import FCNVGG16
+from model.head_lib import SSDHead, RetinaHead, FCOSHead
+from model.fcn_head import FCN8sHead
+
+
+# %% model zoo
+datasets = {'cifar10' : Cifar10Dataset,
+            'cifar100' : Cifar100Dataset,
+            'voc' : VOCDataset,
+            'antsbees': AntsBeesDataset,
+            'widerface': WIDERFaceDataset}
+
+models = {
+        'one_stage_detector': OneStageDetector,
+        'segmentator' : Segmentator,
+        'alexnet8' : AlexNet8,
+        'alexnet' : AlexNet,
+        'ssd_vgg16' : SSDVGG16,
+        'fcn_vgg16' : FCNVGG16,
+        'ssd_head' : SSDHead,
+        'retina_head': RetinaHead,
+        'fcos_head': FCOSHead,
+        'fcn8s_head': FCN8sHead}
+
+loss_fn_dict = {
+            'cross_entropy': torch.nn.CrossEntropyLoss,
+            'smooth_l1': torch.nn.SmoothL1Loss}
+
+
 # %%
 def get_config(config_path="cfg_ssd_voc.py"):
     """从py文件中获取配置信息，py文件中需要为变量赋值形式数据，导入为Dict类型"""
@@ -55,11 +93,6 @@ def get_logger(logger_cfg):
 
 
 # %%
-from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
-from dataset.voc_dataset import VOCDataset
-from dataset.ants_bees_dataset import AntsBeesDataset
-from dataset.widerface_dataset import WIDERFaceDataset
-from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform, MaskTransform
 
 class RepeatDataset(object):
 
@@ -81,11 +114,7 @@ class RepeatDataset(object):
 def get_dataset(dataset_cfg, transform_cfg):
     """创建数据集
     """
-    datasets = {'cifar10' : Cifar10Dataset,
-                'cifar100' : Cifar100Dataset,
-                'voc' : VOCDataset,
-                'antsbees': AntsBeesDataset,
-                'widerface': WIDERFaceDataset}
+
     img_transform = None
     label_transform = None
     bbox_transform = None
@@ -240,24 +269,6 @@ def get_dataloader(dataset, dataloader_cfg):
         
 
 # %%
-from model.detector_lib import OneStageDetector, Segmentator
-from model.alexnet_lib import AlexNet, AlexNet8
-from model.ssdvgg16_lib import SSDVGG16
-from model.fcnvgg16_lib import FCNVGG16
-from model.head_lib import SSDHead, RetinaHead, FCOSHead
-from model.fcn_head import FCN8sHead
-
-models = {
-        'one_stage_detector': OneStageDetector,
-        'segmentator' : Segmentator,
-        'alexnet8' : AlexNet8,
-        'alexnet' : AlexNet,
-        'ssd_vgg16' : SSDVGG16,
-        'fcn_vgg16' : FCNVGG16,
-        'ssd_head' : SSDHead,
-        'retina_head': RetinaHead,
-        'fcos_head': FCOSHead,
-        'fcn8s_head': FCN8sHead}
 
 def get_root_model(cfg):
     """根模型创建：传入根cfg"""
@@ -301,10 +312,6 @@ def get_optimizer(optimizer_cfg, model):
 
 # %%
 def get_loss_fn(loss_cfg):
-    loss_fn_dict = {
-            'cross_entropy': torch.nn.CrossEntropyLoss,
-            'smooth_l1': torch.nn.SmoothL1Loss}
-    
     loss_name = loss_cfg.get('type')
     loss_class = loss_fn_dict[loss_name]
     params = loss_cfg.get('params')

@@ -287,17 +287,18 @@ def get_dataset_norm_params(dataset):
 
 from utils.colors import get_pallete    
 def label2color(img, pallete='voc'):
-    """用于把标签mask转换为颜色
+    """用于在语义分割中把预测的像素标签转换为图片颜色
     ags:
         img: (h, w), 其中的每个像素值为0~20,代表某一类别。
         pallete: (m, 3)
     """
+    img = img.astype(np.int32)
     colors = get_pallete(pallete)
     h, w = img.shape
     new_img = np.zeros((h, w, 3))
     for i in range(h):
         for j in range(w):
-            new_img[i, j, :] = colors[int(img[i, j])]
+            new_img[i, j, :] = colors[img[i, j]]
     return new_img
 
 # TODO: 待完成，待确认pallete是BGR还是RGB
