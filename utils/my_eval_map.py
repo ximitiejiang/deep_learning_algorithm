@@ -136,7 +136,7 @@ def average_precision(recalls, precisions, mode):
         recalls: (n_dets,) 代表随着预测正样本增加(分子)，recall的提高
         precisions: (n_dets, ) 代表随着预测样本个数增加(分母)，precisions的下降
         mode: 'area'表示在precision-recall曲线之下计算面积来作为平均精度
-              '11points'表示在[0,0.1,...1]这11个点下计算平均精度
+              '11points'表示在[0,0.1,...1]这11个点下计算平均精度(这是早期voc计算方法，暂不实现)
     """
     recalls = recalls.reshape(1, -1)
     precisions = precisions.reshape(1, -1)

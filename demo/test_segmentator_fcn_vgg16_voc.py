@@ -51,7 +51,7 @@ if __name__ == "__main__":
         img = cv2.imread('../test/009779.jpg')
         predictor = SegPredictor(cfg_path,                         
                                  load_from = '/home/ubuntu/mytrain/fcn_vgg_voc/epoch_9.pth',
-                                 load_device='cuda')
+                                 load_device='cpu')
         for result in predictor([img]):
             cv2.imshow('seg', result)
     

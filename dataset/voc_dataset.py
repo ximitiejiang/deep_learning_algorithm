@@ -14,7 +14,7 @@ from dataset.base_dataset import BasePytorchDataset
 
 class VOCDataset(BasePytorchDataset):
     """VOC数据集：用于物体分类和物体检测
-    2007版+2012版数据总数16551(5011 + 11540), 可以用2007版做小数据集试验。
+    2007版+2012版数据总数16551(5011 + 11540)
     主要涉及6个文件夹：
         - ImageSets:  txt主体索引文件
                 * main: 所有图片名索引，以及每一类的图片名索引(可用来做其中某几类的训练)
@@ -43,19 +43,16 @@ class VOCDataset(BasePytorchDataset):
                  img_prefix=None,
                  seg_prefix=None,
                  with_difficult=False,
-                 with_mask=False,
                  img_transform=None,
                  label_transform=None,
                  bbox_transform=None,
                  aug_transform=None,
-                 mask_transform=None,
                  seg_transform=None):
         
         self.ann_file = ann_file
         self.img_prefix = img_prefix
         self.seg_prefix = seg_prefix if seg_prefix is not None else ''
         self.with_difficult = with_difficult
-        self.with_mask = with_mask # 对voc没有用，但对类似coco的数据集有用
         # 变换函数
         self.img_transform = img_transform
         self.label_transform = label_transform
@@ -198,18 +195,14 @@ class VOCDataset(BasePytorchDataset):
                     gt_labels = gt_labels,
                     stack_list = ['img'])
         
-        # 如果是分割任务，提供的是分割png，所以用的是seg_transform, 而不是mask_transform
+        # 如果是分割任务，提供的是分割png，所以用的是seg_transform
         # 分割任务不关心bbox，所以
         if self.seg_prefix is not None and img_info['seg_file'] is not None:
-            
-            # 需要传入seg_scale_factor ???
             seg_path = self.img_anns[idx]['seg_file']
 #            seg = cv2.imread(seg_path)   # (h,w,3)
             seg = Image.open(seg_path)   # 采用PIL.Image读入图片可以直接得到用0-20类别值作为像素值的数据(还包括255白色边框)
             seg = np.asarray(seg)  # (h,w)
             seg = self.seg_transform(seg, flip)  # 类似于对img的变换，只需输入seg，额外一个从img transform来的参数，保证与img一致
-            # seg的额外scale比例因子
-#            seg = seg[None, ...]
             data.update(seg = seg)
             data['stack_list'].append('seg')
         # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片
