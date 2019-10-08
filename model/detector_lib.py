@@ -137,6 +137,54 @@ class Segmentator(nn.Module):
         outs = self.seg_head(x)  
         # TODO: 处理分割数据结果
         return outs
+    
+    
+# %%
+class Classifier(nn.Module):
+    """用于分类器的总成模型"""
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+        # 创建基础模型
+        from utils.prepare_training import get_model
+        self.backbone = get_model(cfg.backbone)
+        if cfg.neck:  # 不能写成 is not None, 因为结果是{}不是None, 但可以用True/False来判断
+            self.neck = get_model(cfg.neck)
+        self.cls_head = get_model(cfg.head)  # seg head就说明生成的是bbox
+        
+        # 初始化: 注意权重需要送入cpu/gpu，该步在model.to()完成
+        self.init_weights()
+
+    def init_weights(self):
+        self.backbone.init_weights()
+        if self.cfg.neck:
+            self.neck.init_weights()
+        self.cls_head.init_weights()
+    
+    def forward(self, imgs, return_loss=True, **kwargs):
+        if return_loss:
+            return self.forward_train(imgs, **kwargs)
+        else:
+            return self.forward_test(imgs, **kwargs)
+    
+    def forward_train(self, imgs, labels, **kwargs):
+        x = self.backbone(imgs)
+        if self.cfg.neck:
+            x = self.neck(x)
+        outs = self.cls_head(x)  
+        # 计算损失
+        loss_inputs = [outs, labels]
+        loss_dict = self.cls_head.get_losses(*loss_inputs)
+        return loss_dict
+    
+    def forward_test(self, imgs, **kwargs):
+        x = self.backbone(imgs)
+        if self.cfg.neck:
+            x = self.neck(x)
+        outs = self.cls_head(x)  
+        # TODO: 处理分割数据结果
+        return outs
+    
 
 # %% two stage
 class TwoStageDetector(nn.Module):
@@ -145,10 +193,6 @@ class TwoStageDetector(nn.Module):
         pass
 
 
-# %%
-class Classifier(nn.Module):
-    """用于分类器的总成模型"""
-    def __init__(self):
-        super().__init__()
+
         
     

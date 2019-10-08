@@ -69,7 +69,6 @@ transform = dict(
         label_params=None,
         bbox_params=None,
         aug_params=None,
-        mask_params=None,
         seg_params=dict(
                 to_tensor=True,
                 scale=(480,480),

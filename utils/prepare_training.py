@@ -11,14 +11,13 @@ from importlib import import_module
 import logging
 import torch
 import numpy as np
-
+from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform, MaskTransform
 from utils.tools import get_time_str
 
 from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
 from dataset.voc_dataset import VOCDataset
 from dataset.ants_bees_dataset import AntsBeesDataset
 from dataset.widerface_dataset import WIDERFaceDataset
-from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform, MaskTransform
 
 from model.detector_lib import OneStageDetector, Segmentator
 from model.alexnet_lib import AlexNet, AlexNet8
@@ -99,9 +98,7 @@ class RepeatDataset(object):
     def __init__(self, dataset, times):
         self.dataset = dataset
         self.times = times
-#        self.CLASSES = dataset.CLASSES
-#        if hasattr(self.dataset, 'flag'):
-#            self.flag = np.tile(self.dataset.flag, times)
+        self.CLASSES = dataset.CLASSES
         self._ori_len = len(self.dataset)
 
     def __getitem__(self, idx):

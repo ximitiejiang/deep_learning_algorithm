@@ -14,7 +14,7 @@ from dataset.base_dataset import BasePytorchDataset
 
 class VOCDataset(BasePytorchDataset):
     """VOC数据集：用于物体分类和物体检测
-    2007版+2012版数据总数16551(5011 + 11540), 可以用2007版做小数据集试验。
+    2007版+2012版数据总数16551(5011 + 11540)
     主要涉及6个文件夹：
         - ImageSets:  txt主体索引文件
                 * main: 所有图片名索引，以及每一类的图片名索引(可用来做其中某几类的训练)
@@ -47,7 +47,6 @@ class VOCDataset(BasePytorchDataset):
                  label_transform=None,
                  bbox_transform=None,
                  aug_transform=None,
-                 mask_transform=None,
                  seg_transform=None):
         
         self.ann_file = ann_file
@@ -204,7 +203,6 @@ class VOCDataset(BasePytorchDataset):
             # 确保seg作为标签必须为int64(long)
             seg = np.asarray(seg).astype(np.int64)  # (h,w)
             seg = self.seg_transform(seg, flip)  # 类似于对img的变换，只需输入seg，额外一个从img transform来的参数，保证与img一致
-
             data.update(seg = seg)
             data['stack_list'].append('seg')
         # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片

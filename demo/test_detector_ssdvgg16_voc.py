@@ -21,7 +21,7 @@ def train_ssd(cfg_path):
     
 if __name__ == "__main__":
     
-    task = 'load'
+    task = 'video'
     cfg_path = './cfg_detector_ssdvgg16_voc.py'
     
     if task == 'train':  # 模型训练
