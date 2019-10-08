@@ -96,7 +96,7 @@ if __name__ == '__main__':
     import torchvision
     import numpy as np
     
-    name = 'my'
+    name = 'ori'
     
     if name == 'ori':
         model = torchvision.models.vgg16()

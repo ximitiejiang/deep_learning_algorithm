@@ -43,7 +43,6 @@ class VOCDataset(BasePytorchDataset):
                  img_prefix=None,
                  seg_prefix=None,
                  with_difficult=False,
-                 with_mask=False,
                  img_transform=None,
                  label_transform=None,
                  bbox_transform=None,
@@ -55,7 +54,6 @@ class VOCDataset(BasePytorchDataset):
         self.img_prefix = img_prefix
         self.seg_prefix = seg_prefix if seg_prefix is not None else ''
         self.with_difficult = with_difficult
-        self.with_mask = with_mask # 对voc没有用，但对类似coco的数据集有用
         # 变换函数
         self.img_transform = img_transform
         self.label_transform = label_transform
@@ -144,7 +142,7 @@ class VOCDataset(BasePytorchDataset):
         else:
             bboxes_difficult = np.array(bboxes_difficult, ndmin=2) - 1
             labels_difficult = np.array(labels_difficult)
-        # 组合数据包为dict
+        # 组合数据包为dict: 并确保bbox是float, label是int64(long)
         ann = dict(
             bboxes=bboxes.astype(np.float32),
             labels=labels.astype(np.int64),
@@ -198,18 +196,15 @@ class VOCDataset(BasePytorchDataset):
                     gt_labels = gt_labels,
                     stack_list = ['img'])
         
-        # 如果是分割任务，提供的是分割png，所以用的是seg_transform, 而不是mask_transform
-        # 分割任务不关心bbox，所以
-        if self.seg_prefix is not None and img_info['seg_file'] is not None:
-            
-            # 需要传入seg_scale_factor ???
+        # 如果是分割任务，提供的是分割png，所以用的是seg_transform
+        if self.seg_prefix is not None and img_info.get('seg_file') is not None:
             seg_path = self.img_anns[idx]['seg_file']
 #            seg = cv2.imread(seg_path)   # (h,w,3)
             seg = Image.open(seg_path)   # 采用PIL.Image读入图片可以直接得到用0-20类别值作为像素值的数据(还包括255白色边框)
-            seg = np.asarray(seg)  # (h,w)
+            # 确保seg作为标签必须为int64(long)
+            seg = np.asarray(seg).astype(np.int64)  # (h,w)
             seg = self.seg_transform(seg, flip)  # 类似于对img的变换，只需输入seg，额外一个从img transform来的参数，保证与img一致
-            # seg的额外scale比例因子
-#            seg = seg[None, ...]
+
             data.update(seg = seg)
             data['stack_list'].append('seg')
         # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片

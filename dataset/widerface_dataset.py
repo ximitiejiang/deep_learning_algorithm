@@ -29,26 +29,10 @@ class WIDERFaceDataset(VOCDataset):
                '50--Celebration_Or_Party', '51--Dresses', '52--Photographers', '53--Raid', '54--Rescue', 
                '55--Sports_Coach_Trainer', '56--Voter', '57--Angler', '58--Hockey', '59--people--driving--car', 
                '61--Street_Battle', ]
-    def __init__(self,                  
-                 root_path=None,
-                 ann_file=None,
-                 subset_path=None,
-                 img_transform=None,
-                 label_transform=None,
-                 bbox_transform=None,
-                 aug_transform=None,
-                 data_type=None):
-        super().__init__(
-                root_path, 
-                ann_file, 
-                subset_path,
-                img_transform, 
-                label_transform, 
-                bbox_transform,
-                aug_transform,
-                data_type)
+    def __init__(self, *args, **kwargs):
+        super().__init__( *args, **kwargs)
     
-    def load_annotation_inds(self, ann_file):
+    def load_annotations(self, ann_file):
         """从多个标注文件读取标注列表
         """
         img_anns = []
@@ -61,30 +45,10 @@ class WIDERFaceDataset(VOCDataset):
             for img_id in img_ids:
                 idx = int(img_id.split('_')[0])
                 folder = self.folders[idx] if idx != 61 else self.folders[idx - 1]
-#                tmp = img_id.split('_')[:-2]
-#                names = []
-#                for t in tmp:
-#                    if not t in names and not t[0].islower():  # 如果字符没有重复出现，没有小写字母开头,则存入，否则直接退出for循环
-#                        names.append(t)
-#                    else:
-#                        break                tmp = img_id.split('_')[:-2]
-#                names = []
-#                for t in tmp:
-#                    if not t in names and not t[0].islower():  # 如果字符没有重复出现，没有小写字母开头,则存入，否则直接退出for循环
-#                        names.append(t)
-#                    else:
-#                        break
-#                folder = names[0] + '--' + names[1]   # 需要额外生成文件夹名称
-#                if len(names) > 2:
-#                    for k in range(2, len(names)):    # 获取部分特殊文件名中的folder
-#                        folder += '_' + names[k]
-#                folder = names[0] + '--' + names[1]   # 需要额外生成文件夹名称
-#                if len(names) > 2:
-#                    for k in range(2, len(names)):    # 获取部分特殊文件名中的folder
-#                        folder += '_' + names[k]
+
                 
-                img_file = self.subset_path[i] + 'images/{}/{}.jpg'.format(folder, img_id)
-                xml_file = self.subset_path[i] + 'Annotations/{}.xml'.format(img_id)
+                img_file = self.img_prefix[i] + 'images/{}/{}.jpg'.format(folder, img_id)
+                xml_file = self.img_prefix[i] + 'Annotations/{}.xml'.format(img_id)
                 
                 img_anns.append(dict(img_id=img_id, img_file=img_file, xml_file=xml_file))
         return img_anns

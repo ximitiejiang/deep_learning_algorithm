@@ -238,18 +238,15 @@ def to_tensor(data):
     if isinstance(data, float): # python3中只有一种浮点数类型float，没有其他类型
         return torch.FloatTensor([data])
     
-    if isinstance(data, np.ndarray) and data.ndim >= 3:  # img numpy to tensor
+    if isinstance(data, np.ndarray):  # img numpy to tensor
         return torch.from_numpy(data)
-    
-    if isinstance(data, np.ndarray) and data.ndim == 2:  # seg numpy to tensor
-        return torch.LongTensor(data)
     
     if isinstance(data, torch.Tensor): # tensor to tensor
         return data
     if isinstance(data, list):   # list to tensor (注意字符串不能转tensor)
         return torch.tensor(data)
     else:
-        raise TypeError('not recognized data type.')
+        raise TypeError('not recognized data type for to_tensor.')
 
 
 def to_device(data, device):
@@ -292,6 +289,7 @@ def label2color(img, pallete='voc'):
         img: (h, w), 其中的每个像素值为0~20,代表某一类别。
         pallete: (m, 3)
     """
+    # TODO: 待确认pallete是BGR还是RGB
     img = img.astype(np.int32)
     colors = get_pallete(pallete)
     h, w = img.shape
@@ -301,20 +299,7 @@ def label2color(img, pallete='voc'):
             new_img[i, j, :] = colors[img[i, j]]
     return new_img
 
-# TODO: 待完成，待确认pallete是BGR还是RGB
-def color2label(img, pallete='voc'):
-    """用于把segment的bgr颜色转换为标签代码, 其中
-    args:
-        img: (h, w, 3)分割图片，其中通道c顺序为bgr顺序
-        pallete: (m,3)为颜色调色板
-    """
-    colors = get_pallete(pallete)
-    h, w = img.shape[:2]
-    new_img = np.zeros((h, w))
-    for i in range(h):
-        for j in range(w):
-            pass
-    return new_img
+
 
     
 # %% 变换类

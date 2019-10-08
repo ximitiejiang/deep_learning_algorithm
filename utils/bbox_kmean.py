@@ -31,6 +31,7 @@ def load_dataset(cfg_path):
     dataset = get_dataset(cfg.trainset, cfg.transform)
     ww = []
     hh = []
+#    data = dataset[0]
     for data in tqdm(dataset):
         bbox = data['gt_bboxes']
         w = (bbox[:, 2] - bbox[:, 0]).numpy()
@@ -76,14 +77,14 @@ def area_iou(box, clusters):
         box:  (2,)某一个box的w,h
         clusters: (k, 2)某一组种子聚合点
     return:
-        iou ()
+        iou (k,)
     """
     x = np.minimum(clusters[:, 0], box[0])
     y = np.minimum(clusters[:, 1], box[1])
     area_intersection = x * y
     area_box = box[0] * box[1]
     area_clusters = clusters[:, 0] * clusters[:, 1]  # (k,)
-    
+    # TODO: 需要预防分母为0或者nan的情况(在widerface中可能出现)
     iou = area_intersection / (area_box + area_clusters - area_intersection) # (k,)
     
     return iou # (k,)
@@ -149,15 +150,16 @@ def get_voc_avg_area_iou(anchors, cfg_path):
 
 
 if __name__ =='__main__':
-
-#    cfg_path = '../demo/cfg_detector_ssdvgg16_voc.py'
-    cfg_path = '../demo/cfg_detector_ssdvgg16_widerface.py'
+    task = 'widerface'
     
-    task = 'get_anchor'
+    if task == 'voc':    
+        cfg_path = '../demo/cfg_detector_ssdvgg16_voc.py'
+        
+    if task == 'widerface':
+        cfg_path = '../demo/cfg_detector_ssdvgg16_widerface.py'
     
-    if task == 'get_anchor':    
+ 
         k_clusters, *_ = get_voc_anchor_params(cfg_path, k=12)  # k=9(0.672), k=12
-    
-    if task == 'get_iou':
-        get_voc_avg_area_iou(k_clusters, cfg_path)
+
+#        get_voc_avg_area_iou(k_clusters, cfg_path)
     

@@ -7,7 +7,7 @@ Created on Tue Sep  3 21:29:33 2019
 """
 import cv2
 from model.runner_lib import Runner
-from utils.evaluation import eval_dataset_det, Predictor
+from utils.evaluation import eval_dataset_det, DetPredictor
 from utils.tools import parse_log
 from utils.dataset_classes import get_classes
 from utils.visualization import vis_all_opencv, vis_cam
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     
     if task == 'test':  # 测试单张图或多张图的结果
         img = cv2.imread('../test/1.jpg')
-        predictor = Predictor(cfg_path,                         
+        predictor = DetPredictor(cfg_path,                         
                               load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_11.pth',
                               load_device='cuda')
         for results in predictor([img]):
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     
     if task == 'video': # 测试视频预测结果：注意方法稍有不同，vis_cam需要传入一个predictor
         src = 0  # src可以等于int(cam_id), str(video path), list(img_list)
-        predictor = Predictor(cfg_path,                         
+        predictor = DetPredictor(cfg_path,                         
                               load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_11.pth',
                               load_device='cuda')
         vis_cam(src, predictor, class_names=get_classes('voc'), score_thr=0.2)

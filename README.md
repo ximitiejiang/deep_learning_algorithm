@@ -12,6 +12,7 @@
 2. 语义分割相关
     - FCN
     - DeeplabV3
+    - PSPNet
     
 3. 物体跟踪相关
     - tbf
