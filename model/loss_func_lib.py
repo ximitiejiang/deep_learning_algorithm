@@ -31,20 +31,40 @@ def weighted_smooth_l1(pred, target, weight, beta=1.0, avg_factor=None):
     loss = smooth_l1_loss(pred, target, beta, reduction='none')
     return torch.sum(loss * weight) / avg_factor  # 这里修改了下让输出是一个tensor标量
 
-
-def py_sigmoid_focal_loss(pred,
-                          target,
-                          weight=None,
-                          gamma=2.0,
-                          alpha=0.25,
-                          reduction='mean',
-                          avg_factor=None):
+# %% focal loss
+def sigmoid_focal_loss(pred,
+                       target,
+                       weight,
+                       gamma=2.0,
+                       alpha=0.25,
+                       reduction='elementwise_mean'):
+    """带sigmoid的focal loss实现：
+    args:
+        pred:
+        target:
+        weight:
+        reduction:
+    """
     pred_sigmoid = pred.sigmoid()
-    target = target.type_as(pred)
-    pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
-    focal_weight = (alpha * target + (1 - alpha) *
-                    (1 - target)) * pt.pow(gamma)
-    loss = F.binary_cross_entropy_with_logits(
-        pred, target, reduction='none') * focal_weight
-    loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
-    return loss
+    pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)  # pt = (1-p)*
+    weight = (alpha * target + (1 - alpha) * (1 - target)) * weight
+    weight = weight * pt.pow(gamma)
+    return F.binary_cross_entropy_with_logits(
+        pred, target, weight, reduction=reduction)
+
+
+def weighted_sigmoid_focal_loss(pred,
+                                target,
+                                weight,
+                                gamma=2.0,
+                                alpha=0.25,
+                                avg_factor=None,
+                                num_classes=20):
+    if avg_factor is None:
+        avg_factor = torch.sum(weight > 0).float().item() / num_classes + 1e-6
+    return sigmoid_focal_loss(
+        pred, target, weight, gamma=gamma, alpha=alpha,
+        reduction='sum')[None] / avg_factor
+
+# %%
+    

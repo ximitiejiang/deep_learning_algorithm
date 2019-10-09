@@ -1,5 +1,5 @@
 
-# 临时记录pytorch训练深度神经网络的注意事项
+# 关于pytorch训练深度神经网络的注意事项
 
 
 ### 关于数据格式
@@ -20,7 +20,8 @@
    label = label.long()
    这两句要放在每个batch开始位置
 
-   为了避免遗忘，可以把这部分操作集成到自定义的to_tensor()函数中，在每次开始转tensor的时候自动转换：
+   为了避免遗忘，可以把这部分操作集成到自定义的to_tensor()函数中，在每次开始转tensor的时候自动转换。
+   但对于numpy形式的img, label, segment这里无法区分，需要在数据集中单独转换为float32或int64
     if isinstance(data, torch.Tensor):
         return data
     elif isinstance(data, np.ndarray):
@@ -446,6 +447,13 @@
 2. 下采样的方法：可以采用maxpool(), avgpool(), conv2d()，区别
 
 3. 上采样的方法：插值法，比如F.interpolate()
+
+
+### 关于分割数据集的使用
+
+1. voc的分割数据集：seg文件是一个png图片文件，里边通过PIL.Image加载以后就能直接得到取值0-20共计21个类别的像素值，还包括取值=255的白色边框线。
+所以需要进行的处理就是，把255的值置0作为背景，然后把Image对象转换为numpy作为seg_label进行训练即可。
+(参考：)
 
    
 ### SSD物体检测算法的总结

@@ -106,15 +106,49 @@ def get_one_img_anchor_target(anchors, gt_bboxes, gt_labels, img_metas,
     return bbox_targets, bbox_weights, labels, label_weights, pos_inds, neg_inds
 
 
-# %%
+# %% anchor free - FCOS的target生成程序
+    
+def get_centerness_target(pos_bbox_targets):
+    """centerness可以理解为中心度，用来表征该点距离bbox中心点的程度，该值越接近1，则越接近bbox中心点。
+    而越接近0则越远离中心点。因此采用c = sqrt((min(l,r)/max(l,r) * min(t,b)/max(t,b))来表示，相当于
+    用l/r来评估偏离度，且分别评估了水平方向和竖直方向的偏离度。
+    """
+    lr = pos_bbox_targets[:, [0, 2]]
+    tb = pos_bbox_targets[:, [1, 3]]
+    centerness_target = (lr.min(dim=1)[0] / lr.max(dim=1)[0]) * \
+                        (tb.min(dim=1)[0] / tb.max(dim=1)[0])
+    return torch.sqrt(centerness_target)  # (k,)
+    
+
+def get_points(featmap_sizes, strides, device):
+    """计算一张图片所有特征子图的网格中心点坐标集合
+    args:
+        featmap_sizes: (n_level, )(h, w)
+        strides: 步长
+        device
+    returns:
+        points: (n_level,)(k, 2) 表示每层的k个中心点
+    """
+    all_points = []
+    for i, featmap_size in enumerate(featmap_sizes):
+        h, w = featmap_size
+        x = torch.arange(0, w * strides[i], strides[i], device=device)
+        y = torch.arange(0, h * strides[i], strides[i], device=device)
+        xx, yy = torch.meshgrid(x, y)
+        # 先堆叠成(k, 2)然后平移半个步长到网格中心点
+        points = torch.stack([xx.reshape(-1), yy.reshape(-1)], dim=-1) + strides[i] // 2
+        all_points.append(points)
+    return all_points   # (5,)(k,2)
+
+
     
 def get_point_target(points, regress_ranges, gt_bboxes_list, gt_labels_list, num_level_points):
     """计算target
     args:
         points: (k,2)，为已合并的points，由于对每张图都一样，所以points不需要分batch
         regress_ranges: ((-1,64),(64,128),(..),(..),(..))，由于对每张图都一样，所以regress_rnage不需要分batch
-        gt_bboxes_list: (b,)(m, 4)
-        gt_labels_list: (b,)(m,)
+        gt_bboxes_list: (b,)(m, 4), b为batch size
+        gt_labels_list: (b,)(m,), b为batch size
         num_level_points: (5,) 表示每层特征图上的points个数
     return
         all_bbox_targets
@@ -124,19 +158,27 @@ def get_point_target(points, regress_ranges, gt_bboxes_list, gt_labels_list, num
     repeat_regress_ranges = []
     for i, ranges in enumerate(regress_ranges):
         repeat_regress_ranges.append(points.new_tensor(ranges).repeat(num_level_points[i], 1))
-    regress_ranges = torch.cat(repeat_regress_ranges, dim=0)  # 堆叠 (k, 2)
+    regress_ranges = torch.cat(repeat_regress_ranges, dim=0)  # (k, 2)代表一张图的，跟一张图的points一一对应
     # 计算每张图的target
     num_imgs = len(gt_bboxes_list)
-    all_bbox_targets = []
-    all_labels = []
+    bbox_targets = []
+    labels = []
     for i in range(num_imgs):
-        bbox_targets, labels = get_one_img_point_target(
+        bbox_target, label = get_one_img_point_target(
                 points, regress_ranges, gt_bboxes_list[i], gt_labels_list[i])
-        all_bbox_targets.append(bbox_targets)  # (b,)(k,4)
-        all_labels.append(labels)             # (b,)(k,)
-    # 分拆到每个level
+        bbox_targets.append(bbox_targets)  # (b,)(k,4)
+        labels.append(labels)             # (b,)(k,)
+    # 变换格式：从外层batch，内层(k)变换为外层按照特征分，内层按照batch分
+    all_labels = []
+    all_bbox_targets = []
+    for num in num_level_points:
+        stacked_labels = torch.stack([label[:num] for label in labels], dim=0)  # (b,)(n,) ->(m,)
+        stacked_bbox_targets = torch.stack([bbox_target[:num] for bbox_target in bbox_targets], dim=0) # (b,)(n,4) ->(m,4)
+         
+        all_labels.append(stacked_labels)  # (5,) (m,)
+        all_bbox_targets.append(stacked_bbox_targets) # (5,) (m,4)
     
-    return all_bbox_targets, all_labels  # TODO: 是否要变换成(5,)(k,)  (5,)(k,4)
+    return all_bbox_targets, all_labels  # (5,)(m,4)  and (5,)(m,)
     
     
     
@@ -160,24 +202,25 @@ def get_one_img_point_target(points, regress_ranges, gt_bboxes, gt_labels):
     # 得到每个point针对每个gt bbox的target，然后再筛选
     bbox_targets = torch.stack([left,right,top,bottom], dim=-1) # (k, m, 4)
     
-    # 1. 判断point是否在gt bbox中
-    inside_gt_bbox_mask = bbox_targets.min(dim=-1)[0] > 0  # 取l,r,t,b中最小值>0，则说明l,r,t,b4个值都大于0，必在bbox内
+    # 1. 判断point是否在gt bbox中(l/r/b/t > 0)
+    inside_gt_bbox_mask = bbox_targets.min(dim=-1)[0] > 0  # 用l/r/t/b做判断：取l,r,t,b中最小值>0，则说明l,r,t,b4个值都大于0，必在bbox内
     
-    # 2. 判断point的最大回归值是在哪个回归范围，从而判断该点应该在哪张特征图
+    # 2. 判断point的最大回归值是在哪个回归范围，从而判断该点应该在哪张特征图(l/r/b/t < regress_range)
     regress_ranges = regress_ranges[:, None, :].expand(num_points, num_gts, 2)  # 变换为(k,m,2)便于跟(k,m)做运算
     max_regress_distance = bbox_targets.max(dim=-1)[0]     #(k, m) 
     inside_regress_range_mask = (
             max_regress_distance >= regress_ranges[..., 0]) & (
                     max_regress_distance <= regress_ranges[..., 1])   # 取l,r,t,b中最大值检查是否在regress range内
-    # 3. 剔除mask中为0的: 如果一个point对应了多个gt，取面积更小的gt bbox作为该point对应的bbox
+    # 3. 基于前2步筛除area，同时如果一个point对应了多个gt，取面积更小的gt bbox作为该point对应的bbox
     areas = areas.repeat(num_points, 1)    # (k, m)
-    areas[inside_gt_bbox_mask == 0] = 1e+8
-    areas[inside_regress_range_mask == 0] = 1e+8
+    areas[inside_gt_bbox_mask == 0] = 1e+8       # 剔除gt外边的点
+    areas[inside_regress_range_mask == 0] = 1e+8  # 剔除回归范围外的点
     min_areas, min_area_inds = areas.min(dim=1)    # 为每个point在m个gt中找到面积最小对应的gt bbox
     
     # 为每一个point指定一个label
     labels = gt_labels[min_area_inds]   # 取最小面积对应的那个bbox的label(都是作为正样本取标签，1-20)
-    labels[min_areas == 1e+8] = 0       # 但如果该最小面积不在gt bbox，也不在回归范围，则属于负样本取标签=0
+    labels[min_areas == 1e+8] = 0       # (k,)包含了正样本和负样本：如果该最小面积不在gt bbox，也不在回归范围，则属于负样本取标签=0
+                                        # 注意：labels和bbox_tagets都包含了所有的正样本和负样本，没有去掉任何样本。
     # 取最小面积ind对应的bbox坐标
     # 注意这里筛选bbox_target的用法很容易忽略出错，是对第0,第1维度分别用列表筛选，得到的是两个列表交汇的位置的坐标，所以降维了。
     bbox_targets = bbox_targets[range(num_points), min_area_inds]   # (k,m,4)-> (k,4)
@@ -205,4 +248,12 @@ def calc_lrtb(points, bboxes):
     t = yy - bboxes[:, 1]
     b = bboxes[:, 3] - yy
     return l, r, t, b
-        
+
+
+if __name__ == "__main__":
+    # 单图points
+    points = get_points((300, 300), 10)
+    regress_ranges = ((30, 30))
+    gt_bboxes = torch.tensor([[0,0,40,40], [100,100, 170, 170]])
+    gt_labels = torch.tensor([1, 1])
+    bbox_targets, labels = get_point_target(points, regress_ranges, gt_bboxes, gt_labels)        

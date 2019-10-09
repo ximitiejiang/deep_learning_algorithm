@@ -84,10 +84,11 @@ class FPN(nn.Module):
         # 增加额外输出
         extra_layers = num_outs - len(self.use_levels) 
         if extra_layers > 0:
-            if self.extra_convs_on_inputs:
+            if self.extra_convs_on_inputs:  # FCOS采用的是前一层输出作为extra layer的输入，而之前FPN/Faster RCNN都是采用前一层的输入作为extra layer的输入
                 in_channels = self.in_channels[-1]  # 对于多层extra conv，第一层的输入是从input来，其他extra conv就是接前一层extra conv的输出作为输入
             else:
                 in_channels = self.out_channels    # 如果extra conv不是作用在输入，则就是作用在输出，则只可能是256的输入层数
+            # 添加额外的层数
             for i in range(extra_layers):
                 extra_fpn_conv = conv_bn_relu(in_channels, self.out_channels, 3,
                                               False, None, False, 2, 1)  # 注意extra conv需要缩减特征尺寸s=2

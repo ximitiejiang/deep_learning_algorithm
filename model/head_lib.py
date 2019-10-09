@@ -10,9 +10,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from model.get_target_lib import get_anchor_target, get_point_target
+from model.get_target_lib import get_anchor_target, get_point_target, get_points
 from model.anchor_generator_lib import AnchorGenerator
-from utils.init_weights import xavier_init
+from utils.init_weights import xavier_init, normal_init, bias_init_with_prob
 from model.loss_func_lib import weighted_smooth_l1
 from model.bbox_regression_lib import delta2bbox
 from model.conv_module_lib import conv_norm_acti
@@ -293,8 +293,8 @@ class SSDHead(nn.Module):
     def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg):
         """在测试时基于前向计算结果，计算bbox预测类别和预测坐标，此时前向计算后不需要算loss，直接计算bbox的预测
         Args:
-            cls_scores(6, )(b, c, h, w): 按层分组
-            bbox_preds(6, )(b, c, h, w):按层分组
+            cls_scores(6,)(b,c,h,w): 按层分组
+            bbox_preds(6,)(b,c,h,w):按层分组
             img_metas:()
             cfg:()
         """
@@ -398,14 +398,15 @@ class RetinaHead(SSDHead):
     
     
 # %%
+from utils.prepare_training import get_loss_fn
 class FCOSHead(nn.Module):
     """fcos无anchor的head
     """
     def __init__(self,
-                 num_classes,
-                 in_channels=256,
-                 out_channels=256,
-                 num_convs=4,
+                 num_classes=21,
+                 in_channels=256,  # 堆叠卷积的输入通道数(不包括做变换的卷积层)
+                 out_channels=256, # 堆叠卷积的输出通道数
+                 num_convs=4,      # 堆叠的卷积层数
                  strides=(4, 8, 16, 32, 64),
                  regress_ranges=((-1, 64), (64, 128), (128, 256), (256, 512), (512, 1e8)),
                  loss_cls_cfg=None,
@@ -416,33 +417,48 @@ class FCOSHead(nn.Module):
         super().__init__()
         self.num_classes = num_classes
         self.regress_ranges = regress_ranges
-        
+        self.strides = strides
         # 创建分类，回归，centerness分支
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         for i in range(self.num_convs):
             in_channels = self.in_channels
             self.cls_convs.append(conv_norm_acti(in_channels, out_channels, 3, stride=1, padding=1))
-            self.reg_convs.append(conv_norm_acti(in_channles, out_channels, 3, stride=1, padding=1))
-        self.fcos_cls
-        self.fcos_reg
-        self.fcos_centerness
+            self.reg_convs.append(conv_norm_acti(in_channels, out_channels, 3, stride=1, padding=1))
+        # 创建分类，回归，centerness转换头
+        self.fcos_cls = nn.Conv2d(out_channels, num_classes - 1, 3, stride=1, padding=1)   # 注意这里要调整到20类，不考虑背景类，因为？？？
+        self.fcos_reg = nn.Conv2d(out_channels, 4, 3, stride=1, padding=1)
+        self.fcos_centerness = nn.Conv2d(out_channels, 1, 3, stride=1, padding=1)
         # 这里没有采用scales层
         
         # 创建损失函数
+        self.loss_cls = get_loss_fn(loss_cls_cfg)
+        self.loss_reg = get_loss_fn(loss_reg_cfg)
+        self.loss_centerness = get_loss_fn(loss_centerness_cfg)
 
-        
+
     def init_weights(self):
-        pass
+        for m in self.cls_convs.modules():
+            normal_init(m.conv, std=0.01)
+        for m in self.reg_convs.modules():
+            normal_init(m.conv, std=0.01)
+        bias_cls = bias_init_with_prob(0.01)
+        normal_init(self.fcos_cls, std=0.01, bias=bias_cls)
+        normal_init(self.fcos_reg, std=0.01)
+        normal_init(self.fcos_centerness, std=0.01)
     
     
     def forward(self, x):
+        """对FPN过来的输入进行计算(FPN的作用是把batch中同尺寸特征放一起，且还能堆叠因为通道数也一致)
+        args:
+            x(5) 表示5层特征，每层(b, 256, h, w)
+        """
         cls_scores = []
         centernesses = []
         bbox_preds = []
         # 分别计算每一张特征图(b,c,h,w), 共计5张
         for feat in x:
-            cls_feat = feat   #
+            cls_feat = feat   # (b, 256, h, w)
             reg_feat = feat
             # 计算卷积层
             for cls_layer in self.cls_convs:
@@ -450,11 +466,11 @@ class FCOSHead(nn.Module):
             for reg_layer in self.reg_convs:
                 reg_feat = reg_layer(reg_feat)
             # 计算最终fcos层
-            cls_scores.append(self.fcos_cls(cls_feat))
-            centernesses.append(self.fcos_centerness(cls_feat))
-            bbox_preds.append(self.fcos_reg(reg_feat))
+            cls_scores.append(self.fcos_cls(cls_feat)) # (b, 20, h, w)
+            centernesses.append(self.fcos_centerness(cls_feat))  # (b, 1, h, w)
+            bbox_preds.append(self.fcos_reg(reg_feat).float().exp()) # (b, 4, h, w)但这里需要把预测值取对数变为正数，而设置float()是为了在FP16模式下不会overflow  
             
-        return cls_scores, bbox_preds, centernesses  # (5,)(b, 20*4, h, w)代表每个中心点样本的20个类别置信度, (5,)(b, 1, h, w)代表, (5,)(4, 4, h, w)
+        return cls_scores, bbox_preds, centernesses  # 每个变量都是(5,)
     
     
     def get_losses(self, cls_scores, bbox_preds, centernesses, 
@@ -462,52 +478,72 @@ class FCOSHead(nn.Module):
         """计算损失：先获得target，然后基于样本和target计算损失
         注意：对FCOS的loss可以一次性把一个batch的loss一起算出来，这是更高效的算法
         args:
-            cls_scores: (5,)(b, 20*4, h, w) 按层分组
+            cls_scores: (5,)(b, 20, h, w) 按层分组
             bbox_preds: (5,)(b, 4, h, w) 按层分组
             centernesses: (5,)(b, 1, h, w) 按层分组
             gt_bboxes: (b,)(k, 4) 按batch分组
             gt_labels: (b,)(k, ) 按batch分组
             img_metas: (b,) 按batch分组
         """
-        featmap_sizes = [featmap.shape[-2:] for featmap in cls_scores]
+        num_imgs = len(img_metas)
+        featmap_sizes = [featmap.shape[-2:] for featmap in cls_scores] # (5,) (h,w)
         device = cls_scores.get_device()
         # 计算网格中心点
-        points = self.get_points(featmap_sizes, self.strides, device) # (5,)(k,2)
+        points = get_points(featmap_sizes, self.strides, device) # (5,)(k,2)
         num_level_points = [pt.shape[0] for pt in points]
         points = torch.cat(points, dim=0)   # (k, 2)
         # 计算target
-        self.get_point_target(points, self.regress_ranges, gt_bboxes, num_level_points)
+        labels, bbox_targets = get_point_target(
+                points, self.regress_ranges, gt_bboxes, num_level_points) # labels(5,)(m,),  bbox_targets(5,)(m,4) 
         
-        # 展平调整格式
+        # 展平调整格式: 统一为外层为特征层数，内层为(b, xxx), 然后堆叠
+        all_cls_scores = torch.cat([
+                cls_score.permute(0,2,3,1).reshape(-1, self.num_classes - 1)   # 注意，分类score里边是按照20类或80类来算，不考虑负样本。因为采用的损失函数是focal loss而不是交叉熵。
+                for cls_score in cls_scores])             # (5,)(b,20,h,w)->(5*b*h*w,20)
+        all_bbox_preds = torch.cat([
+                bbox_pred.permute(0,2,3,1).reshape(-1, 4)  
+                for bbox_pred in bbox_preds])             # (5,)(b,4,h,w)->(5*b*h*w,4)
+        all_centernesses = torch.cat([
+                centerness.permute(0,2,3,1).reshape(-1)
+                for centerness in centernesses])          # (5,)(b,1,h,w)->(5*b*h*w,20)
+        # 注意points的堆叠，需要在内层先配出batch的数量出来,然后再按照外层的特征层数堆叠
+        all_points = torch.cat([
+                point.repeat(num_imgs, 1) for point in points])
+        all_labels = torch.cat(labels)    # (5*k, )
+        all_bbox_targets = torch.cat(bbox_targets) # (5*k, 4)
         
-        # 计算损失: 没有增加weights
-        pos_inds = labels.nonzero().reshape(-1)
-        loss_cls = self.loss_cls()
+        # 分类损失: 采用focal loss
+        pos_inds = all_labels.nonzero().reshape(-1)  # 得到正样本的index
         num_pos = len(pos_inds)
+        loss_cls = self.loss_cls(all_cls_scores, 
+                                 all_labels,
+                                 ) 
+
         # 计算正样本的回归损失和中心点分类损失
         if num_pos > 0:
             loss_reg = self.loss_reg()
-            
         
-    def get_points(self, featmap_sizes, strides, device):
-        """计算所有网格中心点坐标集合
-        args:
-            featmap_sizes: (n_level, )(h, w)
-            strides: 步长
-            device
-        returns:
-            points: (n_level,)(k, 2) 表示每层的k个中心点
-        """
-        all_points = []
-        for i, featmap_size in enumerate(featmap_sizes):
-            h, w = featmap_size
-            x = torch.arange(0, w * strides[i], strides[i], device=device)
-            y = torch.arange(0, h * strides[i], strides[i], device=device)
-            xx, yy = torch.meshgrid(x, y)
-            # 先堆叠成(k, 2)然后平移半个步长到网格中心点
-            points = torch.stack([xx.reshape(-1), yy.reshape(-1)], dim=-1) + strides[i] // 2
-            all_points.append(points)
-        return all_points
+        loss_centerness = self.loss_centerness()
+            
+        return dict(loss_cls = loss_cls,
+                    loss_reg = loss_reg,
+                    loss_centerness = loss_centerness)
+        
+        def get_bboxes(self, cls_scores, bbox_preds, centernesses, img_metas, cfg):
+            """
+            Args:
+                cls_scores(6,)(b,c,h,w): 按特征图分组
+                bbox_preds(6,)(b,c,h,w):按特征图分组
+            """
+            pass
+        
+        def get_one_img_bboxes(self, cls_scores, bbox_preds, centernesses, 
+                               points, img_shape, scale_factor, cfg):
+            """
+            Args:
+                cls_scores(6,)(c,h,w): 按特征图分组
+                bbox_preds(6,)(c,h,w):按特征图分组
+            """
     
     
 
