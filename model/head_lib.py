@@ -398,7 +398,6 @@ class RetinaHead(SSDHead):
     
     
 # %%
-from utils.prepare_training import get_loss_fn
 class FCOSHead(nn.Module):
     """fcos无anchor的head
     """
@@ -432,6 +431,7 @@ class FCOSHead(nn.Module):
         # 这里没有采用scales层
         
         # 创建损失函数
+        from utils.prepare_training import get_loss_fn
         self.loss_cls = get_loss_fn(loss_cls_cfg)
         self.loss_reg = get_loss_fn(loss_reg_cfg)
         self.loss_centerness = get_loss_fn(loss_centerness_cfg)

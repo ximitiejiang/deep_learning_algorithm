@@ -21,7 +21,7 @@ def train_ssd_widerface(cfg_path, resume_from):
     
 if __name__ == "__main__":
     
-    task = 'eval'
+    task = 'test'
     cfg_path = './cfg_detector_ssdvgg16_widerface.py'
     
     if task == 'train':  # 模型训练
@@ -42,10 +42,10 @@ if __name__ == "__main__":
                          result_file='/home/ubuntu/mytrain/ssd_vgg_voc/20190928_084133_eval_result.pkl')
     
     if task == 'test':  # 测试单张图或多张图的结果
-        img = cv2.imread('../test/nba.jpg')
+        img = cv2.imread('../test/4.jpg')
         predictor = DetPredictor(cfg_path,                         
                               load_from = '/home/ubuntu/mytrain/ssd_vgg_widerface/epoch_9.pth',
-                              load_device='cuda')
+                              load_device='cpu')
         for results in predictor([img]):
             vis_all_opencv(*results, class_names=get_classes('widerface'), score_thr=0.2)
     

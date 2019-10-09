@@ -94,9 +94,6 @@ def get_nms_op(nms_type):
 """
 
 """
-
-from model.nms.gpu_nms import gpu_nms
-from model.nms.cpu_nms import cpu_nms
 #from model.cpu_soft_nms import cpu_soft_nms
 
 def nms(preds, iou_thr):
@@ -117,9 +114,11 @@ def nms(preds, iou_thr):
     if preds_np.shape[0] == 0:
         inds = []
     elif device_id is not None and device_id >= 0:  # 如果是gpu tensor
+        from model.nms.gpu_nms import gpu_nms
         inds = gpu_nms(preds_np, iou_thr, device_id=device_id)
         inds = preds.new_tensor(inds, dtype=torch.long)  # 恢复tensor
     elif device_id is None or device_id == -1:    # 如果是numpy或cpu tensor
+        from model.nms.cpu_nms import cpu_nms
         inds = cpu_nms(preds_np, iou_thr)
     return preds[inds, :], inds
     
