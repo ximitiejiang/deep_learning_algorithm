@@ -1,6 +1,8 @@
 # Deep Learning Algorithms
+<div align=center><img src="https://github.com/ximitiejiang/deep_learning_algorithm/blob/master/test/nba_epoch9.png"/></div>
 
 ### 主要内容
+
 本仓库主要用于深度学习算法和训练框架的重实现，主要参考：mmdetection, awesome-semantic-segmentation-pytorch
 
 1. 物体检测相关
@@ -8,6 +10,7 @@
     - RetinaNet
     - FCOS
     - FasterRcnn
+    - MaskRcnn
     
 2. 语义分割相关
     - FCN
@@ -17,7 +20,12 @@
 3. 物体跟踪相关
     - tbf
     
-
+4. 支持的数据集
+    - voc
+    - coco
+    - widerface
+    - cityscape
+    
 ### 安装
 
 '''
@@ -52,5 +60,5 @@ python setup.py
 可以沿用某些算法中anchor的设置比例，也可以通过聚类(参考bbox_kmean)来计算针对某一数据集的anchor个数和大小，确保在anchor个数越少越好的前提下获得足够大的平均iou。
 
 7. 关于新增模型
-需要把新增的模型在prepare_training对应的位置添加进model dict中用于调用。
+需要把新增的模型在prepare_training的model zoo区域添加进对应的model dict中用于调用。
 

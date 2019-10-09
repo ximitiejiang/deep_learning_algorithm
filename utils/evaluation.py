@@ -21,6 +21,7 @@ from utils.map import eval_map
 def eval_dataset_det(cfg_path, 
                      load_from=None, 
                      load_device=None,
+                     resume_from=None,
                      result_file=None):
     """检测问题的eval dataset: 
     为了便于eval，添加2个形参参数，不必常去修改cfg里边的设置
@@ -28,11 +29,13 @@ def eval_dataset_det(cfg_path,
     # 准备验证所用的对象
     cfg = get_config(cfg_path)
     cfg.valloader.params.batch_size = 1  # 强制固定验证时batch_size=1
-    # 为了便于eval，不必常去修改cfg里边的设置，直接在func里边添加2个参数即可
+    # 为了便于eval，不必常去修改cfg里边的设置，直接在func里边添加几个参数即可
     if load_from is not None:
         cfg.load_from = load_from
     if load_device is not None:
         cfg.load_device = load_device
+    if resume_from is not None:
+        cfg.resume_from = resume_from
     
     dataset = get_dataset(cfg.valset, cfg.transform_val)
     dataloader = get_dataloader(dataset, cfg.valloader)
@@ -118,7 +121,9 @@ class SegPredictor(DetPredictor):
                 with timer('seg one img'):
                     seg = self.model(**img_data, return_loss=False)  # (1,21,480,480)
                     pred = torch.argmax(seg.squeeze(), dim=0).cpu().data.numpy()  # (h, w)为每个像素的类别(0-20)
-                pred_img = label2color(pred, 'voc')   # (h,w,3)这一步不算是分割的时间，但转换耗时较长，影响cam实时显示
+                # (h,w,3)这一步不算是分割的时间，但转换耗时较长，影响cam实时显示
+                # TODO: 考虑换成PIL.Image提取然后转换到cv2显示
+                pred_img = label2color(pred, 'voc')   
                 yield pred_img
                 
                 

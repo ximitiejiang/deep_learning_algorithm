@@ -93,7 +93,8 @@ class Runner():
     如果主模型是一个集成检测模型，则要求该主模型所包含的所有下级模型也要继承
     自nn.module且包含forward函数。
     """
-    def __init__(self, cfg_path,):
+    def __init__(self, cfg_path,
+                 resume_from=None):
         # 共享变量: 需要声明在resume/load之前，否则会把resume的东西覆盖
         self.c_epoch = 0
         self.c_iter = 0
@@ -103,6 +104,8 @@ class Runner():
                        'lr':[]}
         # 获得配置
         self.cfg = get_config(cfg_path)
+        if resume_from is not None:
+            self.cfg.resume_from = resume_from  # runner可以直接修改resume_from,避免修改cfg文件
         # 检查文件夹和文件是否合法
         self.check_dir_file(self.cfg)
         #设置logger

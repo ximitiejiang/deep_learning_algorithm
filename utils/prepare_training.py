@@ -11,7 +11,7 @@ from importlib import import_module
 import logging
 import torch
 import numpy as np
-from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform, MaskTransform
+from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform
 from utils.tools import get_time_str
 
 from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
@@ -25,6 +25,8 @@ from model.ssdvgg16_lib import SSDVGG16
 from model.fcnvgg16_lib import FCNVGG16
 from model.head_lib import SSDHead, RetinaHead, FCOSHead
 from model.fcn_head import FCN8sHead
+
+from model.lr_processor_lib import FixedLrProcessor, ListLrProcessor, StepLrProcessor
 
 
 # %% model zoo
@@ -50,6 +52,9 @@ loss_fn_dict = {
             'cross_entropy': torch.nn.CrossEntropyLoss,
             'smooth_l1': torch.nn.SmoothL1Loss}
 
+lr_processors = {'fix': FixedLrProcessor,
+                'list': ListLrProcessor,
+                'step': StepLrProcessor}
 
 # %%
 def get_config(config_path="cfg_ssd_voc.py"):
@@ -116,7 +121,6 @@ def get_dataset(dataset_cfg, transform_cfg):
     label_transform = None
     bbox_transform = None
     aug_transform = None
-    mask_transform = None
     seg_transform = None
     
     if transform_cfg.get('img_params') is not None:
@@ -132,9 +136,6 @@ def get_dataset(dataset_cfg, transform_cfg):
     if transform_cfg.get('seg_params') is not None:
         seg_p = transform_cfg['seg_params']
         seg_transform = SegTransform(**seg_p)
-    if transform_cfg.get('mask_params') is not None:
-        mask_p = transform_cfg['mask_params']
-        mask_transform = MaskTransform(**mask_p)
         
     dataset_name = dataset_cfg.get('type')
     dataset_class = datasets[dataset_name]
@@ -146,8 +147,7 @@ def get_dataset(dataset_cfg, transform_cfg):
                          label_transform=label_transform,
                          bbox_transform=bbox_transform,
                          aug_transform=aug_transform,
-                         seg_transform=seg_transform,
-                         mask_transform=mask_transform)    
+                         seg_transform=seg_transform)    
     if repeat:
         return RepeatDataset(dset, repeat)
     else:
@@ -320,12 +320,8 @@ def get_loss_fn(loss_cfg):
 
 
 # %%
-from model.lr_processor_lib import FixedLrProcessor, ListLrProcessor, StepLrProcessor
-        
 def get_lr_processor(runner, lr_processor_cfg):
-    lr_processors = {'fix': FixedLrProcessor,
-                    'list': ListLrProcessor,
-                    'step': StepLrProcessor}
+
     lr_processor_name = lr_processor_cfg.type
     lr_processor_class = lr_processors[lr_processor_name]
     params = lr_processor_cfg.params

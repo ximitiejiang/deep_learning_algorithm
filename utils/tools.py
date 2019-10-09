@@ -115,7 +115,8 @@ def parse_log(path, show=True):
         lines = f.readlines()
         data_dict = {'loss': [],
                      'acc': []}
-        lines = lines[2:]
+        lines = lines[2:]  # 去除开始2行
+        lines = lines[:-1] # 去除最后一行
         for line in lines:
             loss = float(line.split('\t')[-3].split(' ')[-1])
             acc = float(line.split('\t')[-2].split(' ')[-1])
