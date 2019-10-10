@@ -7,7 +7,12 @@ Created on Fri Sep 20 10:07:24 2019
 """
 import torch
 from model.anchor_assigner_sampler_lib import MaxIouAssigner, PseudoSampler
-from model.bbox_regression_lib import bbox2delta
+from model.bbox_regression_lib import bbox2delta, bbox2lrtb
+
+"""总的原则：对于获取target的目的，都是为了送入loss函数进行损失计算。而计算loss通常
+都是按照batch的方式每张图算一次loss，所以target都是整理成(b,)形式的
+"""
+
 
 def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list,
                       img_metas_list, assigner_cfg, sampler_cfg, 
@@ -19,6 +24,8 @@ def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list,
             gt_bboxes_list: (b, )(k, 4)
             gt_labels_list: (b, )(k, )
             img_metas_list： (b, )(dict)
+        return:
+            
         """
         # 初始化
         all_labels = []
@@ -145,7 +152,7 @@ def get_points(featmap_sizes, strides, device):
 def get_point_target(points, regress_ranges, gt_bboxes_list, gt_labels_list, num_level_points):
     """计算target
     args:
-        points: (k,2)，为已合并的points，由于对每张图都一样，所以points不需要分batch
+        points: (5,)(n,2)，单张图的每个特征图的point集合
         regress_ranges: ((-1,64),(64,128),(..),(..),(..))，由于对每张图都一样，所以regress_rnage不需要分batch
         gt_bboxes_list: (b,)(m, 4), b为batch size
         gt_labels_list: (b,)(m,), b为batch size
@@ -154,6 +161,8 @@ def get_point_target(points, regress_ranges, gt_bboxes_list, gt_labels_list, num
         all_bbox_targets
         all_labels
     """
+    # 堆叠point
+    points = torch.cat(points)  # (k,2)
     # 堆叠regress_ranges：让每个point对应一个regress range
     repeat_regress_ranges = []
     for i, ranges in enumerate(regress_ranges):
@@ -198,7 +207,7 @@ def get_one_img_point_target(points, regress_ranges, gt_bboxes, gt_labels):
     areas = (gt_bboxes[:, 2] - gt_bboxes[:, 0] + 1) * (gt_bboxes[:, 3] - gt_bboxes[:, 1] + 1) # (m,)
 
     # 计算每个point与每个gt bbox的对应样本的l,r,t,b
-    left, right, top, bottom = calc_lrtb(points, gt_bboxes)
+    left, right, top, bottom = bbox2lrtb(points, gt_bboxes)
     # 得到每个point针对每个gt bbox的target，然后再筛选
     bbox_targets = torch.stack([left,right,top,bottom], dim=-1) # (k, m, 4)
     
@@ -226,28 +235,6 @@ def get_one_img_point_target(points, regress_ranges, gt_bboxes, gt_labels):
     bbox_targets = bbox_targets[range(num_points), min_area_inds]   # (k,m,4)-> (k,4)
     return bbox_targets, labels  # (k,4) , (k,)
      
-    
-    
-    
-def calc_lrtb(points, bboxes):
-    """计算每个points与每个gtbbox的left,right,top,bottom
-    points(k,2), bboxes(m,4)
-    returns:
-        l(k,m), r(k,m), t(k,m), b(k,m) 
-    """
-    num_bboxes = bboxes.shape[0]
-    # 计算中心点
-    x = points[:, 0]
-    y = points[:, 1]
-    # 中心点堆叠
-    xx = x[:, None].repeat(1, num_bboxes)
-    yy = y[:, None].repeat(1, num_bboxes)
-    # 计算中心点相对bbox边缘的左右上下距离left,right,top,bottom
-    l = xx - bboxes[:, 0]
-    r = bboxes[:, 2] - xx
-    t = yy - bboxes[:, 1]
-    b = bboxes[:, 3] - yy
-    return l, r, t, b
 
 
 if __name__ == "__main__":

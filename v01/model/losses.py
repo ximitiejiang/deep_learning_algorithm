@@ -36,6 +36,10 @@ def sigmoid_focal_loss(pred,
                        alpha=0.25,
                        reduction='elementwise_mean'):
     """带sigmoid的focal loss实现：
+    args:
+        pred: (m, 20)
+        target: (m, 20)
+        weight: (m, 20)
     """
     pred_sigmoid = pred.sigmoid()
     pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)  # pt = (1-p)*

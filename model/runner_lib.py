@@ -47,10 +47,10 @@ def batch_segmentator(model, data, device, return_loss=True, **kwargs):
     imgs = to_device(data['img'], device)
     segs = to_device(data['seg'], device)
     if not return_loss:
-        outs = model(imgs, segs, return_loss=False)
+        outs = model(imgs, return_loss=False, segs=segs)
         return outs
     if return_loss:
-        loss = model(imgs, segs, return_loss=True)
+        loss = model(imgs, return_loss=True, segs=segs)
         return loss
     
     

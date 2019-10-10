@@ -22,7 +22,7 @@ def train_fcn(cfg_path):
     
 if __name__ == "__main__":
     
-    task = 'test'
+    task = 'train'
     cfg_path = './cfg_segmentator_fcn_vgg16_voc.py'
     
     if task == 'pre':

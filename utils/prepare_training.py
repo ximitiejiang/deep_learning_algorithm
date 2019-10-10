@@ -50,7 +50,8 @@ models = {
 
 loss_fn_dict = {
             'cross_entropy': torch.nn.CrossEntropyLoss,
-            'smooth_l1': torch.nn.SmoothL1Loss}
+            'smooth_l1': torch.nn.SmoothL1Loss
+            }
 
 lr_processors = {'fix': FixedLrProcessor,
                 'list': ListLrProcessor,

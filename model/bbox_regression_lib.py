@@ -79,3 +79,52 @@ def delta2bbox(rois,
         y2 = y2.clamp(min=0, max=max_shape[0] - 1)
     bboxes = torch.stack([x1, y1, x2, y2], dim=-1).view_as(deltas)
     return bboxes
+
+# %%
+def bbox2lrtb(points, bboxes):
+    """用来计算每个points与每个bbox的left,right, top,bottom
+    points(k,2), bboxes(m,4)
+    returns:
+        l(k,m), r(k,m), t(k,m), b(k,m) 
+    """
+    num_bboxes = bboxes.shape[0]
+    # 计算中心点
+    x = points[:, 0]
+    y = points[:, 1]
+    # 中心点堆叠
+    xx = x[:, None].repeat(1, num_bboxes)
+    yy = y[:, None].repeat(1, num_bboxes)
+    # 计算中心点相对bbox边缘的左右上下距离left,right,top,bottom
+    l = xx - bboxes[:, 0]
+    r = bboxes[:, 2] - xx
+    t = yy - bboxes[:, 1]
+    b = bboxes[:, 3] - yy
+    return l, r, t, b
+
+
+
+def lrtb2bbox(points, lrtb, max_shape=None):
+    """用来把lrtb转换成bbox
+    Decode distance prediction to bounding box.
+
+    Args:
+        points (Tensor): Shape (n, 2), [x, y].
+        lrtb (Tensor): Distance from the given point to 4
+            boundaries (left, top, right, bottom).
+        max_shape (tuple): Shape of the image.
+
+    Returns:
+        Tensor: Decoded bboxes.
+    """
+    x1 = points[:, 0] - lrtb[:, 0]
+    y1 = points[:, 1] - lrtb[:, 1]
+    x2 = points[:, 0] + lrtb[:, 2]
+    y2 = points[:, 1] + lrtb[:, 3]
+    if max_shape is not None:
+        x1 = x1.clamp(min=0, max=max_shape[1] - 1)
+        y1 = y1.clamp(min=0, max=max_shape[0] - 1)
+        x2 = x2.clamp(min=0, max=max_shape[1] - 1)
+        y2 = y2.clamp(min=0, max=max_shape[0] - 1)
+    return torch.stack([x1, y1, x2, y2], -1)
+
+    

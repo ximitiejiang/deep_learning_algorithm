@@ -201,8 +201,8 @@ class VOCDataset(BasePytorchDataset):
 #            seg = cv2.imread(seg_path)   # (h,w,3)
             seg = Image.open(seg_path)   # 采用PIL.Image读入图片可以直接得到用0-20类别值作为像素值的数据(还包括255白色边框)
             # 确保seg作为标签必须为int64(long)
-            seg = np.asarray(seg).astype(np.int64)  # (h,w)
-            seg = self.seg_transform(seg, flip)  # 类似于对img的变换，只需输入seg，额外一个从img transform来的参数，保证与img一致
+            seg = np.asarray(seg) # (h,w)
+            seg = self.seg_transform(seg, flip).long()  # 类似于对img的变换，只需输入seg，额外一个从img transform来的参数，保证与img一致
             data.update(seg = seg)
             data['stack_list'].append('seg')
         # 如果gt bbox数据缺失，则重新迭代随机获取一个idx的图片

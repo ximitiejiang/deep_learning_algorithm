@@ -74,6 +74,8 @@ class FCN8sHead(nn.Module):
         args:
             seg_scores: (b, 21, 480, 480)
             seg_targets: (b, 480, 480)
+        returns:
+            loss: item(已缩减为1个值)
         """
         loss = F.cross_entropy(seg_scores, seg_targets)
         result = dict(loss = loss)

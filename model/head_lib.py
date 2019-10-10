@@ -10,13 +10,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from model.get_target_lib import get_anchor_target, get_point_target, get_points
+from model.get_target_lib import get_anchor_target, get_point_target, 
+from model.get_target_lib import get_points, get_centerness_target
 from model.anchor_generator_lib import AnchorGenerator
 from utils.init_weights import xavier_init, normal_init, bias_init_with_prob
-from model.loss_func_lib import weighted_smooth_l1
+from model.loss_func_lib import weighted_smooth_l1, iou_loss, weighted_sigmoid_focal_loss 
 from model.bbox_regression_lib import delta2bbox
 from model.conv_module_lib import conv_norm_acti
 from model.nms_lib import nms_operation
+from model.bbox_regression_lib import lrtb2bbox
 
 """待整理：
 小物体检测效果不好的原因;
@@ -431,10 +433,9 @@ class FCOSHead(nn.Module):
         # 这里没有采用scales层
         
         # 创建损失函数
-        from utils.prepare_training import get_loss_fn
-        self.loss_cls = get_loss_fn(loss_cls_cfg)
-        self.loss_reg = get_loss_fn(loss_reg_cfg)
-        self.loss_centerness = get_loss_fn(loss_centerness_cfg)
+        self.loss_cls = weighted_sigmoid_focal_loss 
+        self.loss_reg = iou_loss
+        self.loss_centerness = F.cross_entropy
 
 
     def init_weights(self):
@@ -491,12 +492,13 @@ class FCOSHead(nn.Module):
         # 计算网格中心点
         points = get_points(featmap_sizes, self.strides, device) # (5,)(k,2)
         num_level_points = [pt.shape[0] for pt in points]
-        points = torch.cat(points, dim=0)   # (k, 2)
+
         # 计算target
         labels, bbox_targets = get_point_target(
                 points, self.regress_ranges, gt_bboxes, num_level_points) # labels(5,)(m,),  bbox_targets(5,)(m,4) 
         
         # 展平调整格式: 统一为外层为特征层数，内层为(b, xxx), 然后堆叠
+        # 注意：这个展平方式有点特殊，常规的格式调整是从特征层索引(5,)变换到batch索引(b,)，而这里省略这一步，而是直接跳到下一步，再把batch索引也合并到个数中。
         all_cls_scores = torch.cat([
                 cls_score.permute(0,2,3,1).reshape(-1, self.num_classes - 1)   # 注意，分类score里边是按照20类或80类来算，不考虑负样本。因为采用的损失函数是focal loss而不是交叉熵。
                 for cls_score in cls_scores])             # (5,)(b,20,h,w)->(5*b*h*w,20)
@@ -508,7 +510,7 @@ class FCOSHead(nn.Module):
                 for centerness in centernesses])          # (5,)(b,1,h,w)->(5*b*h*w,20)
         # 注意points的堆叠，需要在内层先配出batch的数量出来,然后再按照外层的特征层数堆叠
         all_points = torch.cat([
-                point.repeat(num_imgs, 1) for point in points])
+                point.repeat(num_imgs, 1) for point in points]) # (5,)(k,2) -> (5*k, 2)
         all_labels = torch.cat(labels)    # (5*k, )
         all_bbox_targets = torch.cat(bbox_targets) # (5*k, 4)
         
@@ -517,14 +519,30 @@ class FCOSHead(nn.Module):
         num_pos = len(pos_inds)
         loss_cls = self.loss_cls(all_cls_scores, 
                                  all_labels,
-                                 ) 
+                                 avg_factor=num_pos + num_imgs)  # 增加num_imgs是防止分母为0 
 
-        # 计算正样本的回归损失和中心点分类损失
-        if num_pos > 0:
-            loss_reg = self.loss_reg()
+        # 计算中心点分类损失
+        pos_bbox_preds = all_bbox_preds[pos_inds]      # 得到正样本对应bbox_pred
+        pos_bbox_targets = all_bbox_targets[pos_inds]  # 得到正样本对应bbox_target
+        pos_centerness = all_centernesses[pos_inds]    # 得到正样本对应中心点
+        pos_centerness_targets = get_centerness_target(pos_bbox_targets)
         
-        loss_centerness = self.loss_centerness()
+        if num_pos > 0: # 如果
+            pos_points = all_points[pos_inds]
+            pos_decoded_bbox_preds = lrtb2bbox(pos_points, pos_bbox_preds)
+            pos_decoded_target_preds = lrtb2bbox(pos_points, pos_bbox_targets)
             
+            loss_reg = self.loss_reg(pos_decoded_bbox_preds,
+                                     pos_decoded_target_preds,
+                                     weight=pos_centerness_targets,
+                                     avg_factor=pos_centerness_targets.sum())
+            
+            loss_centerness = self.loss_centerness(pos_centerness, 
+                                                   pos_centerness_targets)
+        else:
+            loss_bbox = pos_bbox_preds.sum()
+            loss_centerness = pos_centerness.sum()
+        # 计算    
         return dict(loss_cls = loss_cls,
                     loss_reg = loss_reg,
                     loss_centerness = loss_centerness)
