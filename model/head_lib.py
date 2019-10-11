@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from model.get_target_lib import get_anchor_target, get_point_target, 
+from model.get_target_lib import get_anchor_target, get_point_target
 from model.get_target_lib import get_points, get_centerness_target
 from model.anchor_generator_lib import AnchorGenerator
 from utils.init_weights import xavier_init, normal_init, bias_init_with_prob

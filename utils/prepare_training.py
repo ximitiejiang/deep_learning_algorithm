@@ -16,8 +16,10 @@ from utils.tools import get_time_str
 
 from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
 from dataset.voc_dataset import VOCDataset
+from dataset.coco_dataset import CocoDataset
 from dataset.ants_bees_dataset import AntsBeesDataset
 from dataset.widerface_dataset import WIDERFaceDataset
+from dataset.cityscapes_dataset import CityScapesDataset
 
 from model.detector_lib import OneStageDetector, Segmentator
 from model.alexnet_lib import AlexNet, AlexNet8
@@ -33,6 +35,8 @@ from model.lr_processor_lib import FixedLrProcessor, ListLrProcessor, StepLrProc
 datasets = {'cifar10' : Cifar10Dataset,
             'cifar100' : Cifar100Dataset,
             'voc' : VOCDataset,
+            'coco': CocoDataset,
+            'cityscapes' : CityScapesDataset, 
             'antsbees': AntsBeesDataset,
             'widerface': WIDERFaceDataset}
 

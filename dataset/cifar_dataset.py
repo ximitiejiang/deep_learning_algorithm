@@ -7,7 +7,6 @@ Created on Tue Jun 11 17:54:50 2019
 """
 import pickle
 import numpy as np
-from collections import OrderedDict
 
 from dataset.base_dataset import BasePytorchDataset
     
