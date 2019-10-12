@@ -21,7 +21,7 @@ def train_fcos(cfg_path):
     
     
 if __name__ == "__main__":
-
+    
     task = 'train'
     cfg_path = './cfg_detector_fcos_resnet50_voc.py'
     

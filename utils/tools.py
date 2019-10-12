@@ -64,8 +64,31 @@ def accuracy(y_pred, label, topk=1):
             pred = torch.argmax(y_pred, dim=1)         # 输出(b,)           
             acc = (pred == label).sum().float() / len(label)
         return acc
-    
 
+def accuracy2(preds, targets, topk=(1, )):
+    """计算指定的topk精度, topk可以是数值(1 or 5表示第1的精度或者前5的精度), 
+    也可以是一组数([1,5]则表示计算第1精度和前5精度)
+    args:
+        preds: (b, n_class)，为
+        targets: (b, ), 为实际标签(不是独热编码)
+    """
+    if isinstance(topk, int):
+        topk = [topk]
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = targets.size(0)
+
+        _, pred = preds.topk(maxk, 1, True, True) # topk(k, ?, ?, ?)
+        pred = pred.t()
+        correct = pred.eq(targets.view(1, -1).expand_as(pred))
+
+        res = []
+        for k in topk:
+            correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+            res.append(correct_k.mul_(100.0 / batch_size))
+        return res
+
+# %%    
 def get_time_str():
     """计算系统时间并生成字符串"""
     return time.strftime('%Y%m%d_%H%M%S', time.localtime())
@@ -127,6 +150,56 @@ def parse_log(path, show=True):
         vis_loss_acc(data_dict)
     return data_dict
 
+
+# %%
+from argparse import ArgumentParser
+
+dist = dict(
+        launcher='pytorch',
+        backend='nccl',
+        local_rank=0)
+
+
+def parse_args():
+    """用于从命令行获取输入参数来进行分布式训练
+    使用方法： python ./train.py cfg_xxx.py  (这里省略了两个带默认值的关键字参数)
+    """
+    parser = ArgumentParser(description='Dist training argument parse')
+    parser.add_argument('--task', choices=['train'])
+    parser.add_argument('--config')
+    parser.add_argument('--launcher', default='pytorch')   # 分布式默认启动器
+    parser.add_argument('--local_rank', default=0, type=int) # 分布式默认主机
+    args = parser.parse_args()       # 解析参数
+    return args  # 返回已解析好的参数：使用形式为args.xxx
+
+
+import torch.distributed as dist
+import torch.multiprocessing as mp
+def init_dist(backend='nccl', **kwargs):
+    """初始化分布式系统：主要是为了启动本机多进程，一个GPU中运行一个进程
+    """
+    if mp.get_start_method(allow_none=True) is None:
+        mp.set_start_method('spawn')       # 多进程启动方式选择spawn
+    rank = int(os.environ['RANK'])         #
+    num_gpus = torch.cuda.device_count()   # 查找本机多少GPU
+    torch.cuda.set_device(rank % num_gpus) # 设置
+    dist.init_process_group(backend=backend, **kwargs)  # 初始化进程组
+
+
+def main():
+    if dist:
+        world_size = torch.distributed.get_world_size()
+        rank = torch.distributed.get_rank()
+        num_workers = cfg.data_workers
+        assert cfg.batch_size % world_size == 0
+        batch_size = cfg.batch_size // world_size
+        train_sampler = DistributedSampler(train_dataset, world_size, rank)
+        val_sampler = DistributedSampler(val_dataset, world_size, rank)
+        shuffle = False    
+    if dist:
+        model = DistributedDataParallel(
+                model.cuda(), device_ids=[torch.cuda.current_device()])
+    
 
 # %%
 
