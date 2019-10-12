@@ -7,7 +7,7 @@ Created on Sun Sep 22 22:15:27 2019
 """
 import torch
 import numpy as np
-from utils.prepare_training import get_config, get_dataset, get_dataloader, get_root_model
+from utils.prepare_training import get_config, get_dataset, get_dataloader, get_model
 from utils.checkpoint import load_checkpoint
 from utils.transform import to_device, ImgTransform
 from utils.visualization import vis_loss_acc
@@ -40,7 +40,7 @@ def eval_dataset_det(cfg_path,
     dataset = get_dataset(cfg.valset, cfg.transform_val)
     dataloader = get_dataloader(dataset, cfg.valloader)
     
-    model = get_root_model(cfg)
+    model = get_model(cfg)
     device = torch.device(cfg.load_device)
     load_checkpoint(model, cfg.load_from, device)
     model = model.to(device)
@@ -82,7 +82,7 @@ class DetPredictor():
             self.cfg.load_from = load_from
         if load_device is not None:
             self.cfg.load_device = load_device
-        self.model = get_root_model(self.cfg)
+        self.model = get_model(self.cfg)
         self.device = torch.device(self.cfg.load_device)
         load_checkpoint(self.model, self.cfg.load_from, self.device)
         self.model = self.model.to(self.device)
@@ -137,7 +137,7 @@ def eval_dataset_cls(cfg_path, device=None):
     cfg = get_config(cfg_path)
     dataset = get_dataset(cfg.valset, cfg.transform_val)
     dataloader = get_dataloader(dataset, cfg.valloader)
-    model = get_root_model(cfg)
+    model = get_model(cfg)
     if device is None:
         device = torch.device(cfg.load_device)
     # TODO: 如下两句的顺序

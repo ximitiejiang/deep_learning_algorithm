@@ -32,11 +32,11 @@ def get_pallete(pallete):
                     'ade': ade_pallete}
     return pallete_dict[pallete]
     
-"""voc调色板：21种颜色对应21个类别0-20，其中0为背景，1-20为20个分类"""
+"""voc调色板：21种RGB(不是BGR)颜色对应21个类别0-20，其中0为背景，1-20为20个分类"""
 voc_pallete = np.array([[  0,   0,   0],
-                       [128,   0,   0],
-                       [  0, 128,   0],
-                       [128, 128,   0],
+                       [128,   0,   0],   # aerplane
+                       [  0, 128,   0],   # bicycle
+                       [128, 128,   0],   # bird
                        [  0,   0, 128],
                        [128,   0, 128],
                        [  0, 128, 128],

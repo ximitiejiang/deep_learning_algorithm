@@ -7,9 +7,11 @@ Created on Sat Aug 10 17:22:46 2019
 """
 
 #from utils.module_factory import registry, build_module
-
+import torch
 import torch.nn as nn
 import numpy as np
+from utils.tools import accuracy
+import torch.nn.functional as F
     
 # %% onestage
 class OneStageDetector(nn.Module):
@@ -150,8 +152,8 @@ class Classifier(nn.Module):
         self.backbone = get_model(cfg.backbone)
         if cfg.neck:  # 不能写成 is not None, 因为结果是{}不是None, 但可以用True/False来判断
             self.neck = get_model(cfg.neck)
-        self.cls_head = get_model(cfg.head)  # seg head就说明生成的是bbox
-        
+        if cfg.head:
+            self.cls_head = get_model(cfg.head)
         # 初始化: 注意权重需要送入cpu/gpu，该步在model.to()完成
         self.init_weights()
 
@@ -159,7 +161,8 @@ class Classifier(nn.Module):
         self.backbone.init_weights()
         if self.cfg.neck:
             self.neck.init_weights()
-        self.cls_head.init_weights()
+        if self.cfg.head:
+            self.cls_head.init_weights()
     
     def forward(self, imgs, return_loss=True, **kwargs):
         if return_loss:
@@ -168,14 +171,19 @@ class Classifier(nn.Module):
             return self.forward_test(imgs, **kwargs)
     
     def forward_train(self, imgs, labels, **kwargs):
-        x = self.backbone(imgs)
+        preds = self.backbone(imgs)
         if self.cfg.neck:
-            x = self.neck(x)
-        outs = self.cls_head(x)  
+            preds = self.neck(preds)
+        if self.cfg.head:
+            preds = self.cls_head(preds)  
         # 计算损失
-        loss_inputs = [outs, labels]
-        loss_dict = self.cls_head.get_losses(*loss_inputs)
-        return loss_dict
+        labels = torch.cat(labels, dim=0)  # (n,)
+        loss_inputs = [preds, labels]
+        out_dict = self.get_losses(*loss_inputs)
+        # TODO: 增加acc计算
+        acc1 = accuracy(preds, labels, topk=1)
+        out_dict.update(acc1=acc1)
+        return out_dict
     
     def forward_test(self, imgs, **kwargs):
         x = self.backbone(imgs)
@@ -184,6 +192,18 @@ class Classifier(nn.Module):
         outs = self.cls_head(x)  
         # TODO: 处理分割数据结果
         return outs
+    
+    def get_losses(self, preds, labels):
+        """用于代替head的get_loss"""
+        # TODO: 改成模块化输入参数输入
+        loss_fn = F.cross_entropy
+        
+        losses = loss_fn(preds, labels)
+        return dict(loss=losses)
+    
+    def get_predict(self, feat):
+        """用于代替head的get_bbox"""
+        pass
     
 
 # %% two stage

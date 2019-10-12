@@ -21,7 +21,7 @@ class Cifar10Dataset(BasePytorchDataset):
     输出：n,h,w,c (bgr格式), 所有图片源数据都统一用这种格式(包括voc/coco)
     """
     def __init__(self, root_path='/home/ubuntu/MyDatasets/cifar-10-batches-py/', 
-                 data_type='train', img_transform=None, label_transform=None, bbox_transform=None):
+                 data_type='train', img_transform=None, label_transform=None, bbox_transform=None, **kwargs):
         super().__init__()
         self.img_transform = img_transform
         self.label_transform = label_transform

@@ -103,7 +103,7 @@ trainset = dict(
         repeat=0,
         params=dict(
                 root_path=data_root_path, 
-                ann_file=[data_root_path + 'trainInstances.txt'], 
+                ann_file=[data_root_path + 'trainImages.txt'], 
                 img_prefix=[data_root_path],
                 mode='train'))
 

@@ -101,7 +101,7 @@ class Bottleneck(nn.Module):
 
 
 # %%
-class Resnet(nn.Module):
+class ResNet(nn.Module):
     """Resnet主模型: 可生成如下5种基础resnet模型
     结构特点：具有很好的可扩展性，每一个layer下面，都可以无限增加block
     可以看到bottleneck的每个3x3(中间那层)的运算通道数数其实跟basicblock一样，这样好处是利用1x1降维很大的节约了3x3卷积的计算量。

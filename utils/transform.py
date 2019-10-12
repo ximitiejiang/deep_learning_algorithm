@@ -288,21 +288,26 @@ def label2color(img, pallete='voc'):
     ags:
         img: (h, w), 其中的每个像素值为0~20,代表某一类别。
         pallete: (m, 3)
+    return
+        new_img: hwc, bgr, uint8(uint8才能被cv2正确显示)
     """
-    # TODO: 待确认pallete是BGR还是RGB
-    img = img.astype(np.int32)
     colors = get_pallete(pallete)
     h, w = img.shape
     new_img = np.zeros((h, w, 3))
     for i in range(h):
         for j in range(w):
-            new_img[i, j, :] = colors[img[i, j]]
-    return new_img
+            new_img[i, j, :] = colors[img[i, j]][[2,1,0]] # rgb to bgr
+    return new_img.astype(np.uint8)  # 采用hwc, bgr，便于cv2显示
 
 
 
     
 # %% 变换类
+class AugTransform():
+    """数据增强变换"""
+    def __init__(self):
+        pass
+
 class ImgTransform():
     """常规数据集都是hwc, bgr输出，但pytorch操作是在chw,rgb条件下进行。
     所以在pytorch中至少需要to_rgb, to_chw, to_tensor
@@ -543,7 +548,7 @@ def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_name
     # denormalize，该步必须在bgr之后做，因为mean/std的顺序是BGR顺序 (512,512,3) * (3,) + (3,)
     img = imdenormalize(img, mean, std)  
     # 最后截取0-255的无符号整数
-    img = np.clip(img, 0, 255).astype(np.uint8)
+    img = np.clip(img, 0, 255).astype(np.uint8)  # 只有uint8的数据格式才能被opencv正确显示
     if show:
         if bboxes is None:  # 只显示img
             cv2.imshow('raw img', img)  # hwc, bgr

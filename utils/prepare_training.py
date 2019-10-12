@@ -11,7 +11,7 @@ from importlib import import_module
 import logging
 import torch
 import numpy as np
-from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform
+from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform, AugTransform
 from utils.tools import get_time_str
 
 from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
@@ -21,8 +21,9 @@ from dataset.ants_bees_dataset import AntsBeesDataset
 from dataset.widerface_dataset import WIDERFaceDataset
 from dataset.cityscapes_dataset import CityScapesDataset
 
-from model.detector_lib import OneStageDetector, Segmentator
+from model.detector_lib import OneStageDetector, Segmentator, Classifier
 from model.alexnet_lib import AlexNet, AlexNet8
+from model.resnet_lib import ResNet
 from model.ssdvgg16_lib import SSDVGG16
 from model.fcnvgg16_lib import FCNVGG16
 from model.head_lib import SSDHead, RetinaHead, FCOSHead
@@ -43,8 +44,10 @@ datasets = {'cifar10' : Cifar10Dataset,
 models = {
         'one_stage_detector': OneStageDetector,
         'segmentator' : Segmentator,
+        'classifier' : Classifier,
         'alexnet8' : AlexNet8,
         'alexnet' : AlexNet,
+        'resnet'  : ResNet,
         'ssd_vgg16' : SSDVGG16,
         'fcn_vgg16' : FCNVGG16,
         'ssd_head' : SSDHead,
@@ -141,6 +144,9 @@ def get_dataset(dataset_cfg, transform_cfg):
     if transform_cfg.get('seg_params') is not None:
         seg_p = transform_cfg['seg_params']
         seg_transform = SegTransform(**seg_p)
+    if transform_cfg.get('aug_params') is not None:
+        aug_p = transform_cfg['aug_params']
+        aug_transform = AugTransform(**aug_p)
         
     dataset_name = dataset_cfg.get('type')
     dataset_class = datasets[dataset_name]
@@ -272,25 +278,26 @@ def get_dataloader(dataset, dataloader_cfg):
 
 # %%
 
-def get_root_model(cfg):
-    """根模型创建：传入根cfg"""
-    # 如果是classifier单模型的根模型
-    if cfg.get('backbone', None) is None:
-        return get_model(cfg.model)
-    # 如果是detector复合模型，送入根cfg
-    elif cfg.get('backbone', None) is not None:
-        model_name = cfg.model['type']
-        model_class = models[model_name]
-        model = model_class(cfg)
-        return model
+#def get_root_model(cfg):
+#    """根模型创建：传入根cfg"""
+#    model_name = cfg.model['type']
+#    model_class = models[model_name]
+#    model = model_class(cfg)
+#    return model
 
 def get_model(cfg):
     """创建单模型：传入模型cfg
     """
-    model_name = cfg['type']
-    model_class = models[model_name]
-    params = cfg.params    
-    return model_class(**params)  # 其他模型的创建，传入的是解包的dict
+    if cfg.get('model', None) is not None:
+        model_name = cfg.model['type']
+        model_class = models[model_name]
+        model = model_class(cfg)
+        return model
+    else:
+        model_name = cfg['type']
+        model_class = models[model_name]
+        params = cfg.params    
+        return model_class(**params)  # 其他模型的创建，传入的是解包的dict
 
 
 

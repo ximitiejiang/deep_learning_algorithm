@@ -47,7 +47,8 @@ class VOCDataset(BasePytorchDataset):
                  label_transform=None,
                  bbox_transform=None,
                  aug_transform=None,
-                 seg_transform=None):
+                 seg_transform=None,
+                 mode='train'):
         
         self.ann_file = ann_file
         self.img_prefix = img_prefix
@@ -65,6 +66,7 @@ class VOCDataset(BasePytorchDataset):
         self.class_label_dict = {cat: i + 1 for i, cat in enumerate(self.CLASSES)}  # 从1开始(1-20). 
         # 加载图片标注表(只是标注所需文件名，而不是具体标注值)，额外加了一个w,h用于后续参考
         self.img_anns = self.load_annotations(self.ann_file) 
+        # TODO: 增加在mode=train下的数据过滤
         
     
     def load_annotations(self, ann_file):
@@ -196,7 +198,7 @@ class VOCDataset(BasePytorchDataset):
                     stack_list = ['img'])
         
         # 如果是分割任务，提供的是分割png，所以用的是seg_transform
-        if self.seg_prefix is not None and img_info.get('seg_file') is not None:
+        if self.seg_transform is not None and img_info.get('seg_file') is not None:
             seg_path = self.img_anns[idx]['seg_file']
 #            seg = cv2.imread(seg_path)   # (h,w,3)
             seg = Image.open(seg_path)   # 采用PIL.Image读入图片可以直接得到用0-20类别值作为像素值的数据(还包括255白色边框)

@@ -46,11 +46,16 @@ class MaxIouAssigner():
             assigned_gt_inds[anchor_idx] = i + 1   # 从0~k-1变到1～k,该值就代表了第几个gt 
         
         # 转换正样本的标识从1~indx+1为真实gt_label
-        assigned_gt_labels = ious.new_full((num_anchors, ), 0, dtype=torch.long) # (n, )
-        for i, assign in enumerate(assigned_gt_inds):
-            if assign > 0:
-                label = gt_labels[assign-1]
-                assigned_gt_labels[i] = label
+        if gt_labels is not None:
+            assigned_gt_labels = ious.new_full((num_anchors, ), 0, dtype=torch.long) # (n, )
+            for i, assign in enumerate(assigned_gt_inds):
+                if assign > 0:
+                    label = gt_labels[assign-1]
+                    assigned_gt_labels[i] = label
+                else:
+                    continue
+        else:
+            assigned_gt_labels = None
         
         return [assigned_gt_inds, assigned_gt_labels, ious] # [(n,), (n,), (m,n)] 
             

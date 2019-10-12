@@ -13,16 +13,16 @@ from utils.tools import parse_log
 from utils.dataset_classes import get_classes
 from utils.visualization import vis_cam
 
-def train_fcn(cfg_path):
+def train_fcn(cfg_path, resume_from=None):
     
-    runner = Runner(cfg_path = cfg_path)
+    runner = Runner(cfg_path = cfg_path, resume_from=resume_from)
     runner.train()    
     
     
     
 if __name__ == "__main__":
     
-    task = 'train'
+    task = 'test'
     cfg_path = './cfg_segmentator_fcn_vgg16_voc.py'
     
     if task == 'pre':
@@ -32,7 +32,9 @@ if __name__ == "__main__":
 
     
     if task == 'train':  # 模型训练
-        train_fcn(cfg_path)
+        train_fcn(cfg_path,
+                  resume_from='/home/ubuntu/mytrain/fcn_vgg_voc/epoch_9.pth')
+                 
     
 #    if task == 'eval':  # 数据集评估
 #        parse_log('/home/ubuntu/mytrain/ssd_vgg_voc/20190926_181047.log')
@@ -48,10 +50,10 @@ if __name__ == "__main__":
 #                         result_file='/home/ubuntu/mytrain/ssd_vgg_voc/20190928_084133_eval_result.pkl')
     
     if task == 'test':  # 测试单张图或多张图的结果： cpu上0.649 sec， gpu上0.388 sec
-        img = cv2.imread('../test/009779.jpg')
+        img = cv2.imread('/home/ubuntu/MyDatasets/misc/000033.jpg')
         predictor = SegPredictor(cfg_path,                         
-                                 load_from = '/home/ubuntu/mytrain/fcn_vgg_voc/epoch_9.pth',
-                                 load_device='cpu')
+                                 load_from = '/home/ubuntu/mytrain/fcn_vgg_voc/epoch_16.pth',
+                                 load_device='cuda')
         for result in predictor([img]):
             cv2.imshow('seg', result)
     

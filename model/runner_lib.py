@@ -11,9 +11,8 @@ import os
 import time
 
 from utils.prepare_training import get_config, get_logger, get_dataset, get_dataloader 
-from utils.prepare_training import get_root_model, get_optimizer, get_lr_processor, get_loss_fn
+from utils.prepare_training import get_model, get_optimizer, get_lr_processor
 from utils.visualization import vis_loss_acc
-from utils.tools import accuracy
 from utils.checkpoint import load_checkpoint, save_checkpoint
 from utils.transform import to_device
     
@@ -55,23 +54,16 @@ def batch_segmentator(model, data, device, return_loss=True, **kwargs):
     
     
 
-def batch_classifier(self, model, data, device, return_loss=True, loss_fn=None, **kwargs):
+def batch_classifier(model, data, device, return_loss=True, **kwargs):
     # 数据送入设备
-    img = to_device(data['img'], device)  # 由于model要送入device进行计算，且该计算只跟img相关，跟label无关，所以可以只送img到device
+    img = to_device(data['img'], device)  
     label = to_device(data['gt_labels'], device)
-    
-    outputs = {}
-    y_pred = model(img)
-    # 这里需要先组合label：分类问题中的一个batch多张图多个label等效于检测中的一张图多个bbox对应多个label                          
-    label = torch.cat(label, dim=0)               # (b,)
-    acc1 = accuracy(y_pred, label, topk=1)
-    outputs.update(acc1=acc1)
-    
     if return_loss:
-        # 计算损失(!!!注意，一定要得到标量loss)
-        loss = loss_fn(y_pred, label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
-        outputs.update(loss=loss)
-    return outputs
+        loss = model(imgs=img, return_loss=True, labels=label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
+        return loss
+    else:
+        output = model(imgs=img, return_loss=False)
+        return output
 
 
 def get_batch_processor(cfg):
@@ -126,19 +118,19 @@ class Runner():
         self.trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
         self.valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
         
-        data = self.trainset[91]  # for debug
+#        tmp1 = self.trainset[91]  # for debug: 可查看dataset __getitem__
         
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)
         self.valloader = get_dataloader(self.valset, self.cfg.valloader)
+        
+#        tmp2 = next(iter(self.dataloader))  # for debug: 设置worker=0就可查看collate_fn
+        
         # 创建模型并初始化
         if self.cfg.load_from is not None or self.cfg.resume_from is not None:
             self.cfg.backbone.params.pretrained = None  # 如果load_from或resume_from，则不加载pretrained
-        self.model = get_root_model(self.cfg)
-        # 创建损失函数
-        self.loss_fn_clf = get_loss_fn(self.cfg.loss_clf)
-        if self.cfg.get('loss_reg', None) is not None:
-            self.loss_fn_reg = get_loss_fn(self.cfg.loss_reg)
+        self.model = get_model(self.cfg)
+        
         # 优化器：必须在model送入cuda之前创建
         self.optimizer = get_optimizer(self.cfg.optimizer, self.model)
         # 学习率调整器
@@ -204,8 +196,7 @@ class Runner():
                 outputs = self.batch_processor(self.model, 
                                                data_batch, 
                                                self.device,
-                                               return_loss=True,
-                                               loss_fn=self.loss_fn_clf)
+                                               return_loss=True)
                 # 反向传播: 注意随时检查梯度是否爆炸
                 outputs['loss'].backward()  # 更新反向传播, 用数值loss进行backward()      
                 self.optimizer.step()   

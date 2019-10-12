@@ -32,7 +32,7 @@ lr_processor = dict(
 logger = dict(
                 log_level='INFO',
                 log_dir=work_dir,
-                interval=1)        # 文本显示间隔
+                interval=10)        # 文本显示间隔
 
 model = dict(
         type='one_stage_detector')

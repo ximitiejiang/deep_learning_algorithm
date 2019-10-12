@@ -207,8 +207,10 @@
 
 1. 现象：如果模型和数据送入GPU，dataloader会调用dataset的__getitem__函数获取数据进行堆叠，
    此时如果在__getitem__里边有自定义断点，会造成系统警告且暂停训练。
-2. 解决方案：取消断点后模型训练/验证就正常了。而如果想要调试__getitem__里边的语法，可以设置
-   额外的语句img, label = dataset[0]来进入__getitem__进行调试。
+2. 解决方案：取消断点后模型训练/验证就正常了。
+    - 如果想要调试__getitem__里边的语法，可以设置额外的语句img, label = dataset[0]来进入__getitem__进行调试。
+    - 如果想要调试collate_fn里边的语法，可以设置workers=0, 然后在collate_fn添加断点，再通过next(iter(dataloader))进行调试。
+
 
 
 ### 关于预训练模型的加载
@@ -421,6 +423,10 @@
     - 显存不够：此时可以检查自己的batch size是不是设置过大，导致显存不够，通过nvidia-smi查看显存占用情况
     - 需要加载的数据较大，而设置的存储空间不够，但workers又较高，此时可以减小workers，比如workers=0
     - 硬盘空间不够：也有可能导致，需要释放一些硬盘空间。
+
+2. 我第一次碰到是因为前一次的batch size 设置过大，所以把batch size改小即可，但需要重新启动一个kernel
+   我第二次碰到是因为前一次运行别的比较大的数据集(比如coco)，然后再跑小的数据集也会出现该问题，此时把workers设置为0才可以，重启kernel都没有效果
+   参考：https://discuss.pytorch.org/t/oserror-errno-12-cannot-allocate-memory/24827/3
 
 
 ### 关于如何提高小物体的检测精度
