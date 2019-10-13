@@ -188,10 +188,29 @@ import torch.multiprocessing as mp
 def init_dist(backend='nccl', **kwargs):
     """初始化分布式系统：主要是为了启动本机多进程，一个GPU中运行一个进程
     参考：https://tramac.github.io/2019/04/22/%E5%88%86%E5%B8%83%E5%BC%8F%E8%AE%AD%E7%BB%83-PyTorch/
-    1. 多进程启动方式：最好采用spawn
+    step0: 启动pytorch的分布式系统torch.distributed.launch，用于设置环境变量
+        - 会在os.environ中创建环境变量比如RANK
+    step1: 设置多进程启动方式：
+        - 多进程启动方式：最好采用spawn
+    step2: 获取基础参数
+        - rank: 代表进程的编号，也就代表了进程的优先级，所以叫rank
+        - num_gpus
+    step3: 设置本机设备, 也就是host主机设备
+    step4: 初始化进程组
+        - backend
+        - init_method
+        - rank: 
+        - world_size: 总的进程数，也就是GPU数(一个GPU启动一个进程)
+    step5: 
+        
     2. 数据格式定义：需要设置属性non_blocking=True，比如input=input.cuda(non_blocking=True), 需要放在to_device()完成？
     3. batch_size：代表每个进程的batch，所以总的batch_size = batch_size * world_size
-    4. workers: 表示
+    4. workers: 表示在dataloader中的多线程个数，设置0表示不开多线程
+    5. world_size: 表示总计的进程数，由于一个GPU一个进程，所以也就是总计GPU数
+    6. dist_backend: 表示支持分布式训练的通信底层，可以是nccl, mpi, gloo，但nccl是表现最好的
+    7. dist_url: 表示用来初始化进程组的方式，
+    8. dist.init_process_group(backend, init_method, rank, world_size)
+    9. 
     """
     if mp.get_start_method(allow_none=True) is None:
         mp.set_start_method('spawn')       # 多进程启动方式选择：一般有forkserver和spawn, spawn为默认方法，否则容易导致死锁
