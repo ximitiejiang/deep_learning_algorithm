@@ -162,7 +162,13 @@ dist = dict(
 
 def parse_args():
     """用于从命令行获取输入参数来进行分布式训练
-    使用方法： python ./train.py cfg_xxx.py  (这里省略了两个带默认值的关键字参数)
+    使用方法： 
+        - 主机：
+            python torch.distributed.launch --nproc_per_node 2 --node_rank 0
+            python ./train.py --config cfg_xxx.py --local_rank 0
+        - 从机
+            python torch.distributed.launch --n_proc_ 2 --node_rank 1
+            python ./train.py --config cfg_xxx.py --local_rank 1
     相关参数说明：参考https://www.cnblogs.com/freshchen/p/11660046.html    
     1. 参数数据类型设置：默认的传入参数都是字符串，如果需要指定，则通过type=int来设置，此时parser会帮我们转换
     2. 参数名称设置：-n或--name代表参数的变量名，其中-n为简写名，--name为全名，一般有一个就可以，
@@ -185,38 +191,53 @@ def parse_args():
 # %% 分布式
 import torch.distributed as dist
 import torch.multiprocessing as mp
+
 def init_dist(backend='nccl', **kwargs):
-    """初始化分布式系统：主要是为了启动本机多进程，一个GPU中运行一个进程
+    """初始化分布式系统：主要是为了启动本机多进程，通常一个GPU中运行一个进程
     参考：https://tramac.github.io/2019/04/22/%E5%88%86%E5%B8%83%E5%BC%8F%E8%AE%AD%E7%BB%83-PyTorch/
-    step0: 启动pytorch的分布式系统torch.distributed.launch，用于设置环境变量
-        - 会在os.environ中创建环境变量比如RANK
-    step1: 设置多进程启动方式：
+    step0: 启动pytorch的分布式系统$python -m torch.distributed.launch train.py，用于设置环境变量，会在os.environ中创建环境变量比如RANK
+        - n_proc_per_node=2表示每台机器运行的进程数
+        - node_rank=0表示本节点为host主节点
+        - master_addr 是为了设置主机的ip地址，是为了host主机能够被其他机器访问
+        - master_port 是为了设置主机的开放端口，是为了host主机能够被其他机器访问
+        - train.py --arg1 arg1 是代表训练脚本以及训练脚本的参数
+    step1: 设置多进程启动方式：mp.set_start_method('spawn')
         - 多进程启动方式：最好采用spawn
-    step2: 获取基础参数
-        - rank: 代表进程的编号，也就代表了进程的优先级，所以叫rank
-        - num_gpus
-    step3: 设置本机设备, 也就是host主机设备
-    step4: 初始化进程组
-        - backend
-        - init_method
+    step2: 设置本机设备
+        - rank: 代表获取本机进程的优先级编号，所以叫rank，这个值取决于torch.distributed.launch中输入的--node_rank是多少，0则是主机
+        - num_gpus: 代表获取本机的GPU个数
+        - set_device(): 代表设置本机
+    step3: 初始化进程组dist.init_process_group(backend, init_method, rank, world_size)
+        - backend: 表示各进程通信的底层通信协议，可以是nccl, mpi, gloo，但nccl是表现最好的
+        - init_method: 表示各进程的初始化方式，可以采用dist_url，或者...
         - rank: 
         - world_size: 总的进程数，也就是GPU数(一个GPU启动一个进程)
-    step5: 
-        
-    2. 数据格式定义：需要设置属性non_blocking=True，比如input=input.cuda(non_blocking=True), 需要放在to_device()完成？
-    3. batch_size：代表每个进程的batch，所以总的batch_size = batch_size * world_size
+    step4: 创建分布式模型
+        - model = DistributedDataParallel(model, device_ids=dp_device_ids, output_device=local_rank)
+    step5: 创建分布式dataloader
+        - batch_size：代表每个进程的batch，所以总的batch_size = batch_size * world_size  
+        - train_sampler = torch.utils.data.distributed.DistributedSampler(trainset)
+        - train_loader = torch.utils.data.Dataloader(trainset, 
+                                                     batch_size, 
+                                                     shuffle=(train_sampler is None), 
+                                                     num_workers=workers, 
+                                                     pin_memory=False, 
+                                                     sampler=train_sampler)
+    step6: 更新数据格式
+        - 数据格式定义：需要设置属性non_blocking=True，比如input=input.cuda(non_blocking=True), 需要放在to_device()完成？
+
     4. workers: 表示在dataloader中的多线程个数，设置0表示不开多线程
-    5. world_size: 表示总计的进程数，由于一个GPU一个进程，所以也就是总计GPU数
-    6. dist_backend: 表示支持分布式训练的通信底层，可以是nccl, mpi, gloo，但nccl是表现最好的
+
     7. dist_url: 表示用来初始化进程组的方式，
-    8. dist.init_process_group(backend, init_method, rank, world_size)
-    9. 
+
     """
+    # TODO: 这句话似乎不能设置spawn, 是不是直接运行mp.set_start_method('spawn')而不要if判断
     if mp.get_start_method(allow_none=True) is None:
-        mp.set_start_method('spawn')       # 多进程启动方式选择：一般有forkserver和spawn, spawn为默认方法，否则容易导致死锁
+        mp.set_start_method('spawn')       # 多进程启动方式选择：一般有fork和spawn, spawn为默认方法，否则容易导致死锁
+    # 只有运行了torch.distributed.launch之后才能从os.environ获得到RANK变量，否则报错
     rank = int(os.environ['RANK'])         #
     num_gpus = torch.cuda.device_count()   # 查找本机多少GPU
-    torch.cuda.set_device(rank % num_gpus) # 设置
+    torch.cuda.set_device(rank % num_gpus) # 设置host主机的设备
     dist.init_process_group(backend=backend, **kwargs)  # 初始化进程组
 
 
