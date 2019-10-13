@@ -5,7 +5,7 @@ Created on Tue Sep  3 21:29:33 2019
 
 @author: ubuntu
 """
-import torch
+
 from model.runner_lib import Runner
 from utils.evaluation import eval_dataset_cls
 

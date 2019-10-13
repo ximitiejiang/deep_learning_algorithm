@@ -103,6 +103,12 @@ class Runner():
         #设置logger
         self.logger = get_logger(self.cfg.logger)
         self.logger.info('start logging info.')
+        # 检查是否分布式
+        if cfg.distribute is not None:
+            assert 
+            train_sampler = 
+            val_sampler
+            
         #设置设备
         if self.cfg.gpus > 0 and torch.cuda.is_available():
             self.device = torch.device("cuda")   # 设置设备GPU: "cuda"和"cuda:0"的区别？

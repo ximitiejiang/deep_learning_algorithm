@@ -342,20 +342,42 @@ def get_lr_processor(runner, lr_processor_cfg):
 
 
 # %%
+    
+# TODO: 暂时不开发，因为必须升级pytorch版本到1.14，当前pytorch是1.1
 #from torch.utils.tensorboard import SummaryWriter
 #
 #class TensorBoardWriter():
 #    """创建tensorboard的writer类
 #    参考：https://pytorch.org/docs/stable/tensorboard.html
+#    用法：
+#    writer = SummaryWriter()
+#    https://localhost:6006
+#        1. 显示图片：一个batch的图片(b,c,h,w)被grid后，就可提供到writer去显示
+#            img_grid = torchvision.utils.make_grid(images)  
+#            writer.add_image('batch img', img_grid)
+#        2. 显示模型
+#            writer.add_graph(model, images)
+#        3. 显示曲线
+#            writer.add_scalar('loss', ruuning_loss / 1000, epoch)
 #    """
 #    def __init__(self):
-#        self.writer = SummaryWriter()
+#        self.writer = SummaryWriter()  # TODO: 是否需要额外增加一个记录summerywriter的dir，跟logger的dir并列？
 #    
-#    def update(self, data=None, grid=None, title='result'):
-#        if grid is not None:
-#            self.writer.add_image(title, grid, 0)
-#        if data is not None:
-#            self.writer.add_scalar(title, data)
+#    def update(self, record):
+#        if isinstance(record, dict):
+#            for key, value in record.items():
+#                self.writer.add_scalar()
+#        if isinstance(record, torch.Tensor):
+#            pass
+#        
+##        if grid is not None:
+##            self.writer.add_image(title, grid, 0)
+##        if data is not None:
+##            self.writer.add_scalar(title, data)
+#    
+#    def close(self):
+#        self.writer.close()
+
     
 
 if __name__ == "__main__":

@@ -163,6 +163,16 @@ dist = dict(
 def parse_args():
     """用于从命令行获取输入参数来进行分布式训练
     使用方法： python ./train.py cfg_xxx.py  (这里省略了两个带默认值的关键字参数)
+    相关参数说明：参考https://www.cnblogs.com/freshchen/p/11660046.html    
+    1. 参数数据类型设置：默认的传入参数都是字符串，如果需要指定，则通过type=int来设置，此时parser会帮我们转换
+    2. 参数名称设置：-n或--name代表参数的变量名，其中-n为简写名，--name为全名，一般有一个就可以，
+       但如果两个都写，获取参数时需要采用全名(简写名失效)，获取变量名可以通过sys.argv[1->n]中去获取，也可以通过parser.parse_args()之后来获取。
+    3. 默认参数值设置：default='Jack'，注意
+    4. 参数选择范围设置：choices=[20, 30, 40]
+    5. 获取参数同时触发动作设置：
+        - action='store'，这是默认动作，也就是保存参数
+        - action='store_true'，保存为True
+        - action='append'，把值保存到列表，如果参数重复出现，则保存多个值
     """
     parser = ArgumentParser(description='Dist training argument parse')
     parser.add_argument('--task', choices=['train'])
@@ -172,14 +182,19 @@ def parse_args():
     args = parser.parse_args()       # 解析参数
     return args  # 返回已解析好的参数：使用形式为args.xxx
 
-
+# %% 分布式
 import torch.distributed as dist
 import torch.multiprocessing as mp
 def init_dist(backend='nccl', **kwargs):
     """初始化分布式系统：主要是为了启动本机多进程，一个GPU中运行一个进程
+    参考：https://tramac.github.io/2019/04/22/%E5%88%86%E5%B8%83%E5%BC%8F%E8%AE%AD%E7%BB%83-PyTorch/
+    1. 多进程启动方式：最好采用spawn
+    2. 数据格式定义：需要设置属性non_blocking=True，比如input=input.cuda(non_blocking=True), 需要放在to_device()完成？
+    3. batch_size：代表每个进程的batch，所以总的batch_size = batch_size * world_size
+    4. workers: 表示
     """
     if mp.get_start_method(allow_none=True) is None:
-        mp.set_start_method('spawn')       # 多进程启动方式选择spawn
+        mp.set_start_method('spawn')       # 多进程启动方式选择：一般有forkserver和spawn, spawn为默认方法，否则容易导致死锁
     rank = int(os.environ['RANK'])         #
     num_gpus = torch.cuda.device_count()   # 查找本机多少GPU
     torch.cuda.set_device(rank % num_gpus) # 设置
@@ -188,8 +203,8 @@ def init_dist(backend='nccl', **kwargs):
 
 def main():
     if dist:
-        world_size = torch.distributed.get_world_size()
-        rank = torch.distributed.get_rank()
+        world_size = torch.distributed.get_world_size()   # world_size代表
+        rank = torch.distributed.get_rank()               # rank代表 
         num_workers = cfg.data_workers
         assert cfg.batch_size % world_size == 0
         batch_size = cfg.batch_size // world_size
