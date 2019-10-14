@@ -10,7 +10,7 @@ import torch.nn as nn
 import os
 import time
 
-from utils.prepare_training import get_logger, get_dataset, get_dataloader 
+from utils.prepare_training import get_logger, get_dataset, get_dataloader, get_device 
 from utils.prepare_training import get_model, get_optimizer, get_lr_processor
 from utils.visualization import vis_loss_acc
 from utils.checkpoint import load_checkpoint, save_checkpoint
@@ -77,7 +77,6 @@ def get_batch_processor(cfg):
         raise ValueError('Wrong task input.')
 
 
-
 class Runner():
     """创建一个runner类，用于服务pytorch中的模型训练和验证: 支持cpu/单gpu/多gpu并行训练/分布式训练
     Runner类用于操作一个主模型，该主模型可以是单个分类模型，也可以是一个集成检测模型。
@@ -104,15 +103,8 @@ class Runner():
         #设置logger
         self.logger = get_logger(self.cfg.logger)
         self.logger.info('start logging info.')
-        #设置设备
-        if self.cfg.gpus > 0 and torch.cuda.is_available():
-            self.device = torch.device("cuda")   # 设置设备GPU: "cuda"和"cuda:0"的区别？
-            self.logger.info('Operation will start in GPU!')
-        elif self.cfg.gpus == 0:
-            self.device = torch.device("cpu")      # 设置设备CPU
-            self.logger.info('Operation will start in CPU!')
-        else:
-            raise ValueError('can not define device on CPU or GPU!')
+        #设置设备: 如果是分布式，则不同local rank(不同进程号)返回的是不同设备
+        self.device = get_device(self.cfg, self.logger)
         #创建batch处理器
         self.batch_processor = get_batch_processor(self.cfg)
         #创建数据集

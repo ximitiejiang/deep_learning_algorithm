@@ -107,6 +107,33 @@ def get_logger(logger_cfg):
 
 
 # %%
+def get_device(cfg, logger=None):
+    """生成训练对应的设备：如果是分布式，则不同local rank(不同进程号)返回的是不同设备"""
+    # 如果是分布式设备
+    if cfg.distribute and cfg.gpus > 1 and torch.cuda.is_available():
+        local_rank = int(os.environ['RANK'])  # 获得该进程的进程号
+        num_gpus = torch.cuda.device_count()  # 获得本机总的GPU数
+        device_id = local_rank % num_gpus     # 定义device_id: 没有直接用local_rank做device_id是因为这样可以设置只使用所有gpu中的其中一部分。
+        device = torch.cuda.device(device_id)
+    # 如果是并行式单机设备: 提示用分布式，因为分布式比并行式更快。
+    elif not cfg.distribute and cfg.gpus > 1 and torch.cuda.is_available(): 
+        raise ValueError('Currently not support DataParallel, please transfer to DistributedDataParallel.')
+    # 如果是单GPU设备    
+    elif cfg.gpus == 1 and torch.cuda.is_available():
+        device = torch.device("cuda")   # 设置设备GPU: "cuda"和"cuda:0"的区别？
+        info = 'Operation will start in GPU!'
+    # 如果是cpu设备
+    elif cfg.gpus == 0:
+        device = torch.device("cpu")      # 设置设备CPU
+        info = 'Operation will start in CPU!'
+    else:
+        raise ValueError('Can not get correct device from get_device().')
+    if logger is not None:
+        logger.info(info)
+    return device
+
+
+# %%
 
 class RepeatDataset(object):
 
@@ -344,19 +371,9 @@ def get_dataloader(dataset, dataloader_cfg, num_gpus, dist=False):
                                              sampler=sampler, 
                                              collate_fn=collate_fn)
     return dataloader
-#    class DataLoader()            
-#    def __init__(self, dataset, batch_size=1, shuffle=False, sampler=None,
-#                 batch_sampler=None, num_workers=0, collate_fn=default_collate,
-#                 pin_memory=False, drop_last=False, timeout=0,
-#                 worker_init_fn=None):
-# %%
 
-#def get_root_model(cfg):
-#    """根模型创建：传入根cfg"""
-#    model_name = cfg.model['type']
-#    model_class = models[model_name]
-#    model = model_class(cfg)
-#    return model
+
+# %%
 
 def get_model(cfg):
     """创建单模型：传入模型cfg
@@ -367,15 +384,18 @@ def get_model(cfg):
         model_class = models[model_name]
         model = model_class(cfg)
         # 总成模型判断是否分布式
-        if cfg.distribute:
-            model = DistributedDataParallel(model)
-        return model
+        if cfg.distribute and os.environ.get('RANK', None) is not None:
+            local_rank = os.environ['RANK']
+            model = DistributedDataParallel(model, 
+                                            device_ids=[local_rank],   # 模型所在的进程号
+                                            output_device=local_rank)  # 模型
     # 如果传入的是某个model的cfg，则初始化单模型
     else:
         model_name = cfg['type']
         model_class = models[model_name]
         params = cfg.params    
         model = model_class(**params)  # 其他模型的创建，传入的是解包的dict
+    return model
         
 
 
@@ -406,7 +426,6 @@ def get_loss_fn(loss_cfg):
         return loss_class(**params)
     else:                    # 不带超参损失函数
         return loss_class()
-
 
 
 # %%

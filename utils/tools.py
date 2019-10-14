@@ -189,6 +189,16 @@ import torch.multiprocessing as mp
 def init_dist(backend='nccl', **kwargs):
     """初始化分布式系统：主要是为了显式地启动本机多进程，并且把训练代码拷贝给每一个进程
     参考：https://tramac.github.io/2019/04/22/%E5%88%86%E5%B8%83%E5%BC%8F%E8%AE%AD%E7%BB%83-PyTorch/
+    并行式与分布式的区别：
+    1. 并行式：
+        - 只开一个进程，只适合一台机器，可以调动多块GPU，但属于假的多进程。
+        - 数据分块是从batch分，每个batch复制给多个GPU，所以batch size需要设置成单卡的n倍
+    - 分布式：
+        - 一块GPU对应一个进程，可以一台机器，也可以多台机器，是真正的多进程。
+        - 数据分块是从数据集上直接分，也就是通过DistributeSampler先把数据集分成多块给多块GPU，这避免了每个batch传输到多GPU的传输效率
+          所以batch size跟单卡是一样的。
+        - world_size就是
+    
     分布式训练使用方法： 
     - 主机：
         python torch.distributed.launch --nproc_per_node 2      # 定义该机器的GPU数量
@@ -242,9 +252,9 @@ def init_dist(backend='nccl', **kwargs):
     if mp.get_start_method(allow_none=True) is None:
         mp.set_start_method('spawn')       # 多进程启动方式选择：一般有fork和spawn, spawn为默认方法，否则容易导致死锁
     # 只有运行了torch.distributed.launch之后才能从os.environ获得到RANK变量，否则报错
-    rank = int(os.environ['RANK'])         #
+    local_rank = int(os.environ['RANK'])         #
     num_gpus = torch.cuda.device_count()   # 查找本机多少GPU
-    torch.cuda.set_device(rank % num_gpus) # 设置host主机的设备
+    torch.cuda.set_device(local_rank % num_gpus) # 设置host主机的设备
     dist.init_process_group(backend=backend, **kwargs)  # 初始化进程组
 
 

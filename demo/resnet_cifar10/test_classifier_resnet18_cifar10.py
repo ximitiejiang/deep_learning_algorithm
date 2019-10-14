@@ -40,7 +40,7 @@ mmcv    240s
 """
 
 def merge_to(args, cfg):
-    """把args合并到cfg, 可采用vars()或者__dict_-把namespace转换成dict
+    """把args合并到cfg, 可采用vars()把namespace转换成dict
     其中cfg为dict, args为namespace
     """
     args = vars(args)

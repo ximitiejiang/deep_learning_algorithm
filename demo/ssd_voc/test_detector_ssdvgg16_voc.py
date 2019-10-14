@@ -21,7 +21,7 @@ def train_ssd(cfg_path):
     
 if __name__ == "__main__":
     
-    task = 'train'
+    task = 'test'
     cfg_path = './cfg_detector_ssdvgg16_voc.py'
     
     if task == 'train':  # 模型训练
@@ -41,10 +41,10 @@ if __name__ == "__main__":
                          result_file='/home/ubuntu/mytrain/ssd_vgg_voc/20190928_084133_eval_result.pkl')
     
     if task == 'test':  # 测试单张图或多张图的结果： cpu上0.649 sec， gpu上0.388 sec
-        img = cv2.imread('../test/4.jpg')
+        img = cv2.imread('/home/ubuntu/MyDatasets/misc/1.jpg')
         predictor = DetPredictor(cfg_path,                         
                                  load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_11.pth',
-                                 load_device='cuda')
+                                 load_device='cpu')
         for results in predictor([img]):
             vis_all_pyplot(*results, class_names=get_classes('voc'), score_thr=0.2)
     
