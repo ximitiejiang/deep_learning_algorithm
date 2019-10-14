@@ -11,6 +11,8 @@ from importlib import import_module
 import logging
 import torch
 import numpy as np
+from torch.nn.parallel import DistributedDataParallel
+
 from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform, AugTransform
 from utils.tools import get_time_str
 
@@ -167,6 +169,9 @@ def get_dataset(dataset_cfg, transform_cfg):
 
 # %%
 from torch.utils.data.dataloader import default_collate
+from torch.utils.data import DistributedSampler
+from utils.tools import get_dist_info
+
 def multi_collate(batch):
     """自定义一个多数据分别堆叠的collate函数：此时要求数据集输出为[img,label, scale,..]
     参考：https://www.jianshu.com/p/bb90bff9f6e5
@@ -230,7 +235,44 @@ def dict_collate(batch):
     return result
     
 
-def get_dataloader(dataset, dataloader_cfg):
+class NewDistributedSampler(DistributedSampler):
+    """分布式采样：在pytorch原始分布式采样基础上微调，由于pytorch原版分布式采样只能随机采样，无法设置是否shuffle, 也就不能顺序采样。
+    增加shuffle参数，从而让单机版和分布式都可以基于cfg设置shuffle与否，在分布式预测时就可以获得顺序采样的效果。
+    sampler逻辑：重写__iter__()函数，返回iter(一个序列号列表)
+    
+    分布式采样逻辑：根据当前rank号，来提取一组样本序列号。比如rank0的样本序列号indices=shuffled_dataset_indices[0:len:n_rank], len表示整个数据集长度，n_rank表示多少块GPU。
+    从而通过控制起始的idx号和步长n_rank很巧妙的把一组indices分成多组。
+    
+    输入：dataset数据集
+    输出：整个数据集的索引号idx
+    """
+    def __init__(self, dataset, num_replicas=None, rank=None, shuffle=True):
+        super().__init__(dataset, num_replicas=num_replicas, rank=rank)
+        self.shuffle = shuffle
+
+    def __iter__(self):
+        # 默认的shuffle采样
+        if self.shuffle:
+            g = torch.Generator()
+            g.manual_seed(self.epoch)
+            indices = torch.randperm(len(self.dataset), generator=g).tolist()
+        # 新增部分：如果不shuffle，则顺序采样
+        else:
+            indices = torch.arange(len(self.dataset)).tolist()
+
+        # add extra samples to make it evenly divisible
+        indices += indices[:(self.total_size - len(indices))]
+        assert len(indices) == self.total_size
+
+        # subsample
+        indices = indices[self.rank:self.total_size:self.num_replicas]
+        assert len(indices) == self.num_samples
+
+        return iter(indices)
+
+
+
+def get_dataloader(dataset, dataloader_cfg, num_gpus, dist=False):
     """生成pytorch版本的dataloader，在cfg中只提供基础参数，而那些需要自定义函数的则需要另外传入。
     相关参数包括:
     Dataloader(dataset, batch_size, shuffle=False, sampler=None, batch_sampler=None,
@@ -256,26 +298,57 @@ def get_dataloader(dataset, dataloader_cfg):
        而当数据集getitem输出的是img, label, scale, shape，
     
     """
-    collate_fn_dict = {'default_collate':default_collate,
-                       'multi_collate':multi_collate,
-                       'dict_collate':dict_collate}
-    sampler_fn_dict = {}
-    sampler = None
-    collate_fn = default_collate   # 注意不能让collate_fn的默认参数为None,否则会导致不可调用的报错
-    
+    collate_fn_dict = {'default' : default_collate,
+                       'multi_collate' : multi_collate,
+                       'dict_collate' : dict_collate}
+    sampler_fn_dict = {'default' : DistributedSampler,
+                       'group_sampler': None}
+    # 注意不能让collate_fn的默认参数为None,否则会导致不可调用的报错
+    collate_fn = default_collate   
     params = dataloader_cfg.get('params', None)
-    c_name = params.pop('collate_fn')
-    if c_name is not None:  # 创建自定义collate_fn
-        collate_fn = collate_fn_dict[c_name]
     
-    s_name = params.pop('sampler')
-    if s_name is not None:    # 创建自定义sampler
-        sampler = sampler_fn_dict[s_name]
+    # 定义collate_fn
+    collate_name = params.pop('collate_fn')
+    if collate_name is not None:  # 创建自定义collate_fn
+        collate_fn = collate_fn_dict[collate_name]
     
-    return torch.utils.data.DataLoader(dataset, **params, 
-                                       sampler=sampler, collate_fn=collate_fn)
-        
+    # 定义sampler
+    sampler_name = params.pop('sampler')
+    pin_memory = params.get('pin_momory', False)
+    drop_last = params.get('drop_last', False)
+    if not dist:
+        sampler = None   # 非dist条件下设为None，但实际上内部sampler取决于shuffle的定义，如果shuffle=True则自动为RandomSampler，否则为SequentialSampler
+        if num_gpus > 0: # GPU
+            shuffle = params['shuffle']
+            batch_size = params['batch_size'] * num_gpus       # GPU模式下则batch size要乘以GPU块数，cpu模式则不变
+            num_workers = params['num_workers'] * num_gpus
+        else:  # CPU
+            shuffle = params['shuffle']
+            batch_size = params['batch_size']       # GPU模式下则batch size要乘以GPU块数，cpu模式则不变
+            num_workers = params['num_workers']            
 
+    # pytorch默认的分布式采样模块
+    elif (dist and sampler_name=='default') or (dist and sampler_name is None):
+        rank, world_size = get_dist_info()
+        sampler = sampler_fn_dict['default'](dataset, world_size, rank)  # 创建分布式采样器：数据集，GPU块数，等级
+        shuffle = False   # 在分布式情况下，不需要设置随机打乱，因为分布式采样模块本身就是随机的
+        batch_size = params['batch_size']
+        num_workers = params['num_workers']
+    # 生成dataloader
+    dataloader = torch.utils.data.DataLoader(dataset, 
+                                             shuffle=shuffle,
+                                             batch_size=batch_size,
+                                             num_workers=num_workers,
+                                             pin_memory=pin_memory,
+                                             drop_last=drop_last,
+                                             sampler=sampler, 
+                                             collate_fn=collate_fn)
+    return dataloader
+#    class DataLoader()            
+#    def __init__(self, dataset, batch_size=1, shuffle=False, sampler=None,
+#                 batch_sampler=None, num_workers=0, collate_fn=default_collate,
+#                 pin_memory=False, drop_last=False, timeout=0,
+#                 worker_init_fn=None):
 # %%
 
 #def get_root_model(cfg):
@@ -288,17 +361,22 @@ def get_dataloader(dataset, dataloader_cfg):
 def get_model(cfg):
     """创建单模型：传入模型cfg
     """
+    # 如果传入的是整个cfg，则初始化总成模型
     if cfg.get('model', None) is not None:
         model_name = cfg.model['type']
         model_class = models[model_name]
         model = model_class(cfg)
+        # 总成模型判断是否分布式
+        if cfg.distribute:
+            model = DistributedDataParallel(model)
         return model
+    # 如果传入的是某个model的cfg，则初始化单模型
     else:
         model_name = cfg['type']
         model_class = models[model_name]
         params = cfg.params    
-        return model_class(**params)  # 其他模型的创建，传入的是解包的dict
-
+        model = model_class(**params)  # 其他模型的创建，传入的是解包的dict
+        
 
 
 # %%       

@@ -14,7 +14,6 @@ Created on Mon Sep  2 11:30:35 2019
    --------------------------------------------------------------------------
 """
 
-task = 'classifier'              # 用于定义任务类型：classifier, detector, regressor
 gpus = 1
 parallel = False
 distribute = False                       

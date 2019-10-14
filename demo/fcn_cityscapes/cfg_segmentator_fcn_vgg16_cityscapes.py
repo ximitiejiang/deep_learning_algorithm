@@ -5,7 +5,7 @@ Created on Mon Sep  2 11:31:23 2019
 
 @author: ubuntu
 """
-task = 'segmentator'
+
 gpus = 1
 parallel = False
 distribute = False                       

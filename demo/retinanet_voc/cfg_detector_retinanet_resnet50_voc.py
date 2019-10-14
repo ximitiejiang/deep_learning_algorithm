@@ -5,7 +5,7 @@ Created on Mon Sep  2 11:31:23 2019
 
 @author: ubuntu
 """
-task = 'detector'                # 用于定义任务类型：classifier, detector, regressor
+
 gpus = 1
 parallel = False
 distribute = False                       

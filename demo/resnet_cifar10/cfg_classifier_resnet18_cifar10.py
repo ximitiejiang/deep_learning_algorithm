@@ -5,20 +5,19 @@ Created on Mon Sep  2 11:30:35 2019
 
 @author: ubuntu
 """
-task = 'classifier'              # 用于定义任务类型：classifier, detector, regressor
-gpus = 1
-parallel = False
-distribute = False                       
-n_epochs = 4
-imgs_per_core = 32               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
-workers_per_core = 0
+
+gpus = 2
+distribute = True                       
+n_epochs = 2
+imgs_per_core = 16               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
+workers_per_core = 2
 save_checkpoint_interval = 10     # 每多少个epoch保存一次epoch
 work_dir = '/home/ubuntu/mytrain/resnet_cifar10/'
 resume_from = None               # 恢复到前面指定的设备
 load_from = None
 load_device = 'cuda'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
 
-lr = 0.001
+lr = 0.1
 
 lr_processor = dict(
         type='list',
@@ -32,7 +31,7 @@ lr_processor = dict(
 logger = dict(
                 log_level='INFO',
                 log_dir=work_dir,
-                interval=100)
+                interval=50)
 model = dict(
         type='classifier')
 
@@ -46,8 +45,8 @@ backbone = dict(                    # model是必须要有的参数，用来表�
 
 transform = dict(
         img_params=dict(
-                mean=[0.485, 0.456, 0.406],  
-                std=[0.229, 0.224, 0.225],
+                mean = [0.4914, 0.4822, 0.4465],
+                std = [0.2023, 0.1994, 0.2010],
                 norm=True,
                 to_rgb=True,    # bgr to rgb
                 to_tensor=True, # numpy to tensor 
@@ -92,8 +91,8 @@ valset = dict(
 trainloader = dict(
         params=dict(
                 shuffle=True,
-                batch_size=gpus * imgs_per_core if gpus>0 else imgs_per_core,
-                num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
+                batch_size=imgs_per_core,
+                num_workers=workers_per_core,
                 pin_memory=False,   # 数据送入GPU进行加速(默认False)
                 drop_last=False,
                 collate_fn='dict_collate',    # 'default_collate','multi_collate', 'dict_collate'
@@ -101,8 +100,8 @@ trainloader = dict(
 valloader = dict(        
         params=dict(
                 shuffle=False,
-                batch_size=gpus * imgs_per_core if gpus>0 else imgs_per_core,
-                num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
+                batch_size=imgs_per_core,
+                num_workers=workers_per_core,
                 pin_memory=False,   # 数据送入GPU进行加速(默认False)
                 drop_last=False,
                 collate_fn='dict_collate',    # 'default_collate','multi_collate', 'dict_collate'

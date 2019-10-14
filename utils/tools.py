@@ -52,40 +52,43 @@ def hello2(sec):
     
 # %%
 
-def accuracy(y_pred, label, topk=1):
+def accuracy2(preds, targets, topk=1):
     """pytorch tensor版本的精度计算：由于都是未概率化的数据，
     y_pred(b, n_classes)，tensor为未概率化的数据
-    label(b,), tensor为未概率化的数据(也就是实际标签而不是独热编码)
+    targets(b,), tensor为未概率化的数据(也就是实际标签而不是独热编码)
     输出: acc (float标量)
     """
     with torch.no_grad():
         # TODO: 增加topk的功能
         if topk == 1:
-            pred = torch.argmax(y_pred, dim=1)         # 输出(b,)           
-            acc = (pred == label).sum().float() / len(label)
+            pred = torch.argmax(preds, dim=1)         # 输出(b,)           
+            acc = (pred == targets).sum().float() / len(targets)
         return acc
 
-def accuracy2(preds, targets, topk=(1, )):
+def accuracy(preds, targets, topk=(1, 5)):
     """计算指定的topk精度, topk可以是数值(1 or 5表示第1的精度或者前5的精度), 
     也可以是一组数([1,5]则表示计算第1精度和前5精度)
     args:
         preds: (b, n_class)，为
         targets: (b, ), 为实际标签(不是独热编码)
     """
-    if isinstance(topk, int):
+    if isinstance(topk, int):  # topk可以是一个数值，也可以是一个list表示要求的k的个数
         topk = [topk]
     with torch.no_grad():
-        maxk = max(topk)
+        maxk = max(topk)   # 提取最大k个
         batch_size = targets.size(0)
 
-        _, pred = preds.topk(maxk, 1, True, True) # topk(k, ?, ?, ?)
-        pred = pred.t()
-        correct = pred.eq(targets.view(1, -1).expand_as(pred))
+        _, pred = preds.topk(maxk, 1, True, True) # (b, 5), topk(k, ?, ?, ?)
+        pred = pred.t()  # 转置(5, b)
+        correct = pred.eq(targets.view(1, -1).expand_as(pred))  # (5, b)
 
         res = []
         for k in topk:
             correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
+        # 如果只求一个top，则返回一个值而不是list
+        if len(topk) == 1:
+            res = res[0]
         return res
 
 # %%    
@@ -162,14 +165,7 @@ dist = dict(
 
 def parse_args():
     """用于从命令行获取输入参数来进行分布式训练
-    使用方法： 
-        - 主机：
-            python torch.distributed.launch --nproc_per_node 2 --node_rank 0
-            python ./train.py --config cfg_xxx.py --local_rank 0
-        - 从机
-            python torch.distributed.launch --n_proc_ 2 --node_rank 1
-            python ./train.py --config cfg_xxx.py --local_rank 1
-    相关参数说明：参考https://www.cnblogs.com/freshchen/p/11660046.html    
+    相关解析参数的基础说明：参考https://www.cnblogs.com/freshchen/p/11660046.html    
     1. 参数数据类型设置：默认的传入参数都是字符串，如果需要指定，则通过type=int来设置，此时parser会帮我们转换
     2. 参数名称设置：-n或--name代表参数的变量名，其中-n为简写名，--name为全名，一般有一个就可以，
        但如果两个都写，获取参数时需要采用全名(简写名失效)，获取变量名可以通过sys.argv[1->n]中去获取，也可以通过parser.parse_args()之后来获取。
@@ -181,8 +177,6 @@ def parse_args():
         - action='append'，把值保存到列表，如果参数重复出现，则保存多个值
     """
     parser = ArgumentParser(description='Dist training argument parse')
-    parser.add_argument('--task', choices=['train'])
-    parser.add_argument('--config')
     parser.add_argument('--launcher', default='pytorch')   # 分布式默认启动器
     parser.add_argument('--local_rank', default=0, type=int) # 分布式默认主机
     args = parser.parse_args()       # 解析参数
@@ -193,23 +187,36 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 
 def init_dist(backend='nccl', **kwargs):
-    """初始化分布式系统：主要是为了启动本机多进程，通常一个GPU中运行一个进程
+    """初始化分布式系统：主要是为了显式地启动本机多进程，并且把训练代码拷贝给每一个进程
     参考：https://tramac.github.io/2019/04/22/%E5%88%86%E5%B8%83%E5%BC%8F%E8%AE%AD%E7%BB%83-PyTorch/
+    分布式训练使用方法： 
+    - 主机：
+        python torch.distributed.launch --nproc_per_node 2      # 定义该机器的GPU数量
+                                        --node_rank 0           # 定义该机器的rank等级(主机还是从机)
+                                        ./train.py --config cfg_xxx.py --local_rank 0  # 定义训练文件和训练文件的子参数
+    - 从机
+        python torch.distributed.launch --n_proc_per_node 2 
+                                        --node_rank 1
+                                        ./train.py --config cfg_xxx.py --local_rank 1  #
+    
+    整个分布式训练过程解析：
     step0: 启动pytorch的分布式系统$python -m torch.distributed.launch train.py，用于设置环境变量，会在os.environ中创建环境变量比如RANK
         - n_proc_per_node=2表示每台机器运行的进程数
         - node_rank=0表示本节点为host主节点
-        - master_addr 是为了设置主机的ip地址，是为了host主机能够被其他机器访问
-        - master_port 是为了设置主机的开放端口，是为了host主机能够被其他机器访问
-        - train.py --arg1 arg1 是代表训练脚本以及训练脚本的参数
-    step1: 设置多进程启动方式：mp.set_start_method('spawn')
+        - master_addr='tcp://172.31.22.234:23456' 是为了设置主机的ip地址，是为了host主机能够被其他机器访问
+        - master_port=1234 是为了设置主机的开放端口，是为了host主机能够被其他机器访问
+        - train.py --config cfg.py --local_rank 0 是代表训练脚本以及训练脚本的参数
+    step1: 设置多进程启动方式，mp.set_start_method('spawn')
         - 多进程启动方式：最好采用spawn
-    step2: 设置本机设备
+    step2: 设置本机设备，torch.cuda.set_device()
         - rank: 代表获取本机进程的优先级编号，所以叫rank，这个值取决于torch.distributed.launch中输入的--node_rank是多少，0则是主机
         - num_gpus: 代表获取本机的GPU个数
-        - set_device(): 代表设置本机
-    step3: 初始化进程组dist.init_process_group(backend, init_method, rank, world_size)
-        - backend: 表示各进程通信的底层通信协议，可以是nccl, mpi, gloo，但nccl是表现最好的
+        - set_device(ran % num_gpus): 代表设置本机主设备
+    step3: 初始化进程组dist.init_process_group(backend, init_method, store=None, rank=-1, world_size=-1)
+        - 两种初始化进程组的方式：第一种显式定义store/rank/world_size, 第二种指定init_method为一个url地址从而所有进程都知道在哪里如何找到其他进程。    
+        - backend: 表示各进程通信的底层通信协议，可以是nccl, mpi, gloo，(nccl/gloo是默认安装的，mpi必须从源码安装pytorch)建议是GPU分布训练采用nccl, cpu分布训练采用gloo
         - init_method: 表示各进程的初始化方式，可以采用dist_url，或者...
+        - store:
         - rank: 
         - world_size: 总的进程数，也就是GPU数(一个GPU启动一个进程)
     step4: 创建分布式模型
@@ -241,19 +248,35 @@ def init_dist(backend='nccl', **kwargs):
     dist.init_process_group(backend=backend, **kwargs)  # 初始化进程组
 
 
-def main():
-    if dist:
-        world_size = torch.distributed.get_world_size()   # world_size代表
-        rank = torch.distributed.get_rank()               # rank代表 
-        num_workers = cfg.data_workers
-        assert cfg.batch_size % world_size == 0
-        batch_size = cfg.batch_size // world_size
-        train_sampler = DistributedSampler(train_dataset, world_size, rank)
-        val_sampler = DistributedSampler(val_dataset, world_size, rank)
-        shuffle = False    
-    if dist:
-        model = DistributedDataParallel(
-                model.cuda(), device_ids=[torch.cuda.current_device()])
+def get_dist_info():
+    """用来在dataloader中获取当前分布式的状态："""
+    initialized = dist.is_initialized()
+    # 如果已经初始化，即已经执行了dist.init_process_group()
+    if initialized:
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
+    # 如果没有初始化，则当成本机一块GPU方式返回
+    else:
+        rank = 0
+        world_size = 1
+    return rank, world_size    
+    
+
+
+
+#def main():
+#    if dist:
+#        world_size = torch.distributed.get_world_size()   # world_size代表
+#        rank = torch.distributed.get_rank()               # rank代表 
+#        num_workers = cfg.data_workers
+#        assert cfg.batch_size % world_size == 0
+#        batch_size = cfg.batch_size // world_size
+#        train_sampler = DistributedSampler(train_dataset, world_size, rank)
+#        val_sampler = DistributedSampler(val_dataset, world_size, rank)
+#        shuffle = False    
+#    if dist:
+#        model = DistributedDataParallel(
+#                model.cuda(), device_ids=[torch.cuda.current_device()])
     
 
 # %%

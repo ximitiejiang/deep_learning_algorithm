@@ -10,7 +10,7 @@ import torch.nn as nn
 import os
 import time
 
-from utils.prepare_training import get_config, get_logger, get_dataset, get_dataloader 
+from utils.prepare_training import get_logger, get_dataset, get_dataloader 
 from utils.prepare_training import get_model, get_optimizer, get_lr_processor
 from utils.visualization import vis_loss_acc
 from utils.checkpoint import load_checkpoint, save_checkpoint
@@ -59,19 +59,19 @@ def batch_classifier(model, data, device, return_loss=True, **kwargs):
     img = to_device(data['img'], device)  
     label = to_device(data['gt_labels'], device)
     if return_loss:
-        loss = model(imgs=img, return_loss=True, labels=label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
-        return loss
+        outs = model(imgs=img, return_loss=True, labels=label)  # pytorch交叉熵包含了前端的softmax/one_hot以及后端的mean
+        return outs   # 包括loss, acc
     else:
-        output = model(imgs=img, return_loss=False)
-        return output
+        outs = model(imgs=img, return_loss=False)
+        return outs   # tbd
 
 
 def get_batch_processor(cfg):
-    if cfg.task == 'classifier':
+    if cfg.model.type == 'classifier':
         return batch_classifier
-    elif cfg.task == 'detector':
+    elif cfg.model.type == 'detector':
         return batch_detector
-    elif cfg.task == 'segmentator':
+    elif cfg.model.type == 'segmentator':
         return batch_segmentator
     else:
         raise ValueError('Wrong task input.')
@@ -85,17 +85,18 @@ class Runner():
     如果主模型是一个集成检测模型，则要求该主模型所包含的所有下级模型也要继承
     自nn.module且包含forward函数。
     """
-    def __init__(self, cfg_path,
+    def __init__(self, cfg, 
                  resume_from=None):
         # 共享变量: 需要声明在resume/load之前，否则会把resume的东西覆盖
         self.c_epoch = 0
         self.c_iter = 0
         self.weight_ready = False
         self.buffer = {'loss': [],
-                       'acc': [],
+                       'acc1': [],
+                       'acc5': [],
                        'lr':[]}
         # 获得配置
-        self.cfg = get_config(cfg_path)
+        self.cfg = cfg
         if resume_from is not None:
             self.cfg.resume_from = resume_from  # runner可以直接修改resume_from,避免修改cfg文件
         # 检查文件夹和文件是否合法
@@ -103,12 +104,6 @@ class Runner():
         #设置logger
         self.logger = get_logger(self.cfg.logger)
         self.logger.info('start logging info.')
-        # 检查是否分布式
-        if cfg.distribute is not None:
-            assert 
-            train_sampler = 
-            val_sampler
-            
         #设置设备
         if self.cfg.gpus > 0 and torch.cuda.is_available():
             self.device = torch.device("cuda")   # 设置设备GPU: "cuda"和"cuda:0"的区别？
@@ -127,8 +122,14 @@ class Runner():
 #        tmp1 = self.trainset[91]  # for debug: 可查看dataset __getitem__
         
         #创建数据加载器
-        self.dataloader = get_dataloader(self.trainset, self.cfg.trainloader)
-        self.valloader = get_dataloader(self.valset, self.cfg.valloader)
+        self.dataloader = get_dataloader(self.trainset, 
+                                         self.cfg.trainloader, 
+                                         self.cfg.gpus, 
+                                         dist=self.cfg.distribute)
+        self.valloader = get_dataloader(self.valset, 
+                                        self.cfg.valloader,
+                                        self.cfg.gpus,
+                                        dist=self.cfg.distribute)
         
 #        tmp2 = next(iter(self.dataloader))  # for debug: 设置worker=0就可查看collate_fn
         
@@ -209,14 +210,17 @@ class Runner():
                 self.optimizer.zero_grad()       # 每个batch的梯度清零
                 # 存放结果
                 self.buffer['loss'].append(outputs.get('loss', 0))
-                self.buffer['acc'].append(outputs.get('acc1', 0))
+                self.buffer['acc1'].append(outputs.get('acc1', 0))
+                self.buffer['acc5'].append(outputs.get('acc5', 0))
                 self.buffer['lr'].append(self.current_lr()[0])
                 # 显示text
                 if (self.c_iter+1)%self.cfg.logger.interval == 0:
                     lr_str = ','.join(['{:.4f}'.format(lr) for lr in self.current_lr()]) # 用逗号串联学习率得到一个字符串
-                    log_str = 'Epoch [{}][{}/{}]\tloss: {:.4f}\tacc: {:.4f}\tlr: {}'.format(self.c_epoch+1, 
-                            self.c_iter+1, len(self.dataloader), 
-                            self.buffer['loss'][-1].item(), self.buffer['acc'][-1], lr_str)
+                    log_str = 'Epoch [{}][{}/{}]\tloss: {:.4f}, acc1: {:.4f}, acc5: {:.4f}\tlr: {}'.format(self.c_epoch+1, 
+                                     self.c_iter+1, len(self.dataloader), 
+                                     self.buffer['loss'][-1].item(),
+                                     self.buffer['acc1'][-1].item(), 
+                                     self.buffer['acc5'][-1].item(), lr_str)
 
                     self.logger.info(log_str)
             

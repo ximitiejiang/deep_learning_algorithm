@@ -185,6 +185,9 @@
    选项，也不要去把collate_fn设置为None，这会导致collate_fn找不到可用的函数导致错误。
    (从这个角度说，pytorch的官方英文文档有问题，注明DataLoader的collate_fn默认=None，
    但实际上collate_fn的默认=default_collate_fn。)
+
+4. 关于batch size: 如果是单机并行训练，则batch size代表的是所有GPU加载的图片总数
+   而如果是多机分布式训练，则batch size代表的是单个进程也就是单块GPU加载的图片数
    
 
 ### 关于contiguous的问题

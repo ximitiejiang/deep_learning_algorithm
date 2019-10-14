@@ -181,8 +181,9 @@ class Classifier(nn.Module):
         loss_inputs = [preds, labels]
         out_dict = self.get_losses(*loss_inputs)
         # TODO: 增加acc计算
-        acc1 = accuracy(preds, labels, topk=1)
-        out_dict.update(acc1=acc1)
+        acc = accuracy(preds, labels, topk=(1,5))
+        out_dict.update(acc1=acc[0])
+        out_dict.update(acc5=acc[1])
         return out_dict
     
     def forward_test(self, imgs, **kwargs):

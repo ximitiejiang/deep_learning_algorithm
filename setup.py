@@ -7,8 +7,8 @@ Created on Tue Sep  3 17:01:12 2019
 
 永久加入路径的方法：
 gedit ~/.bashrc
-export PYTHONPATH="/home/ubuntu/suliang_git/deep_learning_algorithm/"
-
+export PYTHONPATH=$PYTHONPATH:/home/ubuntu/suliang_git/deep_learning_algorithm
+source .bashrc
 """
 import sys, os
 path = os.path.abspath('.')
