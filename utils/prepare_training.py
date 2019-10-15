@@ -59,11 +59,6 @@ models = {
         'fcos_head': FCOSHead,
         'fcn8s_head': FCN8sHead}
 
-loss_fn_dict = {
-            'cross_entropy': torch.nn.CrossEntropyLoss,
-            'smooth_l1': torch.nn.SmoothL1Loss
-            }
-
 lr_processors = {'fix': FixedLrProcessor,
                 'list': ListLrProcessor,
                 'step': StepLrProcessor}
@@ -413,8 +408,7 @@ def get_model_wrapper(model, cfg):
     """为模型添加外壳：生成并行式模型或者分布式模型"""
     if cfg.gpus is None:
         return model
-    else:
-        model = model.cuda()    # 在添加外壳前，先保证model已经是cuda model
+
     # 并行式模型
     if cfg.parallel and len(cfg.gpus) > 1 and torch.cuda.device_count() > 1:  # 判断并行式，gpu个数
         model = nn.DataParallel(model)
@@ -444,17 +438,6 @@ def get_optimizer(optimizer_cfg, model):
     for name, value in model_params.items():
         params.setdefault(name, value)
     return opt_class(**params)    # 把模型权重，以及自定义的lr/momentum/weight_decay一起传入optimizer
-
-
-# %%
-def get_loss_fn(loss_cfg):
-    loss_name = loss_cfg.get('type')
-    loss_class = loss_fn_dict[loss_name]
-    params = loss_cfg.get('params')
-    if params is not None:  # 带超参损失函数
-        return loss_class(**params)
-    else:                    # 不带超参损失函数
-        return loss_class()
 
 
 # %%
