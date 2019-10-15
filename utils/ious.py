@@ -23,6 +23,7 @@ def calc_ious_tensor(bboxes1, bboxes2, aliged=False):
     """
     bb1 = bboxes1
     bb2 = bboxes2
+    # 如果bb1,bb2是对齐，求解的是一对一的iou，则输出ious(m,)
     if aliged:
         xymin = torch.max(bb1[:, :2], bb2[:, :2])
         xymax = torch.min(bb1[:, 2:], bb2[:, 2:])
@@ -31,6 +32,7 @@ def calc_ious_tensor(bboxes1, bboxes2, aliged=False):
         area1 = (bb1[:, 2] - bb1[:, 0] + 1) * (bb1[:, 3] - bb1[:, 1] + 1) # (m,)
         area2 = (bb2[:, 2] - bb2[:, 0] + 1) * (bb2[:, 3] - bb2[:, 1] + 1) # (m,)
         ious = area / (area1 + area2 - area)
+    # 如果bb1,bb2不对齐，求解多对多的iou, 则输出ious(m,n)
     else:
         xymin = torch.max(bb1[:, None, :2], bb2[:, :2])
         xymax = torch.min(bb1[:, None, 2:], bb2[:, 2:])

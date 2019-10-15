@@ -119,6 +119,8 @@ def get_centerness_target(pos_bbox_targets):
     """centerness可以理解为中心度，用来表征该点距离bbox中心点的程度，该值越接近1，则越接近bbox中心点。
     而越接近0则越远离中心点。因此采用c = sqrt((min(l,r)/max(l,r) * min(t,b)/max(t,b))来表示，相当于
     用l/r来评估偏离度，且分别评估了水平方向和竖直方向的偏离度。
+    args: pos_bbox_targets (k, 4) 代表(l,r,t,b)
+    return: target(k,)
     """
     lr = pos_bbox_targets[:, [0, 2]]
     tb = pos_bbox_targets[:, [1, 3]]

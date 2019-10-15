@@ -288,6 +288,10 @@ def get_dist_info():
 #        model = DistributedDataParallel(
 #                model.cuda(), device_ids=[torch.cuda.current_device()])
     
+# %%
+    
+
+
 
 # %%
 

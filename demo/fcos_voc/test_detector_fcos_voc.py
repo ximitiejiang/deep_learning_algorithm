@@ -9,13 +9,14 @@ from model.runner_lib import Runner
 from utils.evaluation import eval_dataset_det
 from utils.tools import parse_log
 import cv2
+from utils.prepare_training import get_config
 from utils.evaluation import DetPredictor
 from utils.visualization import vis_all_pyplot, vis_cam
 from utils.dataset_classes import get_classes
 
-def train_fcos(cfg_path):
+def train_fcos(cfg, resume_from=None):
     
-    runner = Runner(cfg_path = cfg_path)
+    runner = Runner(cfg, resume_from=None)
     runner.train()    
     
     
@@ -24,9 +25,10 @@ if __name__ == "__main__":
     
     task = 'train'
     cfg_path = './cfg_detector_fcos_resnet50_voc.py'
+    cfg = get_config(cfg_path)
     
     if task == 'train':  # 模型训练
-        train_fcos(cfg_path,
+        train_fcos(cfg=cfg,
                    resume_from = None)
     
     if task == 'eval':  # 数据集评估

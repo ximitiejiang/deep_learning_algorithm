@@ -22,8 +22,8 @@ def vis_loss_acc(buffer_dict, title='result: '):
     accs = None
     losses = None
     lrs = None
-    if buffer_dict.get('acc', None) is not None:
-        accs = buffer_dict['acc']
+    if buffer_dict.get('acc1', None) is not None:
+        accs = buffer_dict['acc1']
     if buffer_dict.get('loss', None) is not None:
         losses = buffer_dict['loss']
     if buffer_dict.get('lr', None) is not None:
@@ -42,12 +42,12 @@ def vis_loss_acc(buffer_dict, title='result: '):
         x = np.arange(len(accs))
         y_acc = np.array(accs)
     # 绘制acc
-    prefix += ' accs'
+    prefix += ' acc1'
     fig = plt.figure()
     ax1 = fig.add_subplot(1,1,1)
     ax1.set_title(prefix)
-    ax1.set_ylabel('acc')
-    lines = ax1.plot(x,y_acc, 'r', label='acc')
+    ax1.set_ylabel('acc1')
+    lines = ax1.plot(x,y_acc, 'r', label='acc1')
     # 绘制loss
     if losses is not None and len(losses) > 0:
         if isinstance(losses[0], list) or isinstance(losses[0], tuple):
@@ -162,7 +162,8 @@ def vis_bbox(bboxes, img=None):
 
 def vis_all_opencv(img, bboxes, scores, labels, class_names=None, score_thr=0, 
                     instance_colors=None, thickness=1, font_scale=0.6,
-                    show=True, win_name='cam', wait_time=0, saveto=None): # 如果输出到文件中则指定路径
+                    show=['img','bbox','label'], win_name='cam', 
+                    wait_time=0, saveto=None): # 如果输出到文件中则指定路径
     """采用opencv作为底层显示img/bbox/labels
     Args:
         img (str or ndarray): The image to be displayed.
@@ -204,33 +205,38 @@ def vis_all_opencv(img, bboxes, scores, labels, class_names=None, score_thr=0,
         bbox_int = bbox.astype(np.int32)
         left_top = (bbox_int[0], bbox_int[1])
         right_bottom = (bbox_int[2], bbox_int[3])
-        cv2.rectangle(                  # 画方框
-            img, left_top, right_bottom, random_colors[label].tolist(), 
-            thickness=thickness)
+        
+        if 'bbox' in show:
+            cv2.rectangle(                  # 画方框
+                img, left_top, right_bottom, random_colors[label].tolist(), 
+                thickness=thickness)
+        
         label_text = class_names[       # 准备文字
             label] if class_names is not None else 'cls {}'.format(label)
         if len(bbox) > 4:
-            label_text += ': {:.02f}'.format(bbox[-1])
-            
+            label_text += ': {:.02f}'.format(bbox[-1])    
         txt_w, txt_h = cv2.getTextSize(
             label_text, cv2.FONT_HERSHEY_DUPLEX, font_scale, thickness = 1)[0]
-        cv2.rectangle(                  # 画文字底色方框
-            img, (bbox_int[0], bbox_int[1]), 
-            (bbox_int[0] + txt_w, bbox_int[1] - txt_h - 4), 
-            random_colors[label].tolist(), -1)  # -1为填充，正整数为边框thickness
-        cv2.putText(
-            img, label_text, (bbox_int[0], bbox_int[1] - 2),     # 字体选择cv2.FONT_HERSHEY_DUPLEX, 比cv2.FONT_HERSHEY_COMPLEX好一点
-            cv2.FONT_HERSHEY_DUPLEX, font_scale, [255,255,255])  # 字体白色
+        
+        if 'label' in show:
+            cv2.rectangle(                  # 画文字底色方框
+                img, (bbox_int[0], bbox_int[1]), 
+                (bbox_int[0] + txt_w, bbox_int[1] - txt_h - 4), 
+                random_colors[label].tolist(), -1)  # -1为填充，正整数为边框thickness
+            cv2.putText(
+                img, label_text, (bbox_int[0], bbox_int[1] - 2),     # 字体选择cv2.FONT_HERSHEY_DUPLEX, 比cv2.FONT_HERSHEY_COMPLEX好一点
+                cv2.FONT_HERSHEY_DUPLEX, font_scale, [255,255,255])  # 字体白色
         
     if saveto is not None:
         cv2.imwrite(saveto, img)
-    if show:
+    if show is not None:
         cv2.imshow(win_name, img)
     return img
 
 
 def vis_all_pyplot(img, bboxes, scores=None, labels=None, class_names=None, score_thr=0, 
-             instance_colors=None, alpha=1., linewidth=1.5, ax=None, saveto=None):
+             instance_colors=None, alpha=1., linewidth=1.5, ax=None, saveto=None,
+             show=['img', 'bbox', 'label']):
     """另外一个图片+bbox显示的代码
     注意，该img输入为hwc/bgr(因为在test环节用这种格式较多)，如果在train等环节使用，
     就需要把img先从chw/rgb转成hwc/bgr
@@ -328,11 +334,12 @@ def vis_all_pyplot(img, bboxes, scores=None, labels=None, class_names=None, scor
         if scores is not None:
             sc = scores[i]
             caption.append('{:.2f}'.format(sc))
-        ax.add_patch(plt.Rectangle(
-            xy, width, height, fill=False,
-            edgecolor=color, linewidth=linewidth, alpha=alpha))
+        if 'bbox' in show:
+            ax.add_patch(plt.Rectangle(
+                xy, width, height, fill=False,
+                edgecolor=color, linewidth=linewidth, alpha=alpha))
 
-        if len(caption) > 0:
+        if 'label' in show and len(caption) > 0:
             ax.text(bb[0], bb[1]-2,     # 改到左下角点(xmin,ymin,xmax,ymax) ->(xmin,ymax)
                     ': '.join(caption),
                     style='italic',

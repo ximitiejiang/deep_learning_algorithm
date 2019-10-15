@@ -11,7 +11,7 @@ import os
 import time
 
 from utils.prepare_training import get_logger, get_dataset, get_dataloader, get_device 
-from utils.prepare_training import get_model, get_optimizer, get_lr_processor
+from utils.prepare_training import get_model, get_model_wrapper, get_optimizer, get_lr_processor
 from utils.visualization import vis_loss_acc
 from utils.checkpoint import load_checkpoint, save_checkpoint
 from utils.transform import to_device
@@ -69,7 +69,7 @@ def batch_classifier(model, data, device, return_loss=True, **kwargs):
 def get_batch_processor(cfg):
     if cfg.model.type == 'classifier':
         return batch_classifier
-    elif cfg.model.type == 'detector':
+    elif cfg.model.type == 'one_stage_detector':
         return batch_detector
     elif cfg.model.type == 'segmentator':
         return batch_segmentator
@@ -116,11 +116,11 @@ class Runner():
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, 
                                          self.cfg.trainloader, 
-                                         self.cfg.gpus, 
+                                         len(self.cfg.gpus), 
                                          dist=self.cfg.distribute)
         self.valloader = get_dataloader(self.valset, 
                                         self.cfg.valloader,
-                                        self.cfg.gpus,
+                                        len(self.cfg.gpus),
                                         dist=self.cfg.distribute)
         
 #        tmp2 = next(iter(self.dataloader))  # for debug: 设置worker=0就可查看collate_fn
@@ -136,9 +136,7 @@ class Runner():
         self.lr_processor = get_lr_processor(self, self.cfg.lr_processor)
         # 送入GPU
         # 包装并行模型是在optimizer提取参数之后，否则可能导致无法提取，因为并行模型在model之下加了一层module壳
-        if self.cfg.parallel and torch.cuda.device_count() > 1:
-            self.model = nn.DataParallel(self.model)
-            self.logger.info('Operation will start in Parallel mode.')
+        self.model = get_model_wrapper(self.model, self.cfg)
         self.model.to(self.device)
         # 注意：恢复或加载是直接加载到目标设备，所以必须在模型传入设备之后进行，确保设备匹配
         # 加载模型权重和训练参数，从之前断开的位置继续训练
@@ -230,6 +228,7 @@ class Runner():
         if vis:
             vis_loss_acc(self.buffer, title='train')
         self.weight_ready= True
+    
     
     def val(self, vis=True):
         """用于模型验证"""

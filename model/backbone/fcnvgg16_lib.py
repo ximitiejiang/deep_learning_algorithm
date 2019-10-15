@@ -5,7 +5,7 @@ Created on Fri Oct  4 16:36:59 2019
 
 @author: ubuntu
 """
-from model.vgg_lib import VGG
+from model.backbone.vgg_lib import VGG
 from utils.init_weights import common_init_weights
 
 class FCNVGG16(VGG):

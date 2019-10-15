@@ -6,14 +6,14 @@ Created on Tue Sep  3 21:29:33 2019
 @author: ubuntu
 """
 import os, sys
-print('current work path: ', os.getcwd())
-print('sys path: ', sys.path)
-
 from model.runner_lib import Runner
 from utils.evaluation import eval_dataset_cls
-from utils.prepare_training import get_config
+from utils.prepare_training import get_config, merge_config
 from utils.tools import parse_args
 import torch.distributed as dist
+
+#print('current work path: ', os.getcwd())
+#print('sys path: ', sys.path)
 
 """
 注意：命令行运行前需要确保把项目根路径加入sys.path(最好通过bashrc添加)
@@ -39,17 +39,6 @@ mmcv    240s
 
 """
 
-def merge_to(args, cfg):
-    """把args合并到cfg, 可采用vars()把namespace转换成dict
-    其中cfg为dict, args为namespace
-    """
-    args = vars(args)
-    for key, value in args.items():
-        if value is not None:
-            cfg[key] = value
-    return cfg
-    
-    
 
 def train_model(args):
 
@@ -58,12 +47,12 @@ def train_model(args):
     
     
 if __name__ == "__main__":
-    task = 'eval'
+    task = 'train'
     cfg_path = './cfg_classifier_resnet18_cifar10.py'
     
     args = parse_args()    # 传入task, config, launcher, local_rank   
     cfg = get_config(cfg_path)
-    cfg = merge_to(args, cfg)
+    cfg = merge_config(args, cfg)
     if os.environ.get('RANK', None) is not None:
         print('dist launched. RANK = %s'%(os.environ['RANK']))
         task = 'train'

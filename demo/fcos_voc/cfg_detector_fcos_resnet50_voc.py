@@ -6,13 +6,13 @@ Created on Mon Sep  2 11:31:23 2019
 @author: ubuntu
 """
 
-gpus = 1
+gpus = [0]
 parallel = False
 distribute = False                       
-n_epochs = 10
+n_epochs = 2
 imgs_per_core = 4               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
-workers_per_core = 4
-save_checkpoint_interval = 1     # 每多少个epoch保存一次epoch
+workers_per_core = 2
+save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
 work_dir = '/home/ubuntu/mytrain/fcos_resnet50_voc/'
 resume_from = None               # 恢复到保存的设备
 load_from = None
@@ -32,7 +32,7 @@ lr_processor = dict(
 logger = dict(
                 log_level='INFO',
                 log_dir=work_dir,
-                interval=1)
+                interval=10)
 
 model = dict(
         type='one_stage_detector')
@@ -52,7 +52,7 @@ neck = dict(
                 out_channels=256,
                 use_levels=(1, 2, 3),
                 num_outs=5,
-                extra_convs_on_input=True
+                extra_convs_on_inputs=True
                 ))
 
 head = dict(
@@ -158,16 +158,3 @@ optimizer = dict(
                 lr=lr, 
                 momentum=0.9, 
                 weight_decay=5e-4))
-
-loss_clf = dict(
-        type='cross_entropy',
-        params=dict(
-                reduction='mean'
-                ))
-
-loss_reg = dict(
-        type='smooth_l1',
-        beta=1.,
-        params=dict(
-                reduction='mean'
-                ))

@@ -10,7 +10,7 @@ from model.runner_lib import Runner
 from utils.evaluation import eval_dataset_det, DetPredictor
 from utils.tools import parse_log
 from utils.dataset_classes import get_classes
-from utils.visualization import vis_all_opencv, vis_cam
+from utils.visualization import vis_all_opencv, vis_all_pyplot, vis_cam
 
 def train_ssd_widerface(cfg_path, resume_from):
 
@@ -42,12 +42,13 @@ if __name__ == "__main__":
                          result_file='/home/ubuntu/mytrain/ssd_vgg_voc/20190928_084133_eval_result.pkl')
     
     if task == 'test':  # 测试单张图或多张图的结果
-        img = cv2.imread('../test/4.jpg')
+        img = cv2.imread('/home/ubuntu/MyDatasets/misc/26.jpg')
         predictor = DetPredictor(cfg_path,                         
                               load_from = '/home/ubuntu/mytrain/ssd_vgg_widerface/epoch_9.pth',
                               load_device='cpu')
         for results in predictor([img]):
-            vis_all_opencv(*results, class_names=get_classes('widerface'), score_thr=0.2)
+            vis_all_opencv(*results, class_names=get_classes('widerface'), 
+                           score_thr=0.25, show=['img','bbox'])
     
     # 针对widerface的训练结果模型，对小脸比较有效，但对大脸效果很差，因为数据集里边大部分都是小脸，大脸数据太少。
     # 所以靠近摄像头反而检不出来，远离摄像头就能检出来。

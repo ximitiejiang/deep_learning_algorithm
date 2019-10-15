@@ -19,6 +19,8 @@ from model.bbox_regression_lib import delta2bbox
 from model.conv_module_lib import conv_norm_acti
 from model.nms_lib import nms_operation
 from model.bbox_regression_lib import lrtb2bbox
+from model.loss_lib import IOULoss, SigmoidBinaryCrossEntropyLoss, SigmoidFocalLoss
+
 
 """待整理：
 小物体检测效果不好的原因;
@@ -400,6 +402,7 @@ class RetinaHead(SSDHead):
     
     
 # %%
+
 class FCOSHead(nn.Module):
     """fcos无anchor的head
     """
@@ -409,14 +412,12 @@ class FCOSHead(nn.Module):
                  out_channels=256, # 堆叠卷积的输出通道数
                  num_convs=4,      # 堆叠的卷积层数
                  strides=(4, 8, 16, 32, 64),
-                 regress_ranges=((-1, 64), (64, 128), (128, 256), (256, 512), (512, 1e8)),
-                 loss_cls_cfg=None,
-                 loss_reg_cfg=None,
-                 loss_centerness_cfg=None
+                 regress_ranges=((-1, 64), (64, 128), (128, 256), (256, 512), (512, 1e8))
                  ):
         
         super().__init__()
         self.num_classes = num_classes
+        self.num_convs = num_convs
         self.regress_ranges = regress_ranges
         self.strides = strides
         # 创建分类，回归，centerness分支
@@ -433,9 +434,9 @@ class FCOSHead(nn.Module):
         # 这里没有采用scales层
         
         # 创建损失函数
-        self.loss_cls = weighted_sigmoid_focal_loss 
-        self.loss_reg = iou_loss
-        self.loss_centerness = F.cross_entropy
+        self.loss_cls = SigmoidFocalLoss()
+        self.loss_reg = IOULoss()
+        self.loss_centerness = SigmoidBinaryCrossEntropyLoss()
 
 
     def init_weights(self):
@@ -517,30 +518,34 @@ class FCOSHead(nn.Module):
         # 分类损失: 采用focal loss
         pos_inds = all_labels.nonzero().reshape(-1)  # 得到正样本的index
         num_pos = len(pos_inds)
-        loss_cls = self.loss_cls(all_cls_scores, 
-                                 all_labels,
+        loss_cls = self.loss_cls(all_cls_scores,                # ()
+                                 all_labels,                    # () 
                                  avg_factor=num_pos + num_imgs)  # 增加num_imgs是防止分母为0 
 
         # 计算中心点分类损失
         pos_bbox_preds = all_bbox_preds[pos_inds]      # 得到正样本对应bbox_pred
         pos_bbox_targets = all_bbox_targets[pos_inds]  # 得到正样本对应bbox_target
+        
         pos_centerness = all_centernesses[pos_inds]    # 得到正样本对应中心点
         pos_centerness_targets = get_centerness_target(pos_bbox_targets)
         
-        if num_pos > 0: # 如果
+        if num_pos > 0: # 如果有正样本，则求位置损失
             pos_points = all_points[pos_inds]
             pos_decoded_bbox_preds = lrtb2bbox(pos_points, pos_bbox_preds)
             pos_decoded_target_preds = lrtb2bbox(pos_points, pos_bbox_targets)
-            
-            loss_reg = self.loss_reg(pos_decoded_bbox_preds,
-                                     pos_decoded_target_preds,
-                                     weight=pos_centerness_targets,
+            # 回归损失采用-log(iou)作为损失函数，并且加入centerness作为权重
+            loss_reg = self.loss_reg(pos_decoded_bbox_preds,   # (k, 4)
+                                     pos_decoded_target_preds, # (k, 4)
+                                     weight=pos_centerness_targets,  # (k,)
                                      avg_factor=pos_centerness_targets.sum())
-            
-            loss_centerness = self.loss_centerness(pos_centerness, 
-                                                   pos_centerness_targets)
+            # 中心点损失采用二值交叉熵做损失函数：中心度最高是1， 相当于一个概率
+            # 也就是评价预测的中心点的中心度与实际中心点的中心度之间的相关性。
+            # 此时label不再是[0,1]这种二分类标签，而是[0~1]之间的一个值，所以属于不太典型的二值交叉熵计算
+            # 此时应该相当于一个回归问题，该点的中心度是一个回归值，使用smooth_l1也许也可以。
+            loss_centerness = self.loss_centerness(pos_centerness,         # (k,)
+                                                   pos_centerness_targets) # (k,)
         else:
-            loss_bbox = pos_bbox_preds.sum()
+            loss_reg = pos_bbox_preds.sum()
             loss_centerness = pos_centerness.sum()
         # 计算    
         return dict(loss_cls = loss_cls,
