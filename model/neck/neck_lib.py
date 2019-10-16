@@ -117,6 +117,53 @@ class FPN(nn.Module):
         return tuple(outs)
         
 
+# %%
+def conv1x1(inc, outc, stride, leaky=0):
+    return nn.Sequential(
+        nn.Conv2d(inc, outc, 1, stride, padding=0, bias=False),
+        nn.BatchNorm2d(outc),
+        nn.LeakyReLU(negative_slope=leaky, inplace=True)
+    )
+
+
+def conv3x3(inc, outc, stride=1, leaky=0):
+    return nn.Sequential(
+        nn.Conv2d(inc, outc, 3, stride, padding=1, bias=False),
+        nn.BatchNorm2d(outc),
+        nn.LeakyReLU(negative_slope=leaky, inplace=True)
+    )
+    
+
+class FPNSSH(nn.module):
+    """带SSH模块的FPN，其中SSH用于进一步做特征融合
+    """
+    def __init__(self, 
+                 in_channels=(64, 128, 256),
+                 out_channels=64,
+                 use_levels=(0, 1, 2),  # 表示作用在哪几层，默认4层都是，但新的FPN只使用了1,2,3层，0层丢弃
+                 num_outs=3):
+        super().__init__()
+        # 水平变换层：用于统一层数
+        self.laterals = []
+        for in_channel in in_channels:
+            self.laterals.append(conv1x1(in_channel, out_channels, stride=1, leaky=0.1))
+        # fpn层：用于去除叠加效应
+        self.fpns = []
+        for _ in range(len(in_channels)):
+            self.fpns.append(conv3x3(out_channels, out_channels, stride=1, leaky=0.1)
+        # SSH模块：用于进一步语义融合
+        self.conv3x3
+        self.conv5x5
+        self.conv7x7
+    
+    
+    def forward(self, x):
+        outs = []
+        for i, lateral in enumerate(self.laterals):
+            outs.append(lateral(x[i]))
+        for 
+        
+
 if __name__ == '__main__':
     model = FPN()
     print(model) 

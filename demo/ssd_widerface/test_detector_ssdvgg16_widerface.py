@@ -7,26 +7,28 @@ Created on Tue Sep  3 21:29:33 2019
 """
 import cv2
 from model.runner_lib import Runner
+from utils.prepare_training import get_config
 from utils.evaluation import eval_dataset_det, DetPredictor
 from utils.tools import parse_log
 from utils.dataset_classes import get_classes
 from utils.visualization import vis_all_opencv, vis_all_pyplot, vis_cam
 
-def train_ssd_widerface(cfg_path, resume_from):
+def train_ssd_widerface(cfg, resume_from=None):
 
-    runner = Runner(cfg_path = cfg_path, resume_from=resume_from)
+    runner = Runner(cfg=cfg, resume_from=resume_from)
     runner.train()    
     
     
     
 if __name__ == "__main__":
     
-    task = 'test'
+    task = 'train'
     cfg_path = './cfg_detector_ssdvgg16_widerface.py'
+    cfg = get_config(cfg_path)
     
     if task == 'train':  # 模型训练
-        train_ssd_widerface(cfg_path,
-                            resume_from = '/home/ubuntu/mytrain/ssd_vgg_widerface/epoch_9.pth')
+        train_ssd_widerface(cfg,
+                            resume_from = None)
     
     if task == 'eval':  # 数据集评估
         parse_log('/home/ubuntu/mytrain/ssd_vgg_widerface/20191008_211622.log')

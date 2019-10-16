@@ -8,8 +8,10 @@ Created on Sat Aug 10 17:22:46 2019
 
 #from utils.module_factory import registry, build_module
 import torch
-import torch.nn as nn
+from torch import nn
+import torchvision
 import numpy as np
+from collections import OrderedDict
 from utils.tools import accuracy
 import torch.nn.functional as F
     
@@ -214,6 +216,68 @@ class TwoStageDetector(nn.Module):
         pass
 
 
+# %%
 
-        
+class ExtractModel(nn.ModuleDict):
+    """来自于torchvision.models._utils.IntermediateLayerGetter
+    可用于从已加载权重的模型中抽取需要的层，从而不需要在load_state_dict里边取筛选相关权重名。
+    会更简洁简单的生成一个新的模型，并且也不需要去检查是否有权重size不匹配的问题。
+    但注意：返回的是一个字典，
+    model = torch.vision.models.resnet18(pretrained=True)
+    return_layers = {'layer1':'layer1', 'layer2':'layer2','layer3':'layer3'}
+    model = ExtractModel(model, return_layers)
     
+    Module wrapper that returns intermediate layers from a model
+
+    It has a strong assumption that the modules have been registered
+    into the model in the same order as they are used.
+    This means that one should **not** reuse the same nn.Module
+    twice in the forward if you want this to work.
+
+    Additionally, it is only able to query submodules that are directly
+    assigned to the model. So if `model` is passed, `model.feature1` can
+    be returned, but not `model.feature1.layer2`.
+
+    Arguments:
+        model (nn.Module): model on which we will extract the features
+        return_layers (Dict[name, new_name]): a dict containing the names
+            of the modules for which the activations will be returned as
+            the key of the dict, and the value of the dict is the name
+            of the returned activation (which the user can specify).
+    """
+    def __init__(self, model, return_layers):
+        # set提取dict的keys, 确保keys都在model的子模型里边
+        if not set(return_layers).issubset([name for name, _ in model.named_children()]):
+            raise ValueError("return_layers are not present in model")
+            
+        orig_return_layers = return_layers
+        return_layers = {k: v for k, v in return_layers.items()}
+        layers = OrderedDict()
+        # 确保从原模型的开始部分开始提取，不能从中间提取
+        # 所有相关layers都放入layers字典中
+        for name, module in model.named_children():
+            layers[name] = module
+            if name in return_layers:
+                del return_layers[name]
+            if not return_layers:
+                break
+        # 用super()的方式来封装layers，从而该对象直接就是一个ModuleDict, 该方式的优点：
+        #   1. model名称就是类名
+        super().__init__(layers)
+        self.return_layers = orig_return_layers
+
+    def forward(self, x):
+        out = OrderedDict()
+        for name, module in self.named_children():
+            x = module(x)
+            if name in self.return_layers:
+                out_name = self.return_layers[name]
+                out[out_name] = x
+        return out  # 注意，返回的是一个字典，需要手动提取成需要的格式，比如list:  out = list(out.values())
+        
+if __name__ == '__main__':
+    model = torchvision.models.resnet18(pretrained=True)
+    return_layers = {'layer1':'layer1', 'layer2':'layer2','layer3':'layer3'}
+    model = ExtractModel(model, return_layers)
+    img = torch.randn((1,3,300,300))
+    out = model(img)

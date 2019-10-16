@@ -13,7 +13,8 @@ import torch
 import numpy as np
 from torch.nn.parallel import DistributedDataParallel
 
-from utils.transform import ImgTransform, BboxTransform, LabelTransform, SegTransform, AugTransform
+from utils.transform import ImgTransform, BboxTransform, LabelTransform
+from utils.transform import SegTransform, AugTransform, LandmarkTransform
 from utils.tools import get_time_str
 
 from dataset.cifar_dataset import Cifar10Dataset, Cifar100Dataset
@@ -170,22 +171,31 @@ def get_dataset(dataset_cfg, transform_cfg):
     label_transform = None
     bbox_transform = None
     aug_transform = None
+    landmark_transform = None
     seg_transform = None
     
-    if transform_cfg.get('img_params') is not None:
+    if transform_cfg.get('img_params', None) is not None:
         img_p = transform_cfg['img_params']
         img_transform = ImgTransform(**img_p)
-    if transform_cfg.get('label_params') is not None:    
+
+    if transform_cfg.get('label_params', None) is not None:    
         label_p = transform_cfg['label_params']
         label_transform = LabelTransform(**label_p)
-    if transform_cfg.get('bbox_params') is not None:        
+
+    if transform_cfg.get('bbox_params', None) is not None:        
         # 且由于bbox_transform比较特殊，大部分变换参数取决于img_transform，因此在call的时候输入
         bbox_p = transform_cfg['bbox_params']
         bbox_transform = BboxTransform(**bbox_p)
-    if transform_cfg.get('seg_params') is not None:
+
+    if transform_cfg.get('landmark_params', None) is not None:
+        landmark_p = transform_cfg['landmark_params']
+        landmark_transform = LandmarkTransform(**landmark_p)
+        
+    if transform_cfg.get('seg_params', None) is not None:
         seg_p = transform_cfg['seg_params']
         seg_transform = SegTransform(**seg_p)
-    if transform_cfg.get('aug_params') is not None:
+
+    if transform_cfg.get('aug_params', None) is not None:
         aug_p = transform_cfg['aug_params']
         aug_transform = AugTransform(**aug_p)
         
@@ -199,6 +209,7 @@ def get_dataset(dataset_cfg, transform_cfg):
                          label_transform=label_transform,
                          bbox_transform=bbox_transform,
                          aug_transform=aug_transform,
+                         landmark_transform=landmark_transform,
                          seg_transform=seg_transform)    
     if repeat:
         return RepeatDataset(dset, repeat)

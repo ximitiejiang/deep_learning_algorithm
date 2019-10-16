@@ -185,7 +185,7 @@ def bbox_flip(bboxes, img_shape, flip_type='h'):
     h, w = img_shape[0], img_shape[1]
     assert bboxes.shape[-1] == 4
     
-    if flip_type == 'h':
+    if flip_type in ['h', 'horizontal']:
         flipped = bboxes.copy()
         # xmin = w-xmax-1, xmax = w-xmin-1
         flipped[...,0] = w - bboxes[..., 2] - 1
@@ -195,6 +195,24 @@ def bbox_flip(bboxes, img_shape, flip_type='h'):
         flipped[...,1] = h - bboxes[..., 3] - 1
         flipped[...,3] = h - bboxes[..., 1] - 1
         
+    return flipped
+
+def landmark_flip(landmarks, img_shape, flip_type='h'):
+    """关键点翻转
+    args:
+        landmark(b, 5, 2)
+    return
+    fliped_landmark(b, 5, 2)
+    """
+    assert flip_type in ['h','v', 'horizontal', 'vertical']
+    landmarks=np.array(landmarks)    
+    h, w = img_shape[0], img_shape[1]
+    if flip_type in ['h', 'horizontal']: # 水平左右翻转
+        flipped = landmarks.copy()
+        flipped[...,0] = w - landmarks[..., 0] - 1
+    elif flip_type == 'v':   # 垂直上下翻转
+        flipped = landmarks.copy()
+        flipped[...,1] = h - landmarks[..., 1] - 1
     return flipped
 
 
@@ -394,7 +412,7 @@ class LabelTransform():
     
     
 class BboxTransform():
-    """Bbox变换类: bboxes(m, 4), 这个变换比较特殊，需要基于img_transform的结果进行变换。
+    """Bbox变换类: bboxes(m, 4), 这个变换需要基于img_transform的结果进行变换。
     所以初始化时不输入什么参数，而在call的时候输入所有变换参数。
     注意：bbox的变换顺序需要跟img一致，由于img是先scale再flip，所以bbox也采用先scale再flip
     因此输入用于flip的shape也应该是scale之后的shape
@@ -415,6 +433,24 @@ class BboxTransform():
         return gt_bboxes
 
 
+class LandmarkTransform():
+    """对关键点的变换类
+    args:
+        landmarks(b, 5, 2)标签b组landmark，每组landmark有5个关键点，每点2个坐标x,y
+        scale_factor(4, )分别为x_scale, y_scale, x_scale, y_scale, 取前面2个值即可
+    """
+    def __init__(self, to_tensor=None):
+        self.to_tensor = to_tensor
+        
+    def __call__(self, landmarks, img_shape, scale_factor, flip):
+        gt_landmarks = landmarks * scale_factor[:2]  # (b,5,2)*(2,)->(b,5,2)
+        if flip:
+            gt_landmarks = landmark_flip(gt_landmarks, img_shape, flip_type='h')
+        if self.to_tensor:
+            gt_landmarks = to_tensor(gt_landmarks)
+        return gt_landmarks
+            
+        
 class SegTransform():
     """对语义分割图semantic segmentation(一般是png图片)进行预处理：seg(h, w, 3), 主要收到scale, flip, pad的影响
     """

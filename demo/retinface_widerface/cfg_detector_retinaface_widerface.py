@@ -13,7 +13,7 @@ n_epochs = 20
 imgs_per_core = 4                 # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
 workers_per_core = 0
 save_checkpoint_interval = 2     # 每多少个epoch保存一次epoch
-work_dir = '/home/ubuntu/mytrain/ssd_vgg_widerface/'
+work_dir = '/home/ubuntu/mytrain/retinaface_widerface/'
 resume_from = None                # 恢复到前面指定的设备
 load_from = None
 load_device = 'cuda'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
@@ -38,15 +38,19 @@ model = dict(
         type='one_stage_detector')
         
 backbone = dict(
-        type='ssd_vgg16',
+        type='mobilenet_v1',
         params=dict(
                 pretrained= '/home/ubuntu/MyWeights/vgg16_caffe-292e1171.pth',   # 这是caffe的模型，对应mean=[123.675, 116.28, 103.53], std=[1, 1, 1],  另外的pytorch的模型pretrained='/home/ubuntu/.torch/models/vgg16-397923af.pth', 对应mean, std需要先归一化再标准化
                 out_feature_indices=(22,34),
                 extra_out_feature_indices=(1,3,5,7),
                 l2_norm_scale=20.))
 
+neck = dict(
+        type='FPNSSH',
+        params=dict())
+
 head = dict(
-        type='ssd_head',
+        type='retinaface_head',
         params=dict(
                 input_size=300,
                 num_classes=2,
@@ -71,7 +75,6 @@ sampler = dict(
         params=dict(
                 ))
 
-neg_pos_ratio = 3  
 nms = dict(
         type='nms',
         score_thr=0.02,

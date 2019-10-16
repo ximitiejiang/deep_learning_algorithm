@@ -19,7 +19,7 @@ from model.bbox_regression_lib import delta2bbox
 from model.conv_module_lib import conv_norm_acti
 from model.nms_lib import nms_operation
 from model.bbox_regression_lib import lrtb2bbox
-from model.loss_lib import IOULoss, SigmoidBinaryCrossEntropyLoss, SigmoidFocalLoss
+from model.loss_lib import IouLoss, SigmoidBinaryCrossEntropyLoss, SigmoidFocalLoss
 
 
 """待整理：
@@ -435,7 +435,7 @@ class FCOSHead(nn.Module):
         
         # 创建损失函数
         self.loss_cls = SigmoidFocalLoss()
-        self.loss_reg = IOULoss()
+        self.loss_reg = IouLoss()
         self.loss_centerness = SigmoidBinaryCrossEntropyLoss()
 
 

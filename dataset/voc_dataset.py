@@ -47,6 +47,7 @@ class VOCDataset(BasePytorchDataset):
                  label_transform=None,
                  bbox_transform=None,
                  aug_transform=None,
+                 landmark_transform=None,
                  seg_transform=None,
                  mode='train'):
         
@@ -59,6 +60,7 @@ class VOCDataset(BasePytorchDataset):
         self.label_transform = label_transform
         self.bbox_transform = bbox_transform
         self.aug_transform = aug_transform
+        self.landmark_transform = landmark_transform
         self.seg_transform = seg_transform
         
         # 注意：这里对标签值的定义跟常规分类不同，常规分类问题的数据集标签是从0开始，
@@ -166,13 +168,21 @@ class VOCDataset(BasePytorchDataset):
         img = cv2.imread(img_path)
         
         # 读取bbox, label
-        ann_dict = self.parse_ann_info(idx)
+        if self.landmark_file is None:
+            ann_dict = super().parse_ann_info(idx)
+        else:
+            ann_dict = self.parse_ann_info(idx)
+            
         gt_bboxes = ann_dict['bboxes']
         gt_labels = ann_dict['labels']
-
-        # aug transform
+        if ann_dict.get('landmarks', None) is not None:
+            gt_landmarks = ann_dict['landmarks']
+        else:
+            gt_landmarks = np.zeros((0, 0, 2))
+        
+        # TODO: 增加对gt_landmark的aug transform
         if self.aug_transform is not None:
-            img, gt_bboxes, gt_labels = self.aug_transform(img, gt_bboxes, gt_labels)
+            img, gt_bboxes, gt_landmarks = self.aug_transform(img, gt_bboxes, gt_landmarks)
         # basic transform
         if self.img_transform is not None:    
             # img transform
@@ -180,6 +190,9 @@ class VOCDataset(BasePytorchDataset):
         # bbox transform: 传入的是scale_shape而不是ori_shape        
         if self.bbox_transform is not None:
             gt_bboxes = self.bbox_transform(gt_bboxes, scale_shape, scale_factor, flip)
+        # landmark tansform
+        if self.landmark_transform is not None:    
+            gt_landmarks = self.landmark_transform(gt_landmarks, scale_shape, scale_factor, flip)
         # label transform
         if self.label_transform is not None:
             gt_labels = self.label_transform(gt_labels)
@@ -195,6 +208,7 @@ class VOCDataset(BasePytorchDataset):
                     img_meta = img_meta,
                     gt_bboxes = gt_bboxes,
                     gt_labels = gt_labels,
+                    gt_landmarks = gt_landmarks,
                     stack_list = ['img'])
         
         # 如果是分割任务，提供的是分割png，所以用的是seg_transform
