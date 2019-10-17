@@ -199,9 +199,9 @@ class Runner():
                 self.optimizer.step()   
                 self.optimizer.zero_grad()       # 每个batch的梯度清零
                 # 存放结果
-                self.buffer['loss'].append(outputs.get('loss', 0))
-                self.buffer['acc1'].append(outputs.get('acc1', 0))
-                self.buffer['acc5'].append(outputs.get('acc5', 0))
+                self.buffer['loss'].append(outputs.get('loss', torch.tensor(0.)))
+                self.buffer['acc1'].append(outputs.get('acc1', torch.tensor(0.)))
+                self.buffer['acc5'].append(outputs.get('acc5', torch.tensor(0.)))
                 self.buffer['lr'].append(self.current_lr()[0])
                 # 显示text
                 if (self.c_iter+1)%self.cfg.logger.interval == 0:

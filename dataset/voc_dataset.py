@@ -42,6 +42,7 @@ class VOCDataset(BasePytorchDataset):
                  ann_file=None,
                  img_prefix=None,
                  seg_prefix=None,
+                 landmark_file=None,
                  with_difficult=False,
                  img_transform=None,
                  label_transform=None,
@@ -52,6 +53,7 @@ class VOCDataset(BasePytorchDataset):
                  mode='train'):
         
         self.ann_file = ann_file
+        self.landmark_file = landmark_file
         self.img_prefix = img_prefix
         self.seg_prefix = seg_prefix if seg_prefix is not None else ''
         self.with_difficult = with_difficult
@@ -168,10 +170,7 @@ class VOCDataset(BasePytorchDataset):
         img = cv2.imread(img_path)
         
         # 读取bbox, label
-        if self.landmark_file is None:
-            ann_dict = super().parse_ann_info(idx)
-        else:
-            ann_dict = self.parse_ann_info(idx)
+        ann_dict = self.parse_ann_info(idx)
             
         gt_bboxes = ann_dict['bboxes']
         gt_labels = ann_dict['labels']

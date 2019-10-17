@@ -6,79 +6,33 @@ Created on Fri Sep 20 10:07:24 2019
 @author: ubuntu
 """
 import torch
+from functools import partial
 from model.anchor_assigner_sampler_lib import MaxIouAssigner, PseudoSampler
 from model.bbox_regression_lib import bbox2delta, bbox2lrtb
 
-"""总的原则：对于获取target的目的，都是为了送入loss函数进行损失计算。而计算loss通常
-都是按照batch的方式每张图算一次loss，所以target都是整理成(b,)形式的
-"""
-
 
 def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list,
-                      img_metas_list, assigner_cfg, sampler_cfg, 
-                      num_level_anchors, target_means, target_stds):
-        """在ssd算法中计算一个batch的多张图片的anchor target，也就是对每个anchor定义他所属的label和坐标：
-        其中如果是正样本则label跟对应bbox一致，坐标跟对应bbox也一致；如果是负样本则label
-        Input:
-            anchor_list: (b, )(s, 4)
-            gt_bboxes_list: (b, )(k, 4)
-            gt_labels_list: (b, )(k, )
-            img_metas_list： (b, )(dict)
-        return:
-            
-        """
-        # 初始化
-        all_labels = []
-        all_label_weights = []
-        all_bbox_targets = []
-        all_bbox_weights = []
-        
-        all_pos_inds_list = []
-        all_neg_inds_list = []
-        # 循环对每张图分别计算anchor target
-        for i in range(len(img_metas_list)):        
-            bbox_targets, bbox_weights, labels, label_weights, pos_inds, neg_inds = \
-                get_one_img_anchor_target(anchor_list[i],
-                                          gt_bboxes_list[i],
-                                          gt_labels_list[i],
-                                          img_metas_list[i],
-                                          assigner_cfg,
-                                          sampler_cfg,
-                                          target_means,
-                                          target_stds)
-            # batch图片targets汇总
-            all_bbox_targets.append(bbox_targets)   # (b, ) (n_anchor, 4)
-            all_bbox_weights.append(bbox_weights)   # (b, ) (n_anchor, 4)
-            all_labels.append(labels)                # (b, ) (n_anchor, )
-            all_label_weights.append(label_weights)  # (b, ) (n_anchor, )
-            all_pos_inds_list.append(pos_inds)       # (b, ) (k, )
-            all_neg_inds_list.append(neg_inds)       # (b, ) (j, )
-            
-        # 对targets数据进行变换，把多张图片的同尺寸特征图的数据放一起，统一做loss
-        all_bbox_targets = torch.stack(all_bbox_targets, dim=0)   # (b, n_anchor, 4)
-        all_bbox_weights = torch.stack(all_bbox_weights, dim=0)   # (b, n_anchor, 4)
-        all_labels = torch.stack(all_labels, dim=0)               # (b, n_anchor)
-        all_label_weights = torch.stack(all_label_weights, dim=0) # (b, n_anchor)
-        
-        num_batch_pos = sum([inds.numel() for inds in all_pos_inds_list])
-        num_batch_neg = sum([inds.numel() for inds in all_neg_inds_list])
-
-        return (all_bbox_targets, all_bbox_weights, all_labels, all_label_weights, num_batch_pos, num_batch_neg)
-
-
-def get_one_img_anchor_target(anchors, gt_bboxes, gt_labels, img_metas, 
-                              assigner_cfg, sampler_cfg, target_means, target_stds):
-    """针对单张图的anchor target计算： 本质就是把正样本的坐标和标签作为target
-    提供一种挑选target的思路：先iou筛选出正样本(>0)和负样本(=0)，去掉无关样本(-1)
-    然后找到对应正样本anchor, 换算出对应bbox和对应label
+                      assigner_cfg, sampler_cfg, means, stds):
+    """简化get anchor target的写法：基于batch的gt数据(b,)，让anchors能够匹配到合适的target(这个target可能是gt，可能是背景)
+    """
+    pfunc = partial(match_target, assigner_cfg=assigner_cfg, sampler_cfg=sampler_cfg, means=means, stds=stds)
+    results = list(map(pfunc, anchor_list, gt_bboxes_list, gt_labels_list))  # (b,) (6,)生成每张图的target
+    # 堆叠
+    bboxes_t = torch.stack([result[0] for result in results])   # (b,-1,4)
+    bboxes_w = torch.stack([result[1] for result in results])   # (b,-1,4)
+    labels_t = torch.stack([result[2] for result in results])   # (b,-1)
+    labels_w = torch.stack([result[3] for result in results])   # (b,-1)
+    num_pos = sum([result[4].numel() for result in results])    # (m,)
+    num_neg = sum([result[5].numel() for result in results])    # (n,)  m+n = b * 8732
     
-    args:
-        anchors (s, 4)
-        gt_bboxes (k, 4)
-        gt_labels (k, )
-        img_metas (dict)
-        assigner_cfg (dict)
-        sampler_cfg (dict)
+    return bboxes_t, bboxes_w, labels_t, labels_w, num_pos, num_neg
+    
+
+def match_target(anchors, gt_bboxes, gt_labels, 
+                 assigner_cfg, sampler_cfg, means, stds):
+    """核心程序: 对单张图的anchor进行匹配。
+    让每个anchor都能匹配到合适的target，如果匹配的target是gt就获得对应gt的数据(bbox,label,ldmk)
+    如果匹配的target是背景就置0.
     """
     # 1.指定: 指定每个anchor是正样本还是负样本(通过让anchor跟gt bbox进行iou计算来评价，得到每个anchor的)
     bbox_assigner = MaxIouAssigner(**assigner_cfg.params)
@@ -102,7 +56,7 @@ def get_one_img_anchor_target(anchors, gt_bboxes, gt_labels, img_metas,
     pos_assigned_gt_inds = assigned_gt_inds[pos_inds] - 1 # 表示正样本对应的label也就是gt_bbox是第0个还是第1个(已经减1，就从1-n变成0-n-1)
     pos_gt_bboxes = gt_bboxes[pos_assigned_gt_inds]  # (k,4)获得正样本bbox对应的gt bbox坐标
     
-    pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, target_means, target_stds)  
+    pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, means, stds)  
     bbox_targets[pos_inds] = pos_bbox_targets
     bbox_weights[pos_inds] = 1
     # 5. 把正样本labels填入
@@ -110,7 +64,107 @@ def get_one_img_anchor_target(anchors, gt_bboxes, gt_labels, img_metas,
     label_weights[pos_inds] = 1  # 这里设置正负样本权重都为=1， 如果有需要可以提高正样本权重
     label_weights[neg_inds] = 1
     
-    return bbox_targets, bbox_weights, labels, label_weights, pos_inds, neg_inds
+    return bbox_targets, bbox_weights, labels, label_weights, pos_inds, neg_inds    
+    
+    
+#
+#def get_anchor_target1(anchor_list, gt_bboxes_list, gt_labels_list,
+#                      img_metas_list, assigner_cfg, sampler_cfg, 
+#                      num_level_anchors, target_means, target_stds):
+#        """在ssd算法中计算一个batch的多张图片的anchor target，也就是对每个anchor定义他所属的label和坐标：
+#        其中如果是正样本则label跟对应bbox一致，坐标跟对应bbox也一致；如果是负样本则label
+#        Input:
+#            anchor_list: (b, )(s, 4)
+#            gt_bboxes_list: (b, )(k, 4)
+#            gt_labels_list: (b, )(k, )
+#            img_metas_list： (b, )(dict)
+#        return:
+#            
+#        """
+#        # 初始化
+#        all_labels = []
+#        all_label_weights = []
+#        all_bbox_targets = []
+#        all_bbox_weights = []
+#        
+#        all_pos_inds_list = []
+#        all_neg_inds_list = []
+#        # 循环对每张图分别计算anchor target
+#        for i in range(len(img_metas_list)):        
+#            bbox_targets, bbox_weights, labels, label_weights, pos_inds, neg_inds = \
+#                get_one_img_anchor_target(anchor_list[i],
+#                                          gt_bboxes_list[i],
+#                                          gt_labels_list[i],
+#                                          img_metas_list[i],
+#                                          assigner_cfg,
+#                                          sampler_cfg,
+#                                          target_means,
+#                                          target_stds)
+#            # batch图片targets汇总
+#            all_bbox_targets.append(bbox_targets)   # (b, ) (n_anchor, 4)
+#            all_bbox_weights.append(bbox_weights)   # (b, ) (n_anchor, 4)
+#            all_labels.append(labels)                # (b, ) (n_anchor, )
+#            all_label_weights.append(label_weights)  # (b, ) (n_anchor, )
+#            all_pos_inds_list.append(pos_inds)       # (b, ) (k, )
+#            all_neg_inds_list.append(neg_inds)       # (b, ) (j, )
+#            
+#        # 对targets数据进行变换，把多张图片的同尺寸特征图的数据放一起，统一做loss
+#        all_bbox_targets = torch.stack(all_bbox_targets, dim=0)   # (b, n_anchor, 4)
+#        all_bbox_weights = torch.stack(all_bbox_weights, dim=0)   # (b, n_anchor, 4)
+#        all_labels = torch.stack(all_labels, dim=0)               # (b, n_anchor)
+#        all_label_weights = torch.stack(all_label_weights, dim=0) # (b, n_anchor)
+#        
+#        num_batch_pos = sum([inds.numel() for inds in all_pos_inds_list])
+#        num_batch_neg = sum([inds.numel() for inds in all_neg_inds_list])
+#
+#        return (all_bbox_targets, all_bbox_weights, all_labels, all_label_weights, num_batch_pos, num_batch_neg)
+#
+#
+#def get_one_img_anchor_target(anchors, gt_bboxes, gt_labels, img_metas, 
+#                              assigner_cfg, sampler_cfg, target_means, target_stds):
+#    """针对单张图的anchor target计算： 本质就是把正样本的坐标和标签作为target
+#    提供一种挑选target的思路：先iou筛选出正样本(>0)和负样本(=0)，去掉无关样本(-1)
+#    然后找到对应正样本anchor, 换算出对应bbox和对应label
+#    
+#    args:
+#        anchors (s, 4)
+#        gt_bboxes (k, 4)
+#        gt_labels (k, )
+#        img_metas (dict)
+#        assigner_cfg (dict)
+#        sampler_cfg (dict)
+#    """
+#    # 1.指定: 指定每个anchor是正样本还是负样本(通过让anchor跟gt bbox进行iou计算来评价，得到每个anchor的)
+#    bbox_assigner = MaxIouAssigner(**assigner_cfg.params)
+#    assign_result = bbox_assigner.assign(anchors, gt_bboxes, gt_labels)
+#    assigned_gt_inds, assigned_gt_labels, ious = assign_result  # (m,), (m,) 表示anchor的身份, anchor对应的标签，[0,1,0,..2], [0,15,...18]
+#    
+#    # 2. 采样： 采样一定数量的正负样本, 通常用于预防正负样本不平衡
+#    #　但在SSD中没有采样只是区分了一下正负样本，所以这里只是一个假采样。(正负样本不平衡是通过最后loss的OHEM完成)
+#    bbox_sampler = PseudoSampler(**sampler_cfg.params)
+#    sampling_result = bbox_sampler.sample(*assign_result, anchors, gt_bboxes)
+#    pos_inds, neg_inds = sampling_result  # (k,), (j,) 表示正/负样本的位置号，比如[7236, 7249, 8103], [0,1,2...8104..]
+#    
+#    # 3. 初始化target    
+#    bbox_targets = torch.zeros_like(anchors)
+#    bbox_weights = torch.zeros_like(anchors)
+#    labels = anchors.new_zeros(len(anchors), dtype=torch.long)       # 借用anchors的device
+#    label_weights = anchors.new_zeros(len(anchors), dtype=torch.long)# 借用anchors的device
+#    # 4. 把正样本 bbox坐标转换成delta坐标并填入
+#    pos_bboxes = anchors[pos_inds]                   # (k,4)获得正样本bbox
+#    
+#    pos_assigned_gt_inds = assigned_gt_inds[pos_inds] - 1 # 表示正样本对应的label也就是gt_bbox是第0个还是第1个(已经减1，就从1-n变成0-n-1)
+#    pos_gt_bboxes = gt_bboxes[pos_assigned_gt_inds]  # (k,4)获得正样本bbox对应的gt bbox坐标
+#    
+#    pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, target_means, target_stds)  
+#    bbox_targets[pos_inds] = pos_bbox_targets
+#    bbox_weights[pos_inds] = 1
+#    # 5. 把正样本labels填入
+#    labels[pos_inds] = gt_labels[pos_assigned_gt_inds] # 获得正样本对应label
+#    label_weights[pos_inds] = 1  # 这里设置正负样本权重都为=1， 如果有需要可以提高正样本权重
+#    label_weights[neg_inds] = 1
+#    
+#    return bbox_targets, bbox_weights, labels, label_weights, pos_inds, neg_inds
 
 
 # %% anchor free - FCOS的target生成程序

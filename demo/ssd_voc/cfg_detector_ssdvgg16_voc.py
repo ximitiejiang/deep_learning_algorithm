@@ -6,7 +6,7 @@ Created on Mon Sep  2 11:31:23 2019
 @author: ubuntu
 """
 
-gpus = 1
+gpus = [0]
 parallel = False
 distribute = False                       
 n_epochs = 100
@@ -141,8 +141,8 @@ valset = dict(
 trainloader = dict(
         params=dict(
                 shuffle=True,
-                batch_size=gpus * imgs_per_core if gpus>0 else imgs_per_core,
-                num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
+                batch_size=imgs_per_core,
+                num_workers=workers_per_core,
                 pin_memory=False,   # 数据送入GPU进行加速(默认False)
                 drop_last=False,
                 collate_fn='dict_collate',    # 'default_collate','multi_collate', 'dict_collate'
@@ -152,7 +152,7 @@ valloader = dict(
         params=dict(
                 shuffle=False,
                 batch_size=1 * 1,  # 做验证时需要让batch_size=1???
-                num_workers=gpus * workers_per_core if gpus>0 else imgs_per_core,
+                num_workers=workers_per_core,
                 pin_memory=False,             # 数据送入GPU进行加速(默认False)
                 drop_last=False,
                 collate_fn='dict_collate',    # 'default_collate','multi_collate', 'dict_collate'

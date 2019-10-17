@@ -91,20 +91,18 @@ class SigmoidFocalLoss(nn.Module):
 def focal_loss(pred, target, alpha, gamma):
     """focal loss底层函数"""
     pred_sigmoid = pred.sigmoid()
-    pt
-    at
+    return pred_sigmoid
+
        
 
 # %%
 class SmoothL1Loss(nn.Module):
     """回归损失：柔性l1"""
-    def __init__(self, beta, reduction):
-        self.beta = beta
+    def __init__(self, reduction):
         self.reduction = reduction
     
-    def forward(self, pred, target, weight, avg_factor):
-        
-        loss = smooth_l1_loss(pred, target, self.beta, reduction='none')
+    def forward(self, pred, target, weight, avg_factor):        
+        loss = F.smooth_l1_loss(pred, target, reduction='none')
         if weight is not None:
             loss = weight * loss      
         if avg_factor is not None:
@@ -114,8 +112,8 @@ class SmoothL1Loss(nn.Module):
         return loss
 
 
-def smooth_l1_loss(pred, target, beta):
-    """柔性l1 loss底层函数
+def smooth_l1_loss(pred, target, beta=1.):
+    """柔性l1 loss底层函数, 用作参考，但底层实际还是采用pytorch的F函数库
     args:
         pred: ()
         target: ()

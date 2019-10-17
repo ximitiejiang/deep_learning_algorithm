@@ -86,9 +86,6 @@ def accuracy(preds, targets, topk=(1, 5)):
         for k in topk:
             correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
-        # 如果只求一个top，则返回一个值而不是list
-        if len(topk) == 1:
-            res = res[0]
         return res
 
 # %%    

@@ -132,9 +132,42 @@ def conv3x3(inc, outc, stride=1, leaky=0):
         nn.BatchNorm2d(outc),
         nn.LeakyReLU(negative_slope=leaky, inplace=True)
     )
+
+
+def conv3x3_no_relu(inc, outc, stride=1):
+    return nn.Sequential(
+        nn.Conv2d(inc, outc, 3, stride, padding=1, bias=False),
+        nn.BatchNorm2d(outc)
+    )
+
+
+class SSH(nn.Module):
+    def __init__(self, in_channel):
+        super().__init__()
+        # 用一个3x3作为第一种滤波器
+        self.conv3x3 = conv3x3_no_relu(in_channel, in_channel // 2, stride=1)
+        # 用2个3x3串联模拟1个5x5的滤波器
+        self.conv5x5_1 = conv3x3(in_channel, in_channel // 4, stride=1, leaky=0.1)
+        self.conv5x5_2 = conv3x3_no_relu(in_channel // 4, in_channel // 4, stride=1)
+        # 用3个3x3串联模拟1个7x7的滤波器
+        self.conv7x7_2 = conv3x3(in_channel // 4, in_channel // 4, stride=1, leaky=0.1)
+        self.conv7x7_3 = conv3x3_no_relu(in_channel // 4, in_channel // 4, stride=1)
+    
+    def forward(self, x): 
+        out3x3 = self.conv3x3(x)
+        
+        out5x5_tmp = self.conv5x5_1(x)
+        out5x5 = self.conv5x5_2(out5x5_tmp)
+    
+        out7x7 = self.conv7x7_2(out5x5_tmp)
+        out7x7 = self.conv7x7_3(out7x7)
+        
+        out = torch.cat([out3x3, out5x5, out7x7], dim=1)  # 注意这里dim=1, 因为是在通道方向堆叠(b,c,h,w) c的dim=1
+        out = F.relu(out)
+        return out
     
 
-class FPNSSH(nn.module):
+class FPNSSH(nn.Module):
     """带SSH模块的FPN，其中SSH用于进一步做特征融合
     """
     def __init__(self, 
@@ -143,37 +176,58 @@ class FPNSSH(nn.module):
                  use_levels=(0, 1, 2),  # 表示作用在哪几层，默认4层都是，但新的FPN只使用了1,2,3层，0层丢弃
                  num_outs=3):
         super().__init__()
-        # 水平变换层：用于统一层数
-        self.laterals = []
-        for in_channel in in_channels:
-            self.laterals.append(conv1x1(in_channel, out_channels, stride=1, leaky=0.1))
+        self.num_outs = num_outs
+        # 水平变换层：用于统一层数, 注意这里对水平变换层也加了bn和leaky_relu
+        for i, in_channel in enumerate(in_channels):
+            self.add_module('lateral'+str(i), conv1x1(in_channel, out_channels, stride=1, leaky=0.1))
+        
         # fpn层：用于去除叠加效应
-        self.fpns = []
-        for _ in range(len(in_channels)):
-            self.fpns.append(conv3x3(out_channels, out_channels, stride=1, leaky=0.1)
+        for i in range(len(in_channels)):
+            self.add_module('fpn'+str(i), conv3x3(out_channels, out_channels, stride=1, leaky=0.1))
+        
         # SSH模块：用于进一步语义融合
-        self.conv3x3
-        self.conv5x5
-        self.conv7x7
+        for i in range(num_outs):
+            self.add_module('ssh'+str(i), SSH(out_channels))
     
     
     def forward(self, x):
         outs = []
-        for i, lateral in enumerate(self.laterals):
-            outs.append(lateral(x[i]))
-        for 
+        # 计算水平变换
+        for i in range(self.num_outs):
+            layer = eval('self.lateral' + str(i))
+            outs.append(layer(x[i]))
+        # 计算上采样和叠加
+        for i in range(len(outs)-1, 0, -1):
+            outs[i-1] += F.interpolate(outs[i], scale_factor=2, mode='nearest')
+        # 计算fpn
+        for i in range(self.num_outs - 1):
+            layer = eval('self.fpn' + str(i))
+            outs[i] = layer(outs[i])
+        # 计算SSH
+        for i in range(self.num_outs):
+            layer = eval('self.ssh' + str(i))
+            outs[i] = layer(outs[i])
+        return outs
         
 
 if __name__ == '__main__':
     model = FPN()
     print(model) 
-    
     x1 = torch.randn(2, 256, 200, 272)
     x2 = torch.randn(2, 512, 100, 136)
     x3 = torch.randn(2, 1024, 50, 68)
     x4 = torch.randn(2, 2048, 25, 34) 
     x = (x1, x2, x3, x4)      
     outs = model(x)
+    
+    net = FPNSSH()
+    print(net)
+    y1 = torch.randn(2, 64, 80, 80)
+    y2 = torch.randn(2, 128, 40, 40)
+    y3 = torch.randn(2, 256, 20, 20)
+    y = [y1,y2,y3]
+    outs = net(y)
+    
 """
 FPN(
   (lateral_convs): ModuleList(

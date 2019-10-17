@@ -15,10 +15,9 @@
 2. 语义分割相关
     - FCN
     - DeeplabV3
-    - PSPNet
     
-3. 物体跟踪相关
-    - tbf
+3. 关键点检测相关
+    - RetinaFace
 
 4. 训练框架
     - Runner
@@ -53,8 +52,6 @@ python setup.py
 3. 关于文件夹位置
 <br>需要预先设置工作文件夹work_dir等文件夹，并且确保文件夹存在，程序有文件夹检查功能，以防训练好以后模型无法保存。
 
-4. 关于config中的task
-<br>需要设置成classifier, segmentator, detector之一，用于区分是哪种任务。
 
 5. 关于dataloader中的collate_fn
 <br>其中的dict_collate可以支持对img/seg数据的堆叠，也支持输入图片尺寸不同的情况，会自动进行padding统一到一个batch的最大图片尺寸。

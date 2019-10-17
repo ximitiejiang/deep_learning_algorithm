@@ -104,6 +104,33 @@ def get_hard_negtive_sample_loss(loss_cls, labels, neg_pos_ratio):
   
     
 # %%    
+class ClassHead(nn.Module):
+    """分类模块"""
+    def __init__(self, in_channels, num_anchors, num_classes=2):
+        super.__init__()
+        self.num_classes = num_classes
+        self.conv3x3 = nn.Conv2d(in_channels, num_anchors * num_classes, 3, stride=1, padding=1)
+    
+    def forward(self, x):
+        out = self.conv1x1(x)
+        out = out.permute(0, 2, 3, 1).contiguous()
+        out = out.view(out.shape(0), -1, self.num_classes)
+        return out
+        
+
+class BboxHead(nn.Module):
+    """bbox回归模块"""
+    def __init__(self, in_channels, num_anchors):
+        super.__init__()
+        self.conv3x3 = nn.Conv2d(in_channels, num_anchors * 4, 3, stride=1, padding=1)
+    
+    def forward(self, x):
+        out = self.conv1x1(x)
+        out = out.permute(0, 2, 3, 1).contiguous()
+        out = out.view(out.shape(0), -1, 4)
+        return out     
+
+
 class SSDHead(nn.Module):
     """分类回归头：
     分类回归头的工作过程： 以下描述在维度上都省略b，因为b在整个模型过程不变，只讨论单张图的情况
@@ -157,7 +184,7 @@ class SSDHead(nn.Module):
         cls_convs = conv_head(in_channels, [num_anchor * num_classes for num_anchor in num_anchors])  # 分类分支目的：通道数变换为21*n_anchors
         reg_convs = conv_head(in_channels, [num_anchor * 4 for num_anchor in num_anchors])
         self.cls_convs = nn.ModuleList(cls_convs) # 由于6个convs是并行分别处理每一个特征层，所以不需要用sequential
-        self.reg_convs = nn.ModuleList(reg_convs)
+        self.reg_convs = nn.ModuleList(reg_convs)        
         
         # 生成base_anchor所需参数
         n_featmap = len(in_channels)
@@ -207,7 +234,7 @@ class SSDHead(nn.Module):
         for i in range(len(featmap_sizes)):
             anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i], self.anchor_strides[i])
             multi_layer_anchors.append(anchors)  # (6,)(k, 4)
-        num_level_anchors = [len(an) for an in multi_layer_anchors]
+#        num_level_anchors = [len(an) for an in multi_layer_anchors]
         multi_layer_anchors = torch.cat(multi_layer_anchors, dim=0)  # 堆叠(8732, 4)    
         # 再复制生成一个batch size多张图的grid_anchors
         anchor_list = [multi_layer_anchors for _ in range(len(img_metas))]  # (b,) (s,4)
@@ -216,12 +243,10 @@ class SSDHead(nn.Module):
         target_result = get_anchor_target(anchor_list, 
                                           gt_bboxes, 
                                           gt_labels,
-                                          img_metas, 
                                           cfg.assigner, 
                                           cfg.sampler,
-                                          num_level_anchors,
-                                          target_means = self.target_means,
-                                          target_stds = self.target_stds)
+                                          means = self.target_means,
+                                          stds = self.target_stds)
         # 解析target
         (all_bbox_targets,     # (b, n_anchor, 4)
          all_bbox_weights,     # (b, n_anchor, 4)

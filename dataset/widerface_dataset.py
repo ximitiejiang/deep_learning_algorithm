@@ -40,6 +40,7 @@ class WIDERFaceDataset(VOCDataset):
     def load_annotations(self, ann_file):
         """从多个标注文件读取标注列表
         """
+        print('Loading widerface dataset...')
         img_anns = []
         # 如果有landmark_file, 则基于landmark_file生成img_anns
         if self.landmark_file is not None:
