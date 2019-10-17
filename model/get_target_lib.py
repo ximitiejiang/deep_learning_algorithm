@@ -15,22 +15,22 @@ def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list,
                       assigner_cfg, sampler_cfg, means, stds):
     """简化get anchor target的写法：基于batch的gt数据(b,)，让anchors能够匹配到合适的target(这个target可能是gt，可能是背景)
     """
-    pfunc = partial(match_target, assigner_cfg=assigner_cfg, sampler_cfg=sampler_cfg, means=means, stds=stds)
-    results = list(map(pfunc, anchor_list, gt_bboxes_list, gt_labels_list))  # (b,) (6,)生成每张图的target
-    # 堆叠
-    bboxes_t = torch.stack([result[0] for result in results])   # (b,-1,4)
-    bboxes_w = torch.stack([result[1] for result in results])   # (b,-1,4)
-    labels_t = torch.stack([result[2] for result in results])   # (b,-1)
-    labels_w = torch.stack([result[3] for result in results])   # (b,-1)
-    num_pos = sum([result[4].numel() for result in results])    # (m,)
-    num_neg = sum([result[5].numel() for result in results])    # (n,)  m+n = b * 8732
+    pfunc = partial(anchor_match_target, assigner_cfg=assigner_cfg, sampler_cfg=sampler_cfg, means=means, stds=stds)
+    targets = list(map(pfunc, anchor_list, gt_bboxes_list, gt_labels_list))  # (b,) (6,)生成每张图的target
+
+    bboxes_t = torch.stack([result[0] for result in targets])   # (b,-1,4)
+    bboxes_w = torch.stack([result[1] for result in targets])   # (b,-1,4)
+    labels_t = torch.stack([result[2] for result in targets])   # (b,-1)
+    labels_w = torch.stack([result[3] for result in targets])   # (b,-1)
+    num_pos = sum([result[4].numel() for result in targets])    # (m,)
+    num_neg = sum([result[5].numel() for result in targets])    # (n,)  m+n = b * 8732
     
     return bboxes_t, bboxes_w, labels_t, labels_w, num_pos, num_neg
     
 
-def match_target(anchors, gt_bboxes, gt_labels, 
-                 assigner_cfg, sampler_cfg, means, stds):
-    """核心程序: 对单张图的anchor进行匹配。
+def anchor_match_target(anchors, gt_bboxes, gt_labels, 
+                        assigner_cfg, sampler_cfg, means, stds):
+    """核心程序: 对单张图的anchor进行目标匹配。
     让每个anchor都能匹配到合适的target，如果匹配的target是gt就获得对应gt的数据(bbox,label,ldmk)
     如果匹配的target是背景就置0.
     """
@@ -52,7 +52,6 @@ def match_target(anchors, gt_bboxes, gt_labels,
     label_weights = anchors.new_zeros(len(anchors), dtype=torch.long)# 借用anchors的device
     # 4. 把正样本 bbox坐标转换成delta坐标并填入
     pos_bboxes = anchors[pos_inds]                   # (k,4)获得正样本bbox
-    
     pos_assigned_gt_inds = assigned_gt_inds[pos_inds] - 1 # 表示正样本对应的label也就是gt_bbox是第0个还是第1个(已经减1，就从1-n变成0-n-1)
     pos_gt_bboxes = gt_bboxes[pos_assigned_gt_inds]  # (k,4)获得正样本bbox对应的gt bbox坐标
     
@@ -229,7 +228,7 @@ def get_point_target(points, regress_ranges, gt_bboxes_list, gt_labels_list, num
     bbox_targets = []
     labels = []
     for i in range(num_imgs):
-        bbox_target, label = get_one_img_point_target(
+        bbox_target, label = point_match_target(
                 points, regress_ranges, gt_bboxes_list[i], gt_labels_list[i])
         bbox_targets.append(bbox_targets)  # (b,)(k,4)
         labels.append(labels)             # (b,)(k,)
@@ -247,7 +246,7 @@ def get_point_target(points, regress_ranges, gt_bboxes_list, gt_labels_list, num
     
     
     
-def get_one_img_point_target(points, regress_ranges, gt_bboxes, gt_labels):
+def point_match_target(points, regress_ranges, gt_bboxes, gt_labels):
     """单张图的target计算
     1. 如果point在某一gt bbox内，则该点为正样本，否则为负样本
     2. 如果point对应最大l/r/t/b大于回归值，则该点不适合在该特征图，取为负样本

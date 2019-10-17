@@ -9,12 +9,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from functools import partial
 
 from model.get_target_lib import get_anchor_target, get_point_target
 from model.get_target_lib import get_points, get_centerness_target
 from model.anchor_generator_lib import AnchorGenerator
 from utils.init_weights import xavier_init, normal_init, bias_init_with_prob
 from model.loss_func_lib import weighted_smooth_l1, iou_loss, weighted_sigmoid_focal_loss 
+from model.loss_lib import CrossEntropyLoss, SmoothL1Loss
 from model.bbox_regression_lib import delta2bbox
 from model.conv_module_lib import conv_norm_acti
 from model.nms_lib import nms_operation
@@ -30,17 +32,17 @@ from model.loss_lib import IouLoss, SigmoidBinaryCrossEntropyLoss, SigmoidFocalL
 """
 
 
-def conv_head(in_channel_list, out_channel_list):
-    """用来创建并列的一组卷积分别对应并列的一组特征图(一一对应)，用来分类或者回归的通道数变换：
-    比如从通道数512变换成分类需要的通道数n_class*n_anchor, 或者变换成回归需要的通道数
-    """
-    n_convs = len(in_channel_list)
-    layers = []
-    for i in range(n_convs):
-        # 卷积参数是常规不改变w,h的参数(即s=1,p=1)
-        layers.append(nn.Conv2d(in_channel_list[i], out_channel_list[i], 
-                                kernel_size=3, padding=1, stride=1))
-    return layers
+#def conv_head(in_channel_list, out_channel_list):
+#    """用来创建并列的一组卷积分别对应并列的一组特征图(一一对应)，用来分类或者回归的通道数变换：
+#    比如从通道数512变换成分类需要的通道数n_class*n_anchor, 或者变换成回归需要的通道数
+#    """
+#    n_convs = len(in_channel_list)
+#    layers = []
+#    for i in range(n_convs):
+#        # 卷积参数是常规不改变w,h的参数(即s=1,p=1)
+#        layers.append(nn.Conv2d(in_channel_list[i], out_channel_list[i], 
+#                                kernel_size=3, padding=1, stride=1))
+#    return layers
     
 
 def get_base_anchor_params(img_size, ratio_range, n_featmap, strides, ratios):
@@ -86,7 +88,7 @@ def get_base_anchor_params(img_size, ratio_range, n_featmap, strides, ratios):
             anchor_ratios,  # (1, 1/2, 2, 1/3, 3)
             centers)        # ((3.5,3.5),(7.5,7.5),(15.5,15.5),(31.5,31.5),(49.5,49.5),(149.5,149.5))
 
-def get_hard_negtive_sample_loss(loss_cls, labels, neg_pos_ratio):
+def ohem(loss_cls, labels, neg_pos_ratio):
     """负样本挖掘：从中挖掘出分类损失中固定比例的，难样本的损失值作为负样本损失
     既保证正负样本平衡，也保证对损失贡献大的负样本被使用
     """    
@@ -105,7 +107,7 @@ def get_hard_negtive_sample_loss(loss_cls, labels, neg_pos_ratio):
     
 # %%    
 class ClassHead(nn.Module):
-    """分类模块"""
+    """针对单层特征的分类模块"""
     def __init__(self, in_channels, num_anchors, num_classes=2):
         super.__init__()
         self.num_classes = num_classes
@@ -119,7 +121,7 @@ class ClassHead(nn.Module):
         
 
 class BboxHead(nn.Module):
-    """bbox回归模块"""
+    """针对单层特征的bbox回归模块"""
     def __init__(self, in_channels, num_anchors):
         super.__init__()
         self.conv3x3 = nn.Conv2d(in_channels, num_anchors * 4, 3, stride=1, padding=1)
@@ -181,10 +183,14 @@ class SSDHead(nn.Module):
         self.target_stds = target_stds 
         self.neg_pos_ratio = neg_pos_ratio
         # 创建分类分支，回归分支
-        cls_convs = conv_head(in_channels, [num_anchor * num_classes for num_anchor in num_anchors])  # 分类分支目的：通道数变换为21*n_anchors
-        reg_convs = conv_head(in_channels, [num_anchor * 4 for num_anchor in num_anchors])
-        self.cls_convs = nn.ModuleList(cls_convs) # 由于6个convs是并行分别处理每一个特征层，所以不需要用sequential
-        self.reg_convs = nn.ModuleList(reg_convs)        
+#        cls_convs = conv_head(in_channels, [num_anchor * num_classes for num_anchor in num_anchors])  # 分类分支目的：通道数变换为21*n_anchors
+#        reg_convs = conv_head(in_channels, [num_anchor * 4 for num_anchor in num_anchors])
+#        self.cls_convs = nn.ModuleList(cls_convs) # 由于6个convs是并行分别处理每一个特征层，所以不需要用sequential
+#        self.reg_convs = nn.ModuleList(reg_convs)     
+        
+        for i in range(len(in_channels)):
+            self.cls_convs.append(ClassHead(in_channels[i], num_anchors[i], num_classes))
+            self.reg_convs.append(BboxHead(in_channels[i], num_anchors[i]))
         
         # 生成base_anchor所需参数
         n_featmap = len(in_channels)
@@ -203,6 +209,10 @@ class SSDHead(nn.Module):
             keep_anchor_indices = range(0, len(ratios[i])+1)
             anchor_generator.base_anchors = anchor_generator.base_anchors[keep_anchor_indices]
             self.anchor_generators.append(anchor_generator)
+        # 创建损失函数
+        self.loss_cls = F.cross_entropy   # 由于需要做负样本挖掘，所以没有采用带权重和均值的损失函数
+        self.loss_bbox = SmoothL1Loss()
+        
         
     def init_weights(self):
         for m in self.modules():
@@ -212,58 +222,46 @@ class SSDHead(nn.Module):
     def forward(self, x):
         cls_scores = []
         bbox_preds = []
-        for i, feat in enumerate(x):  # 在这里把堆叠的特征分拆进行计算和输出
-            cls_scores.append(self.cls_convs[i](feat))
-            bbox_preds.append(self.reg_convs[i](feat))
+        for i, feat in enumerate(x):
+            cls_scores.append(self.cls_convs[i](feat))   # (6,)(b,-1,21)
+            bbox_preds.append(self.reg_convs[i](feat))   # (6,)(b,-1,4)
+        cls_scores = torch.cat(cls_scores, dim=1)        # (b,-1,21)
+        bbox_preds = torch.cat(bbox_preds, dim=1)        # (b,-1,4)
         return cls_scores, bbox_preds 
     
     def get_losses(self, cls_scores, bbox_preds, gt_bboxes, gt_labels, img_metas, cfg):
         """在训练时基于前向计算结果，计算损失
-        cls_scores(6, )(b, c, h, w): 按层分组
-        bbox_preds(6, )(b, c, h, w):按层分组
-        gt_bboxes(b, )(n, 4): 按batch分组
-        gt_labels(b, )(n, ):按batch分组
-        img_metas(b, )(dict):按batch分组
+        cls_scores: (b,-1,21)
+        bbox_preds: (b,-1,4)
+        gt_bboxes: (b,)(m,4)
+        gt_labels: (b,)(m,)
+        img_metas: (b,)(dict)
         cfg
         """
-        # 获得各个特征图尺寸: (6,)-(38,38)(19,19)(10,10)(5,5)(3,3)(1,1)
-        featmap_sizes = [featmap.shape[2:] for featmap in cls_scores]
+        featmap_sizes = [featmap.shape[2:] for featmap in cls_scores]  #(6,)-(38,38)(19,19)(10,10)(5,5)(3,3)(1,1)
         num_imgs = len(img_metas)
-        # 先生成单张图的每个特征图的grid anchors, 并堆叠在一起
         multi_layer_anchors = []
         for i in range(len(featmap_sizes)):
             anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i], self.anchor_strides[i])
             multi_layer_anchors.append(anchors)  # (6,)(k, 4)
-#        num_level_anchors = [len(an) for an in multi_layer_anchors]
         multi_layer_anchors = torch.cat(multi_layer_anchors, dim=0)  # 堆叠(8732, 4)    
-        # 再复制生成一个batch size多张图的grid_anchors
         anchor_list = [multi_layer_anchors for _ in range(len(img_metas))]  # (b,) (s,4)
-        
-        # 计算每个grid_anchor的分类标签labels，以及回归标签坐标bbox_target
-        target_result = get_anchor_target(anchor_list, 
-                                          gt_bboxes, 
-                                          gt_labels,
-                                          cfg.assigner, 
-                                          cfg.sampler,
-                                          means = self.target_means,
-                                          stds = self.target_stds)
+        # 计算target
+        target_result = get_anchor_target(anchor_list, gt_bboxes, gt_labels,
+                                          cfg.assigner, cfg.sampler,
+                                          self.target_means, self.target_stds)
         # 解析target
-        (all_bbox_targets,     # (b, n_anchor, 4)
-         all_bbox_weights,     # (b, n_anchor, 4)
-         all_labels,           # (b, n_anchor)
-         all_label_weights,    # (b, n_anchor)
-         num_batch_pos, 
-         num_batch_neg) = target_result
+        bboxes_t, bboxes_w, labels_t, labels_w, num_pos, num_neg = target_result  # (b,-1,4)x2, (b,-1)x2
         
-        # 调整特征和预测格式 
-        all_cls_scores = [score.permute(0,2,3,1).reshape(
-                num_imgs, -1, self.cls_out_channels) for score in cls_scores]    #(6,)(b,c,h,w)->(6,)(b,-1,21)
-        all_cls_scores = torch.cat(all_cls_scores, dim=1)                        #(6,)(b,-1,21)->(b, 8732, 21)
-
+        # bbox回归损失
+        pfunc = partial(self.loss_bbox, avg_factor)
+        loss_bbox = list(map(pfunc, bbox_preds, bboxes_t, bboxes_w))
         
-        all_bbox_preds = [pred.permute(0,2,3,1).reshape(
-                num_imgs, -1, 4) for pred in bbox_preds]
-        all_bbox_preds = torch.cat(all_bbox_preds, dim=1)                        #(6,)(b,-1,4)...到(b, 8732, 4)
+        pfunc = partial(self.loss_cls, num_pos, neg_pos_ratio, cfg)
+        loss_cls = list(map(pfunc, cls_scores, labels_t, labels_w, avg_factor))
+        
+        pfunc = partial(self.loss_bbox, )
+        
         
         all_loss_cls = []
         all_loss_reg = []
@@ -280,8 +278,8 @@ class SSDHead(nn.Module):
             all_loss_cls.append(loss_cls)
             all_loss_reg.append(loss_reg)
         return dict(loss_cls = all_loss_cls, loss_reg = all_loss_reg)  # {(b,), (b,)} 每张图对应一个分类损失值和一个回归损失值。
-            
-            
+             
+        
     def get_one_img_losses(self, cls_scores, bbox_preds, labels, label_weights, 
                            bbox_targets, bbox_weights, num_total_samples, 
                            neg_pos_ratio, cfg):
@@ -304,8 +302,7 @@ class SSDHead(nn.Module):
         loss_cls = F.cross_entropy(cls_scores, labels, reduction="none") # (8732)
         loss_cls *= label_weights.float()  # (8732)
         # OHEM在线负样本挖掘：提取损失中数值最大的前k个，并保证正负样本比例1:3 
-        loss_cls_pos, loss_cls_neg = get_hard_negtive_sample_loss(
-                loss_cls, labels, neg_pos_ratio)
+        loss_cls_pos, loss_cls_neg = ohem(loss_cls, labels, neg_pos_ratio)
         # 规约分类损失
         loss_cls_pos = loss_cls_pos.sum()
         loss_cls_neg = loss_cls_neg.sum()
@@ -395,21 +392,7 @@ class SSDHead(nn.Module):
 
     
         
-# %%    
-# ssd        
-#def __init__(self, 
-#             input_size=300,
-#             num_classes=21,
-#             in_channels=(512, 1024, 512, 256, 256, 256),
-#             num_anchors=(4, 6, 6, 6, 4, 4),
-#             anchor_size_ratio_range = (0.2, 0.9),
-#             anchor_ratios = ([2], [2, 3], [2, 3], [2, 3], [2], [2]),
-#             anchor_strides=(8, 16, 32, 64, 100, 300),
-#             target_means=(.0, .0, .0, .0),
-#             target_stds=(0.1, 0.1, 0.2, 0.2),
-#             neg_pos_ratio=3,
-#             **kwargs): 
-       
+# %%           
     
 class RetinaHead(SSDHead):
     """retina head"""
@@ -423,178 +406,6 @@ class RetinaHead(SSDHead):
                  **kwargs):
         
         super().__init__()
-
-    
-    
-# %%
-
-class FCOSHead(nn.Module):
-    """fcos无anchor的head
-    """
-    def __init__(self,
-                 num_classes=21,
-                 in_channels=256,  # 堆叠卷积的输入通道数(不包括做变换的卷积层)
-                 out_channels=256, # 堆叠卷积的输出通道数
-                 num_convs=4,      # 堆叠的卷积层数
-                 strides=(4, 8, 16, 32, 64),
-                 regress_ranges=((-1, 64), (64, 128), (128, 256), (256, 512), (512, 1e8))
-                 ):
-        
-        super().__init__()
-        self.num_classes = num_classes
-        self.num_convs = num_convs
-        self.regress_ranges = regress_ranges
-        self.strides = strides
-        # 创建分类，回归，centerness分支
-        self.cls_convs = nn.ModuleList()
-        self.reg_convs = nn.ModuleList()
-        for i in range(self.num_convs):
-            in_channels = self.in_channels
-            self.cls_convs.append(conv_norm_acti(in_channels, out_channels, 3, stride=1, padding=1))
-            self.reg_convs.append(conv_norm_acti(in_channels, out_channels, 3, stride=1, padding=1))
-        # 创建分类，回归，centerness转换头
-        self.fcos_cls = nn.Conv2d(out_channels, num_classes - 1, 3, stride=1, padding=1)   # 注意这里要调整到20类，不考虑背景类，因为？？？
-        self.fcos_reg = nn.Conv2d(out_channels, 4, 3, stride=1, padding=1)
-        self.fcos_centerness = nn.Conv2d(out_channels, 1, 3, stride=1, padding=1)
-        # 这里没有采用scales层
-        
-        # 创建损失函数
-        self.loss_cls = SigmoidFocalLoss()
-        self.loss_reg = IouLoss()
-        self.loss_centerness = SigmoidBinaryCrossEntropyLoss()
-
-
-    def init_weights(self):
-        for m in self.cls_convs.modules():
-            normal_init(m.conv, std=0.01)
-        for m in self.reg_convs.modules():
-            normal_init(m.conv, std=0.01)
-        bias_cls = bias_init_with_prob(0.01)
-        normal_init(self.fcos_cls, std=0.01, bias=bias_cls)
-        normal_init(self.fcos_reg, std=0.01)
-        normal_init(self.fcos_centerness, std=0.01)
-    
-    
-    def forward(self, x):
-        """对FPN过来的输入进行计算(FPN的作用是把batch中同尺寸特征放一起，且还能堆叠因为通道数也一致)
-        args:
-            x(5) 表示5层特征，每层(b, 256, h, w)
-        """
-        cls_scores = []
-        centernesses = []
-        bbox_preds = []
-        # 分别计算每一张特征图(b,c,h,w), 共计5张
-        for feat in x:
-            cls_feat = feat   # (b, 256, h, w)
-            reg_feat = feat
-            # 计算卷积层
-            for cls_layer in self.cls_convs:
-                cls_feat = cls_layer(cls_feat)
-            for reg_layer in self.reg_convs:
-                reg_feat = reg_layer(reg_feat)
-            # 计算最终fcos层
-            cls_scores.append(self.fcos_cls(cls_feat)) # (b, 20, h, w)
-            centernesses.append(self.fcos_centerness(cls_feat))  # (b, 1, h, w)
-            bbox_preds.append(self.fcos_reg(reg_feat).float().exp()) # (b, 4, h, w)但这里需要把预测值取对数变为正数，而设置float()是为了在FP16模式下不会overflow  
-            
-        return cls_scores, bbox_preds, centernesses  # 每个变量都是(5,)
-    
-    
-    def get_losses(self, cls_scores, bbox_preds, centernesses, 
-                   gt_bboxes, gt_labels, img_metas, cfg):
-        """计算损失：先获得target，然后基于样本和target计算损失
-        注意：对FCOS的loss可以一次性把一个batch的loss一起算出来，这是更高效的算法
-        args:
-            cls_scores: (5,)(b, 20, h, w) 按层分组
-            bbox_preds: (5,)(b, 4, h, w) 按层分组
-            centernesses: (5,)(b, 1, h, w) 按层分组
-            gt_bboxes: (b,)(k, 4) 按batch分组
-            gt_labels: (b,)(k, ) 按batch分组
-            img_metas: (b,) 按batch分组
-        """
-        num_imgs = len(img_metas)
-        featmap_sizes = [featmap.shape[-2:] for featmap in cls_scores] # (5,) (h,w)
-        device = cls_scores.get_device()
-        # 计算网格中心点
-        points = get_points(featmap_sizes, self.strides, device) # (5,)(k,2)
-        num_level_points = [pt.shape[0] for pt in points]
-
-        # 计算target
-        labels, bbox_targets = get_point_target(
-                points, self.regress_ranges, gt_bboxes, num_level_points) # labels(5,)(m,),  bbox_targets(5,)(m,4) 
-        
-        # 展平调整格式: 统一为外层为特征层数，内层为(b, xxx), 然后堆叠
-        # 注意：这个展平方式有点特殊，常规的格式调整是从特征层索引(5,)变换到batch索引(b,)，而这里省略这一步，而是直接跳到下一步，再把batch索引也合并到个数中。
-        all_cls_scores = torch.cat([
-                cls_score.permute(0,2,3,1).reshape(-1, self.num_classes - 1)   # 注意，分类score里边是按照20类或80类来算，不考虑负样本。因为采用的损失函数是focal loss而不是交叉熵。
-                for cls_score in cls_scores])             # (5,)(b,20,h,w)->(5*b*h*w,20)
-        all_bbox_preds = torch.cat([
-                bbox_pred.permute(0,2,3,1).reshape(-1, 4)  
-                for bbox_pred in bbox_preds])             # (5,)(b,4,h,w)->(5*b*h*w,4)
-        all_centernesses = torch.cat([
-                centerness.permute(0,2,3,1).reshape(-1)
-                for centerness in centernesses])          # (5,)(b,1,h,w)->(5*b*h*w,20)
-        # 注意points的堆叠，需要在内层先配出batch的数量出来,然后再按照外层的特征层数堆叠
-        all_points = torch.cat([
-                point.repeat(num_imgs, 1) for point in points]) # (5,)(k,2) -> (5*k, 2)
-        all_labels = torch.cat(labels)    # (5*k, )
-        all_bbox_targets = torch.cat(bbox_targets) # (5*k, 4)
-        
-        # 分类损失: 采用focal loss
-        pos_inds = all_labels.nonzero().reshape(-1)  # 得到正样本的index
-        num_pos = len(pos_inds)
-        loss_cls = self.loss_cls(all_cls_scores,                # ()
-                                 all_labels,                    # () 
-                                 avg_factor=num_pos + num_imgs)  # 增加num_imgs是防止分母为0 
-
-        # 计算中心点分类损失
-        pos_bbox_preds = all_bbox_preds[pos_inds]      # 得到正样本对应bbox_pred
-        pos_bbox_targets = all_bbox_targets[pos_inds]  # 得到正样本对应bbox_target
-        
-        pos_centerness = all_centernesses[pos_inds]    # 得到正样本对应中心点
-        pos_centerness_targets = get_centerness_target(pos_bbox_targets)
-        
-        if num_pos > 0: # 如果有正样本，则求位置损失
-            pos_points = all_points[pos_inds]
-            pos_decoded_bbox_preds = lrtb2bbox(pos_points, pos_bbox_preds)
-            pos_decoded_target_preds = lrtb2bbox(pos_points, pos_bbox_targets)
-            # 回归损失采用-log(iou)作为损失函数，并且加入centerness作为权重
-            loss_reg = self.loss_reg(pos_decoded_bbox_preds,   # (k, 4)
-                                     pos_decoded_target_preds, # (k, 4)
-                                     weight=pos_centerness_targets,  # (k,)
-                                     avg_factor=pos_centerness_targets.sum())
-            # 中心点损失采用二值交叉熵做损失函数：中心度最高是1， 相当于一个概率
-            # 也就是评价预测的中心点的中心度与实际中心点的中心度之间的相关性。
-            # 此时label不再是[0,1]这种二分类标签，而是[0~1]之间的一个值，所以属于不太典型的二值交叉熵计算
-            # 此时应该相当于一个回归问题，该点的中心度是一个回归值，使用smooth_l1也许也可以。
-            loss_centerness = self.loss_centerness(pos_centerness,         # (k,)
-                                                   pos_centerness_targets) # (k,)
-        else:
-            loss_reg = pos_bbox_preds.sum()
-            loss_centerness = pos_centerness.sum()
-        # 计算    
-        return dict(loss_cls = loss_cls,
-                    loss_reg = loss_reg,
-                    loss_centerness = loss_centerness)
-        
-        def get_bboxes(self, cls_scores, bbox_preds, centernesses, img_metas, cfg):
-            """
-            Args:
-                cls_scores(6,)(b,c,h,w): 按特征图分组
-                bbox_preds(6,)(b,c,h,w):按特征图分组
-            """
-            pass
-        
-        def get_one_img_bboxes(self, cls_scores, bbox_preds, centernesses, 
-                               points, img_shape, scale_factor, cfg):
-            """
-            Args:
-                cls_scores(6,)(c,h,w): 按特征图分组
-                bbox_preds(6,)(c,h,w):按特征图分组
-            """
-    
-    
-
         
 
 # %%

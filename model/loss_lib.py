@@ -25,7 +25,7 @@ class CrossEntropyLoss(nn.Module):
         target： 任意
     """
     def __init__(self):
-        pass
+        super().__init__()
     
     def forward(self, pred, target, weight=None, avg_factor=None):
         loss = F.cross_entropy(pred, target, reduction='none') 
@@ -46,7 +46,7 @@ class SigmoidBinaryCrossEntropyLoss(nn.Module):
         target: (b, n_class)必须是[0,1]两种数值且为n_class列的独热编码形式
     """    
     def __init__(self):
-        pass
+        super().__init__()
     
     def forward(self, pred, target, weight=None, avg_factor=None):
         # 如果label不是独热编码形式，则自动转换
@@ -74,6 +74,7 @@ class SigmoidFocalLoss(nn.Module):
         target: (b, n_class)必须是n_class列的独热编码形式
     """
     def __init__(self, alpha=0.25, gamma=2):
+        super().__init__()
         self.alpha = alpha
         self.gamma = gamma
     
@@ -98,10 +99,10 @@ def focal_loss(pred, target, alpha, gamma):
 # %%
 class SmoothL1Loss(nn.Module):
     """回归损失：柔性l1"""
-    def __init__(self, reduction):
-        self.reduction = reduction
+    def __init__(self):
+        super().__init__()
     
-    def forward(self, pred, target, weight, avg_factor):        
+    def forward(self, pred, target, weight=None, avg_factor=None):        
         loss = F.smooth_l1_loss(pred, target, reduction='none')
         if weight is not None:
             loss = weight * loss      
@@ -129,11 +130,10 @@ def smooth_l1_loss(pred, target, beta=1.):
 # %%
 class IouLoss(nn.Module):
     """iou loss基础上增加centerness作为权重"""
-    def __init__(self, reduction='mean'):
-        self.reduction = reduction
-    
-    def forward(self, pred, target, weight, avg_factor):
+    def __init__(self):
+        super().__init__()
         
+    def forward(self, pred, target, weight, avg_factor):
         loss = iou_loss(pred, target)
         if weight is not None:
             loss = weight * loss      
@@ -142,7 +142,6 @@ class IouLoss(nn.Module):
         else:
             loss = loss.mean()
         return loss
-
 
 def iou_loss(pred, target):
     """iou loss底层函数，loss = -log(iou)作为回归损失函数
