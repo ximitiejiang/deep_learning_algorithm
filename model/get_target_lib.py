@@ -50,31 +50,32 @@ def anchor_match_target(anchors, gt_bboxes, gt_labels, gt_ldmks,
     # 3. 初始化target    
     bbox_targets = torch.zeros_like(anchors)
     bbox_weights = torch.zeros_like(anchors)
-    labels = anchors.new_zeros(len(anchors), dtype=torch.long)       # 借用anchors的device
+    label_targets = anchors.new_zeros(len(anchors), dtype=torch.long)       # 借用anchors的device
     label_weights = anchors.new_zeros(len(anchors), dtype=torch.long)# 借用anchors的device
+    ldmk_targets = anchors.new_zeros(len(anchors), 10, dtype=torch.float32)
+    ldmk_weights = anchors.new_zeros(len(anchors), 10, dtype=torch.float32)    
     # 4. 把正样本 bbox坐标转换成delta坐标并填入
     pos_bboxes = anchors[pos_inds]                   # (k,4)表示从8000多个anchors里边提取出对应正样本的anchor作为bbox
     pos_assigned_gt_inds = assigned_gt_inds[pos_inds] - 1 # 表示正样本对应的label也就是gt_bbox是第几个，并且从第0个开始(减1所以从1-n变成0-n-1)
     pos_gt_bboxes = gt_bboxes[pos_assigned_gt_inds]  # (k,4)获得正样本bbox对应的gt bbox坐标
     
-#    ldmk_targets = anchors.new_zeros(len(anchors), 10, dtype=torch.float32)
-#    ldmk_weights = anchors.new_zeros(len(anchors), 10, dtype=torch.float32)
-#    pos_gt_ldmks = gt_ldmks[pos_assigned_gt_inds]
-#    pos_ldmk_targets = landmark2delta(pos_bboxes, pos_gt_ldmks, means, stds)
-#    ldmk_targets[pos_inds] = pos_ldmk_targets
-#    ldmk_weights[pos_inds] = 1
+
+    pos_gt_ldmks = gt_ldmks[pos_assigned_gt_inds]
+    pos_ldmk_targets = landmark2delta(pos_bboxes, pos_gt_ldmks, means, stds)
+    ldmk_targets[pos_inds] = pos_ldmk_targets
+    ldmk_weights[pos_inds] = 1
     
     pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, means, stds)  # 
     bbox_targets[pos_inds] = pos_bbox_targets
     bbox_weights[pos_inds] = 1
     # 5. 把正样本labels填入
-    labels[pos_inds] = gt_labels[pos_assigned_gt_inds] # 获得正样本对应label
+    label_targets[pos_inds] = gt_labels[pos_assigned_gt_inds] # 获得正样本对应label
     label_weights[pos_inds] = 1  # 这里设置正负样本权重都为=1， 如果有需要可以提高正样本权重
     label_weights[neg_inds] = 1
       
     return (bbox_targets, bbox_weights, 
-            labels, label_weights, 
-#            ldmk_targets, ldmk_weights,
+            label_targets, label_weights, 
+            ldmk_targets, ldmk_weights,
             pos_inds, neg_inds)    
 
     

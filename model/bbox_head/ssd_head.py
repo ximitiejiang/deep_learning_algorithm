@@ -12,14 +12,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from functools import partial
 
-from model.get_target_lib import get_anchor_target, get_point_target
-from model.get_target_lib import get_points, get_centerness_target
+from model.get_target_lib import get_anchor_target
 from model.anchor_generator_lib import AnchorGenerator
-from utils.init_weights import xavier_init, normal_init, bias_init_with_prob
-from model.loss_func_lib import weighted_smooth_l1, iou_loss, weighted_sigmoid_focal_loss 
+from utils.init_weights import xavier_init
 from model.loss_lib import CrossEntropyLoss, SmoothL1Loss
 from model.bbox_regression_lib import delta2bbox
-from model.conv_module_lib import conv_norm_acti
 from model.nms_lib import nms_operation
 from model.bbox_regression_lib import lrtb2bbox
 from model.loss_lib import IouLoss, SigmoidBinaryCrossEntropyLoss, SigmoidFocalLoss

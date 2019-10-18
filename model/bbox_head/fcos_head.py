@@ -12,6 +12,27 @@ from utils.init_weights import normal_init, bias_init_with_prob
 from model.get_target_lib import get_points, get_point_target, get_centerness_target
 from model.bbox_regression_lib import lrtb2bbox
 
+class ClassHead(nn.Module):
+    def __init__(self):
+        pass
+    
+    def forward(self, x):
+        pass
+
+class BboxHead(nn.Module):
+    def __init__(self):
+        pass
+    
+    def forward(self, x):
+        pass
+    
+class CenternessHead(nn.Module):
+    def __init__(self):
+        pass
+    def forward(self):
+        pass
+    
+
 class FCOSHead(nn.Module):
     """fcos无anchor的head
     """
@@ -60,7 +81,7 @@ class FCOSHead(nn.Module):
     
     
     def forward(self, x):
-        """对FPN过来的输入进行计算(FPN的作用是把batch中同尺寸特征放一起，且还能堆叠因为通道数也一致)
+        """对FPN过来的输入进行计算
         args:
             x(5) 表示5层特征，每层(b, 256, h, w)
         """

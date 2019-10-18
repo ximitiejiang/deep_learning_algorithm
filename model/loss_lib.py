@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from utils.ious import calc_ious_tensor
-from utils.transform import label_to_onehot
+
 """损失函数库：
 1. 采用独立函数定义损失函数的底层实现，但不包括权重和缩减
 2. 采用nn.Module类的形式，统一forward的接口(pred, target, weight, avg_factor)
@@ -40,16 +40,14 @@ class SigmoidBinaryCrossEntropyLoss(nn.Module):
     """二值交叉熵：带sigmoid函数在内部
     args
         pred: (b, n_class)任意
-        target: (b, n_class)必须是[0,1]两种数值且为n_class列的独热编码形式
+        target: (b, n_class)
     """    
     def __init__(self):
         super().__init__()
     
     def forward(self, pred, target, weight=None, avg_factor=None):
-        # 如果label不是独热编码形式，则自动转换
         if target.dim() != pred.dim():
-            target = label_to_onehot(target)
-            
+            raise ValueError('target should be onehot code, with same dim as predicts.')
         loss = F.binary_cross_entropy_with_logits(
                     pred, target, reduction='none')   
         if weight is not None:
@@ -85,7 +83,10 @@ class SigmoidFocalLoss(nn.Module):
 def focal_loss(pred, target, alpha, gamma):
     """focal loss底层函数"""
     pred_sigmoid = pred.sigmoid()
-    return pred_sigmoid
+    pt = pred * target + (1 - pred) * (1 - target)
+    at = alpha * target + (1 - alpha) * (1 - target)
+    loss = pt * at * F.binary_cross_entropy(pred, target, reduction='none')
+    return loss
 
        
 
@@ -107,10 +108,10 @@ class SmoothL1Loss(nn.Module):
 def smooth_l1_loss(pred, target, beta=1.):
     """柔性l1 loss底层函数, 用作参考，但底层实际还是采用pytorch的F函数库
     args:
-        pred: ()
-        target: ()
+        pred: (k,4)
+        target: (k,4)
     returns:
-        loss
+        loss: (k,)
     """
     diff = torch.abs(pred - target)
     loss = torch.where(diff < beta, 0.5 * diff * diff / beta,

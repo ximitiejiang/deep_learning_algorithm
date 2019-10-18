@@ -8,8 +8,10 @@ Created on Thu Oct 17 09:36:18 2019
 import torch
 import torch.nn as nn
 from math import ceil
+from functools import partial
 from model.anchor_generator_lib import AnchorGenerator
-from model.loss_lib import SmoothL1Loss, CrossEntropyLoss
+from model.loss_lib import SmoothL1Loss, CrossEntropyLoss, SigmoidBinaryCrossEntropyLoss
+from model.get_target_lib import get_anchor_target
 
 class ClassHead(nn.Module):
     """分类模块"""
@@ -87,7 +89,7 @@ class RetinaFaceHead(nn.Module):
         # 定义损失函数
         self.loss_cls_fn = CrossEntropyLoss()
         self.loss_bbox_fn = SmoothL1Loss()
-        self.loss_ldmk_fn = SmoothL1Loss()
+        self.loss_ldmk_fn = SigmoidBinaryCrossEntropyLoss()
         
         # 定义anchors
         self.anchor_generators = []
@@ -138,17 +140,13 @@ class RetinaFaceHead(nn.Module):
         target_result = get_anchor_target(all_anchors, gt_bboxes, gt_labels, gt_landmarks,
                                           cfg.assigner, cfg.sampler, 
                                           self.means, self.stds)
-        bboxes_t, labels_t, ldmk_t = target_result
+        bboxes_t, _, labels_t, _, ldmk_t, *_ = target_result
         
         # 计算损失
-        loss_cls
-        loss_bbox
-        loss_ldmk
+        loss_cls = list(map(self.loss_cls_fn, cls_scores, labels_t))
+        loss_bbox = list(map(self.loss_bbox_fn, bbox_preds, bboxes_t))
+        loss_ldmk = list(map(self.loss_ldmk_fn, ))
         return dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_ldmk=loss_ldmk)
-        
-    def get_anchor_target(anchors, gt_bboxes, gt_labels, img_metas, assigner_cfg, sampler_cfg, num_level_anchors, target_means, target_stds):
-        """通过anchors从gt数据中获取target"""
-        bbox_t, bbox_w, labels_t, labels_w, pos_inds, neg_inds = map(single_target, )
         
     
     def get_bboxes(self):
