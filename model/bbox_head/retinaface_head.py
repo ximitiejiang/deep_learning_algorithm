@@ -7,6 +7,7 @@ Created on Thu Oct 17 09:36:18 2019
 """
 import torch
 import torch.nn as nn
+from math import ceil
 from model.anchor_generator_lib import AnchorGenerator
 from model.loss_lib import SmoothL1Loss, CrossEntropyLoss
 
@@ -20,7 +21,7 @@ class ClassHead(nn.Module):
     def forward(self, x):
         out = self.conv1x1(x)
         out = out.permute(0, 2, 3, 1).contiguous()
-        out = out.view(out.shape(0), -1, self.num_classes)
+        out = out.view(out.shape[0], -1, self.num_classes)
         return out
         
 
@@ -33,7 +34,7 @@ class BboxHead(nn.Module):
     def forward(self, x):
         out = self.conv1x1(x)
         out = out.permute(0, 2, 3, 1).contiguous()
-        out = out.view(out.shape(0), -1, 4)
+        out = out.view(out.shape[0], -1, 4)
         return out        
 
     
@@ -47,18 +48,29 @@ class LandmarkHead(nn.Module):
     def forward(self, x):
         out = self.conv1x1(x)
         out = out.permute(0, 2, 3, 1).contiguous()
-        out = out.view(out.shape(0), -1, self.num_points)
+        out = out.view(out.shape[0], -1, self.num_points)
         return out
 
 
 class RetinaFaceHead(nn.Module):
     
-    def __init__(self, 
+    def __init__(self,
+                 input_size=(640, 640),
                  in_channels=(64, 64, 64), 
-                 num_anchors=2,
                  num_classes=2,
-                 num_landmarks=10):
+                 num_landmarks=10,
+                 base_sizes=(16, 64, 256),
+                 strides=(8, 16, 32),
+                 scales=(1, 2),
+                 ratios=(1),
+                 means=(0.,0.,0.,0.),
+                 stds=(0.1,0.1,0.1,0.1)):
         super().__init__()
+        
+        self.means = means
+        self.stds = stds
+        self.featmap_sizes = [[ceil(input_size[0]/stride), ceil(input_size[1]/stride)] for stride in strides]
+        num_anchors = len(scales) * len(ratios)
         # 定义分类回归头
         self.class_head = nn.ModuleList()
         for in_channel in in_channels:
@@ -74,19 +86,15 @@ class RetinaFaceHead(nn.Module):
         
         # 定义损失函数
         self.loss_cls_fn = CrossEntropyLoss()
-        self.loss_bbox_fn = SmoothL1Loss(beta=0.2)
-        self.loss_ldmk_fn = SmoothL1Loss(beta=0.2)
+        self.loss_bbox_fn = SmoothL1Loss()
+        self.loss_ldmk_fn = SmoothL1Loss()
         
         # 定义anchors
-        base_sizes
-        scales
-        ratios
-        centers
         self.anchor_generators = []
         for i in range(len(in_channels)):
+            ctr = ((strides[i] - 1.) / 2, (strides[i] - 1.) / 2)
             self.anchor_generators.append(AnchorGenerator(
-                    base_sizes[i], scales[i], ratios[i], ctr=centers[i], scale_major=False))
-            
+                    base_sizes[i], scales, ratios, ctr=ctr, scale_major=False))
     
     def init_weights(self):
         pass
@@ -106,7 +114,7 @@ class RetinaFaceHead(nn.Module):
     
     
     def get_losses(self, cls_scores, bbox_preds, ldmk_preds, 
-                   gt_bboxes, gt_labels, gt_landmarks, img_metas, cfg):
+                   gt_bboxes, gt_labels, gt_landmarks, cfg):
         """计算损失，通过anchors把3组gt数据转化成target数据，然后分别跟3组预测数据计算损失
         args:
             cls_scores: (b,-1,2)
@@ -116,24 +124,27 @@ class RetinaFaceHead(nn.Module):
             gt_labels: (b,) (n,)
             gt_landmarks: (b,) (n,5,2)
         """
-        num_imgs = len(img_metas)
+        num_imgs = len(gt_labels)
         # 准备anchors
         all_anchors = []
-        for i in range():
-            all_anchors.append(self.anchor_generators[i].grid_anchors())
-        num_anchors = [len(anchor) for anchor in all_anchors]
+        for i in range(len(self.featmap_sizes)):
+            device = cls_scores.device
+            all_anchors.append(self.anchor_generators[i].grid_anchors(
+                    self.featmap_sizes[i], self.strides[i], device=device))   
+#        num_anchors = [len(anchor) for anchor in all_anchors]
         all_anchors = torch.cat(all_anchors, dim=0)
-        all_anchors = [all_anchors for _ in range(len(img_metas))]
-        
+        all_anchors = [all_anchors for _ in range(len(num_imgs))]
         # 开始计算target
-        for i in range(num_imgs):
-            targets = get_anchor_target(all_anchors, gt_bboxes, gt_labels, gt_landmarks, img_metas)
-        cls_scores_t, bbox_preds_t, ldmk_preds_t = targets
+        target_result = get_anchor_target(all_anchors, gt_bboxes, gt_labels, gt_landmarks,
+                                          cfg.assigner, cfg.sampler, 
+                                          self.means, self.stds)
+        bboxes_t, labels_t, ldmk_t = target_result
         
         # 计算损失
         loss_cls
-        loss_reg
+        loss_bbox
         loss_ldmk
+        return dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_ldmk=loss_ldmk)
         
     def get_anchor_target(anchors, gt_bboxes, gt_labels, img_metas, assigner_cfg, sampler_cfg, num_level_anchors, target_means, target_stds):
         """通过anchors从gt数据中获取target"""

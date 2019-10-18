@@ -57,7 +57,7 @@ class OneStageDetector(nn.Module):
             x = self.neck(x)
         outs = self.bbox_head(x)  # 获得分类和回归的预测值cls_score, bbox_preds
         # 计算损失
-        loss_inputs = outs + (gt_bboxes, gt_labels, img_metas, self.cfg)
+        loss_inputs = outs + (gt_bboxes, gt_labels, self.cfg) # 去掉img_metas
         losses = self.bbox_head.get_losses(*loss_inputs)
         return losses
         

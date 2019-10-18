@@ -8,15 +8,17 @@ Created on Fri Sep 20 10:07:24 2019
 import torch
 from functools import partial
 from model.anchor_assigner_sampler_lib import MaxIouAssigner, PseudoSampler
-from model.bbox_regression_lib import bbox2delta, bbox2lrtb
+from model.bbox_regression_lib import bbox2delta, bbox2lrtb, landmark2delta
 
 
-def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list,
+def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list, gt_landmarks_list,
                       assigner_cfg, sampler_cfg, means, stds):
     """简化get anchor target的写法：基于batch的gt数据(b,)，让anchors能够匹配到合适的target(这个target可能是gt，可能是背景)
     """
+    if gt_landmarks_list is None:
+        gt_landmarks_list = [None for _ in anchor_list]
     pfunc = partial(anchor_match_target, assigner_cfg=assigner_cfg, sampler_cfg=sampler_cfg, means=means, stds=stds)
-    targets = list(map(pfunc, anchor_list, gt_bboxes_list, gt_labels_list))  # (b,) (6,)生成每张图的target
+    targets = list(map(pfunc, anchor_list, gt_bboxes_list, gt_labels_list, gt_landmarks_list))  # (b,) (6,)生成每张图的target
 
     bboxes_t = torch.stack([result[0] for result in targets])   # (b,-1,4)
     bboxes_w = torch.stack([result[1] for result in targets])   # (b,-1,4)
@@ -28,7 +30,7 @@ def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list,
     return bboxes_t, bboxes_w, labels_t, labels_w, num_pos, num_neg
     
 
-def anchor_match_target(anchors, gt_bboxes, gt_labels, 
+def anchor_match_target(anchors, gt_bboxes, gt_labels, gt_ldmks,
                         assigner_cfg, sampler_cfg, means, stds):
     """核心程序: 对单张图的anchor进行目标匹配。
     让每个anchor都能匹配到合适的target，如果匹配的target是gt就获得对应gt的数据(bbox,label,ldmk)
@@ -37,13 +39,13 @@ def anchor_match_target(anchors, gt_bboxes, gt_labels,
     # 1.指定: 指定每个anchor是正样本还是负样本(通过让anchor跟gt bbox进行iou计算来评价，得到每个anchor的)
     bbox_assigner = MaxIouAssigner(**assigner_cfg.params)
     assign_result = bbox_assigner.assign(anchors, gt_bboxes, gt_labels)
-    assigned_gt_inds, assigned_gt_labels, ious = assign_result  # (m,), (m,) 表示anchor的身份, anchor对应的标签，[0,1,0,..2], [0,15,...18]
-    
+    assigned_gt_inds, assigned_gt_labels, ious = assign_result  # 前者(8732,)表示anchor的身份是第几个gt(从1开始，1则表示第1个gt class, 0表示负样本)
+                                                                # 后者(8732,)表示anchor的身份标签为0~20
     # 2. 采样： 采样一定数量的正负样本, 通常用于预防正负样本不平衡
     #　但在SSD中没有采样只是区分了一下正负样本，所以这里只是一个假采样。(正负样本不平衡是通过最后loss的OHEM完成)
     bbox_sampler = PseudoSampler(**sampler_cfg.params)
     sampling_result = bbox_sampler.sample(*assign_result, anchors, gt_bboxes)
-    pos_inds, neg_inds = sampling_result  # (k,), (j,) 表示正/负样本的位置号，比如[7236, 7249, 8103], [0,1,2...8104..]
+    pos_inds, neg_inds = sampling_result  # (k,), (j,) 表示anchor中第几个anchor为正样本，第几个样本为负样本
     
     # 3. 初始化target    
     bbox_targets = torch.zeros_like(anchors)
@@ -51,20 +53,30 @@ def anchor_match_target(anchors, gt_bboxes, gt_labels,
     labels = anchors.new_zeros(len(anchors), dtype=torch.long)       # 借用anchors的device
     label_weights = anchors.new_zeros(len(anchors), dtype=torch.long)# 借用anchors的device
     # 4. 把正样本 bbox坐标转换成delta坐标并填入
-    pos_bboxes = anchors[pos_inds]                   # (k,4)获得正样本bbox
-    pos_assigned_gt_inds = assigned_gt_inds[pos_inds] - 1 # 表示正样本对应的label也就是gt_bbox是第0个还是第1个(已经减1，就从1-n变成0-n-1)
+    pos_bboxes = anchors[pos_inds]                   # (k,4)表示从8000多个anchors里边提取出对应正样本的anchor作为bbox
+    pos_assigned_gt_inds = assigned_gt_inds[pos_inds] - 1 # 表示正样本对应的label也就是gt_bbox是第几个，并且从第0个开始(减1所以从1-n变成0-n-1)
     pos_gt_bboxes = gt_bboxes[pos_assigned_gt_inds]  # (k,4)获得正样本bbox对应的gt bbox坐标
     
-    pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, means, stds)  
+#    ldmk_targets = anchors.new_zeros(len(anchors), 10, dtype=torch.float32)
+#    ldmk_weights = anchors.new_zeros(len(anchors), 10, dtype=torch.float32)
+#    pos_gt_ldmks = gt_ldmks[pos_assigned_gt_inds]
+#    pos_ldmk_targets = landmark2delta(pos_bboxes, pos_gt_ldmks, means, stds)
+#    ldmk_targets[pos_inds] = pos_ldmk_targets
+#    ldmk_weights[pos_inds] = 1
+    
+    pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, means, stds)  # 
     bbox_targets[pos_inds] = pos_bbox_targets
     bbox_weights[pos_inds] = 1
     # 5. 把正样本labels填入
     labels[pos_inds] = gt_labels[pos_assigned_gt_inds] # 获得正样本对应label
     label_weights[pos_inds] = 1  # 这里设置正负样本权重都为=1， 如果有需要可以提高正样本权重
     label_weights[neg_inds] = 1
-    
-    return bbox_targets, bbox_weights, labels, label_weights, pos_inds, neg_inds    
-    
+      
+    return (bbox_targets, bbox_weights, 
+            labels, label_weights, 
+#            ldmk_targets, ldmk_weights,
+            pos_inds, neg_inds)    
+
     
 #
 #def get_anchor_target1(anchor_list, gt_bboxes_list, gt_labels_list,

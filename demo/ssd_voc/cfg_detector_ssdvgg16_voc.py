@@ -17,13 +17,13 @@ work_dir = '/home/ubuntu/mytrain/ssd_vgg_voc/'
 resume_from = None                # 恢复到前面指定的设备
 load_from = None
 load_device = 'cuda'              # 额外定义用于评估预测的设备: ['cpu', 'cuda']，可在cpu预测
-
 lr = 0.001
+img_size = (300, 300)
 
 lr_processor = dict(
         type='list',
         params = dict(
-                step=[50, 80],       # 代表第2个(从1开始算)
+                step=[5, 8],       # 代表第2个(从1开始算)
                 lr = [0.0005, 0.0001],
                 warmup_type='linear',
                 warmup_iters=500,
@@ -48,7 +48,7 @@ backbone = dict(
 head = dict(
         type='ssd_head',
         params=dict(
-                input_size=300,
+                input_size=img_size,
                 num_classes=21,
                 in_channels=(512, 1024, 512, 256, 256, 256),
                 num_anchors=(4, 6, 6, 6, 4, 4),
@@ -88,7 +88,7 @@ transform = dict(
                 to_tensor=True, # numpy to tensor 
                 to_chw=True,    # hwc to chw
                 flip_ratio=None,
-                scale=(300, 300),  # 选择300的小尺寸
+                scale=img_size,  # 选择300的小尺寸
                 size_divisor=None,
                 keep_ratio=False),  # ssd需要统一到方形300,300，不能按比例
         label_params=dict(
@@ -108,7 +108,7 @@ transform_val = dict(
                 to_tensor=True, # numpy to tensor 
                 to_chw=True,    # hwc to chw
                 flip_ratio=None,
-                scale=(300, 300),  # [w,h]
+                scale=img_size,  # [w,h]
                 size_divisor=None,
                 keep_ratio=False),
         label_params=dict(
@@ -165,15 +165,3 @@ optimizer = dict(
                 momentum=0.9, 
                 weight_decay=5e-4))
 
-loss_clf = dict(
-        type='cross_entropy',
-        params=dict(
-                reduction='mean'
-                ))
-
-loss_reg = dict(
-        type='smooth_l1',
-        beta=1.,
-        params=dict(
-                reduction='mean'
-                ))

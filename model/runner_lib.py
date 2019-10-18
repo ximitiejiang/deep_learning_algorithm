@@ -32,7 +32,7 @@ def batch_detector(model, data, device, return_loss=True, **kwargs): # kwargs用
         losses = model(imgs, img_metas, 
                        gt_bboxes=gt_bboxes, 
                        gt_labels=gt_labels, return_loss=True)  # 
-        # 损失缩减：先分别对分类和回归损失进行求和，然后把分类和回归损失再求和。
+        # 损失缩减：先分别对每种loss进行batch内的求和，并对不同种loss进行求和。
         loss_sum = {}
         for name, value in zip(losses.keys(), losses.values()):
             loss_sum[name] = sum(data for data in value)

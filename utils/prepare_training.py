@@ -30,7 +30,8 @@ from model.backbone.resnet_lib import ResNet
 from model.backbone.ssdvgg16_lib import SSDVGG16
 from model.backbone.fcnvgg16_lib import FCNVGG16
 from model.neck.neck_lib import FPN
-from model.bbox_head.head_lib import SSDHead, RetinaHead, FCOSHead
+from model.bbox_head.head_lib import SSDHead, RetinaHead
+from model.bbox_head.fcos_head import FCOSHead
 from model.seg_head.fcn_head import FCN8sHead
 
 from model.lr_processor_lib import FixedLrProcessor, ListLrProcessor, StepLrProcessor

@@ -81,8 +81,17 @@ def delta2bbox(rois,
     return bboxes
 
 # %%
+def landmark2delta():
+    pass
+
+
+def delta2landmark():
+    pass
+
+
+# %%
 def bbox2lrtb(points, bboxes):
-    """用来计算每个points与每个bbox的left,right, top,bottom
+    """用来把每个points位置坐标(x,y)转化成points距离所对应bbox四边的距离(left,right, top,bottom)
     points(k,2), bboxes(m,4)
     returns:
         l(k,m), r(k,m), t(k,m), b(k,m) 
@@ -104,7 +113,7 @@ def bbox2lrtb(points, bboxes):
 
 
 def lrtb2bbox(points, lrtb, max_shape=None):
-    """用来把lrtb转换成bbox
+    """用来把point的位置尺寸(left,right,top, bottom)转换成bbox坐标(xmin,ymin,xmax,ymax)
     Decode distance prediction to bounding box.
 
     Args:

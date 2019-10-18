@@ -20,6 +20,8 @@ class AnchorGenerator():
         self.ratios = np.array(ratios)
         self.scale_major = scale_major
         self.ctr = ctr
+        
+        # 计算base_anchors
         if base_anchors is None:
             self.base_anchors = self.get_base_anchors()  # 采用常规的方式生成base anchors
         else:
@@ -51,6 +53,7 @@ class AnchorGenerator():
                                  y_ctr + 0.5 * (h_new - 1)], axis=-1).round()  # (m*n, 4))
         
         return torch.tensor(base_anchors, dtype=torch.float32)  # 做类型转换为pytorch weight通用的float32(否则会因为Numpy原因变float64)
+    
     
     def grid_anchors(self, featmap_size, stride, device=torch.device('cuda')):
         """生成单个特征图的网格anchors

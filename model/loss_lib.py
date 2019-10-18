@@ -33,9 +33,6 @@ class CrossEntropyLoss(nn.Module):
             loss = weight * loss   
         if avg_factor is not None:
             loss = loss.sum() / avg_factor
-        else:
-            loss = loss.mean()
-
         return loss
 
 
@@ -59,8 +56,6 @@ class SigmoidBinaryCrossEntropyLoss(nn.Module):
             loss = weight * loss          
         if avg_factor is not None:
             loss = loss.sum() / avg_factor
-        else:
-            loss = loss.mean()
         return loss
 
 
@@ -85,8 +80,6 @@ class SigmoidFocalLoss(nn.Module):
             loss = weight * loss      
         if avg_factor is not None:
             loss = loss.sum() / avg_factor
-        else:
-            loss = loss.mean()
         return loss
 
 def focal_loss(pred, target, alpha, gamma):
@@ -108,8 +101,6 @@ class SmoothL1Loss(nn.Module):
             loss = weight * loss      
         if avg_factor is not None:
             loss = loss.sum() / avg_factor
-        else:
-            loss = loss.mean()
         return loss
 
 
@@ -139,8 +130,6 @@ class IouLoss(nn.Module):
             loss = weight * loss      
         if avg_factor is not None:
             loss = loss.sum() / avg_factor
-        else:
-            loss = loss.mean()
         return loss
 
 def iou_loss(pred, target):
