@@ -25,12 +25,10 @@ class MaxIouAssigner():
         self.min_pos_iou = min_pos_iou     #最小正样本阈值： 
         
     def assign(self, anchors, gt_bboxes, gt_labels):
-        # 计算ious
         ious = calc_ious_tensor(gt_bboxes, anchors)  # (m,4)(n,4)->(m,n),其中gt的m在行，n在列
         # 获取
         anchor_maxiou_for_all_gt, anchor_maxiou_idx_for_all_gt = ious.max(dim=0)  # (n,) (n,) torch的max既返回值，又返回idx
         gt_maxiou_for_all_anchor, gt_maxiou_idx_for_all_anchor = ious.max(dim=1) # (m,) (m,)
-
         # 基于规则指定每个anchor的身份, 创建anchor标识变量，先指定所有anchor为-1 (然后设置负样本=0，正样本=idx+1>0)
         num_anchors = ious.shape[1]
         assigned_gt_inds = ious.new_full((num_anchors, ), -1, dtype=torch.long)  # (n, ) 借用ious的device(cuda)
@@ -44,7 +42,6 @@ class MaxIouAssigner():
         # 这样确保每个gt至少有一个anchor对应
         for i, anchor_idx in enumerate(gt_maxiou_idx_for_all_anchor):
             assigned_gt_inds[anchor_idx] = i + 1   # 从0~k-1变到1～k,该值就代表了第几个gt 
-        
         # 转换正样本的标识从1~indx+1为真实gt_label
         if gt_labels is not None:
             assigned_gt_labels = ious.new_full((num_anchors, ), 0, dtype=torch.long) # (n, )

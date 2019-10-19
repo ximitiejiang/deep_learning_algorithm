@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from math import ceil
 from functools import partial
+from utils.init_weights import xavier_init
 from model.anchor_generator_lib import AnchorGenerator
 from model.loss_lib import SmoothL1Loss, CrossEntropyLoss, SigmoidBinaryCrossEntropyLoss
 from model.get_target_lib import get_anchor_target
@@ -99,7 +100,9 @@ class RetinaFaceHead(nn.Module):
                     base_sizes[i], scales, ratios, ctr=ctr, scale_major=False))
     
     def init_weights(self):
-        pass
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                xavier_init(m, distribution="uniform", bias=0)
     
     
     def forward(self, x):
