@@ -231,9 +231,9 @@ class SSDHead(nn.Module):
             bbox_preds.append(reg_conv(feat))   # (6,)(b,-1,4)
         cls_scores = torch.cat(cls_scores, dim=1)        # (b,-1,21)
         bbox_preds = torch.cat(bbox_preds, dim=1)        # (b,-1,4)
-        return cls_scores, bbox_preds 
+        return dict(cls_scores=cls_scores, bbox_preds=bbox_preds) 
     
-    def get_losses(self, cls_scores, bbox_preds, gt_bboxes, gt_labels, cfg):
+    def get_losses(self, cls_scores, bbox_preds, gt_bboxes, gt_labels, cfg, **kwargs): # 用kwargs兼容ldmk
         """在训练时基于前向计算结果，计算损失
         cls_scores: (b,-1,21)
         bbox_preds: (b,-1,4)
@@ -255,7 +255,7 @@ class SSDHead(nn.Module):
                                           cfg.assigner, cfg.sampler,
                                           self.target_means, self.target_stds)
         # 解析target
-        bboxes_t, bboxes_w, labels_t, labels_w, num_pos, num_neg = target_result  # (b,-1,4)x2, (b,-1)x2
+        bboxes_t, bboxes_w, labels_t, labels_w, _, _, num_pos, num_neg = target_result  # (b,-1,4)x2, (b,-1)x2
         
         # bbox回归损失
         pfunc = partial(self.loss_bbox, avg_factor=num_pos)

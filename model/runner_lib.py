@@ -22,6 +22,10 @@ def batch_detector(model, data, device, return_loss=True, **kwargs): # kwargs用
     imgs = to_device(data['img'], device)
     gt_bboxes = to_device(data['gt_bboxes'], device)
     gt_labels = to_device(data['gt_labels'], device)
+    if data.get('gt_landmarks', None) is not None:
+        gt_landmarks = to_device(data['gt_landmarks'], device)
+    else:
+        gt_landmarks = None
     img_metas = data['img_meta']
     # 计算模型输出
     if not return_loss:
@@ -31,7 +35,8 @@ def batch_detector(model, data, device, return_loss=True, **kwargs): # kwargs用
     if return_loss:
         losses = model(imgs, img_metas, 
                        gt_bboxes=gt_bboxes, 
-                       gt_labels=gt_labels, return_loss=True)  # 
+                       gt_labels=gt_labels, 
+                       gt_landmarks=gt_landmarks, return_loss=True)  # 
         # 损失缩减：先分别对每种loss进行batch内的求和，并对不同种loss进行求和。
         loss_sum = {}
         for name, value in zip(losses.keys(), losses.values()):

@@ -29,8 +29,10 @@ from model.backbone.alexnet_lib import AlexNet, AlexNet8
 from model.backbone.resnet_lib import ResNet
 from model.backbone.ssdvgg16_lib import SSDVGG16
 from model.backbone.fcnvgg16_lib import FCNVGG16
-from model.neck.neck_lib import FPN
+from model.backbone.mobilenet_lib import MobileNetV1
+from model.neck.neck_lib import FPN, FPNSSH
 from model.bbox_head.ssd_head import SSDHead
+from model.bbox_head.retinaface_head import RetinaFaceHead
 from model.bbox_head.fcos_head import FCOSHead
 from model.seg_head.fcn_head import FCN8sHead
 
@@ -53,10 +55,13 @@ models = {
         'alexnet8' : AlexNet8,
         'alexnet' : AlexNet,
         'resnet'  : ResNet,
+        'mobilenet_v1': MobileNetV1,
         'ssd_vgg16' : SSDVGG16,
         'fcn_vgg16' : FCNVGG16,
         'fpn' : FPN,
+        'fpnssh': FPNSSH,
         'ssd_head' : SSDHead,
+        'retinaface_head' : RetinaFaceHead,
         'fcos_head': FCOSHead,
         'fcn8s_head': FCN8sHead}
 

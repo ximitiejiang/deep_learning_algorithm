@@ -30,10 +30,8 @@ class WIDERFaceDataset(VOCDataset):
                '50--Celebration_Or_Party', '51--Dresses', '52--Photographers', '53--Raid', '54--Rescue', 
                '55--Sports_Coach_Trainer', '56--Voter', '57--Angler', '58--Hockey', '59--people--driving--car', 
                '61--Street_Battle', ]
-    def __init__(self, *args, landmark_file=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         # 增加landmark_file作为ann_file的替代
-        if landmark_file is not None:
-            self.landmark_file = landmark_file
         super().__init__( *args, **kwargs)
 
         

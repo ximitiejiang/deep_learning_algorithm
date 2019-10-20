@@ -13,11 +13,12 @@ from utils.init_weights import xavier_init
 from model.anchor_generator_lib import AnchorGenerator
 from model.loss_lib import SmoothL1Loss, CrossEntropyLoss, SigmoidBinaryCrossEntropyLoss
 from model.get_target_lib import get_anchor_target
+from model.bbox_head.ssd_head import ohem
 
 class ClassHead(nn.Module):
     """分类模块"""
     def __init__(self, in_channels, num_anchors, num_classes=2):
-        super.__init__()
+        super().__init__()
         self.num_classes = num_classes
         self.conv1x1 = nn.Conv2d(in_channels, num_anchors * num_classes, 1, stride=1, padding=0)
     
@@ -31,7 +32,7 @@ class ClassHead(nn.Module):
 class BboxHead(nn.Module):
     """bbox回归模块"""
     def __init__(self, in_channels, num_anchors):
-        super.__init__()
+        super().__init__()
         self.conv1x1 = nn.Conv2d(in_channels, num_anchors * 4, 1, stride=1, padding=0)
     
     def forward(self, x):
@@ -44,7 +45,7 @@ class BboxHead(nn.Module):
 class LandmarkHead(nn.Module):
     """landmark回归模块"""
     def __init__(self, in_channels, num_anchors, num_points):
-        super.__init__()
+        super().__init__()
         self.num_points = num_points
         self.conv1x1 = nn.Conv2d(in_channels, num_anchors * num_points, 1, stride=1, padding=0)
     
@@ -66,13 +67,17 @@ class RetinaFaceHead(nn.Module):
                  strides=(8, 16, 32),
                  scales=(1, 2),
                  ratios=(1),
-                 means=(0.,0.,0.,0.),
-                 stds=(0.1,0.1,0.1,0.1)):
+                 target_means=(0.,0.,0.,0.),
+                 target_stds=(0.1,0.1,0.1,0.1),
+                 neg_pos_ratio=3):
         super().__init__()
-        
-        self.means = means
-        self.stds = stds
+        self.strides = strides
+        self.target_means= target_means
+        self.target_stds = target_stds
+        self.neg_pos_ratio = neg_pos_ratio
         self.featmap_sizes = [[ceil(input_size[0]/stride), ceil(input_size[1]/stride)] for stride in strides]
+        scales = [scales] if isinstance(scales, int) else scales
+        ratios = [ratios] if isinstance(ratios, int) else ratios  # 如果输入的是单个数，比如2，或(2)，则需要转换成list
         num_anchors = len(scales) * len(ratios)
         # 定义分类回归头
         self.class_head = nn.ModuleList()
@@ -115,7 +120,7 @@ class RetinaFaceHead(nn.Module):
         ldmk_preds = [self.landmark_head[i](x[i]) for i in range(len(x))]
         ldmk_preds = torch.cat(ldmk_preds, dim=1) # (b,-1,10)
         
-        return tuple(cls_scores, bbox_preds, ldmk_preds)
+        return dict(cls_scores=cls_scores, bbox_preds=bbox_preds, ldmk_preds=ldmk_preds)
     
     
     def get_losses(self, cls_scores, bbox_preds, ldmk_preds, 
@@ -138,17 +143,25 @@ class RetinaFaceHead(nn.Module):
                     self.featmap_sizes[i], self.strides[i], device=device))   
 #        num_anchors = [len(anchor) for anchor in all_anchors]
         all_anchors = torch.cat(all_anchors, dim=0)
-        all_anchors = [all_anchors for _ in range(len(num_imgs))]
+        all_anchors = [all_anchors for _ in range(num_imgs)]
         # 开始计算target
         target_result = get_anchor_target(all_anchors, gt_bboxes, gt_labels, gt_landmarks,
                                           cfg.assigner, cfg.sampler, 
-                                          self.means, self.stds)
-        bboxes_t, _, labels_t, _, ldmk_t, *_ = target_result
+                                          self.target_means, self.target_stds)
+        bboxes_t, bboxes_w, labels_t, labels_w, ldmk_t, ldmk_w, num_pos, num_neg = target_result
         
-        # 计算损失
+        # 计算分类损失
         loss_cls = list(map(self.loss_cls_fn, cls_scores, labels_t))
-        loss_bbox = list(map(self.loss_bbox_fn, bbox_preds, bboxes_t))
-        loss_ldmk = list(map(self.loss_ldmk_fn, ))
+        loss_cls = [loss_cls[i] * labels_w[i].float() for i in range(len(loss_cls))]
+        pfunc = partial(ohem, neg_pos_ratio=self.neg_pos_ratio, avg_factor=num_pos)
+        loss_cls = list(map(pfunc, loss_cls, labels_t))
+        # 计算回归损失
+        pfunc = partial(self.loss_bbox_fn, avg_factor=num_pos)
+        loss_bbox = list(map(pfunc, bbox_preds, bboxes_t, bboxes_w))
+        # 计算关键点损失
+        pfunc = partial(self.loss_ldmk_fn, avg_factor=num_pos)
+        loss_ldmk = list(map(pfunc, ldmk_preds, ldmk_t, ldmk_w))
+        
         return dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_ldmk=loss_ldmk)
         
     

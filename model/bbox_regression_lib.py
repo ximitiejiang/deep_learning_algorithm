@@ -10,19 +10,22 @@ import numpy as np
 # %%
 def bbox2delta(prop, gt, means, stds):
     """把筛选出来的正样本anchor的坐标转换成偏差坐标dx,dy,dw,dh, 并做normalize
-
+    基本逻辑：由于神经网络从anchor中筛选出来的proposal是固定尺寸固定位置的，即使通过盒海战术能找到iou比较接近的，
+    但往往还是跟gt_bbox有一定的偏差，所以需要神经网络去学习到这种偏差，因此需要有这个delta(即偏差)转换过程。
+    偏差的求法很自然，但为了让偏差有一个统一的范围，实际是计算该偏差相对proposal的变化，也就是dx/w, dy/h, log(dw/w),log(dh/h)
+    
     基本逻辑：由前面的卷积网络可以得到预测xmin,ymin,xmax,ymax，并转化成px,py,pw,ph.
     此时存在一种变换dx,dy,dw,dh，可以让预测值变成gx',gy',gw',gh'且该值更接近gx,gy,gw,gh
     所以目标就变成找到dx,dy,dw,dh，寻找的方式就是dx=(gx-px)/pw, dy=(gy-py)/ph, dw=log(gw/pw), dh=log(gh/ph)
     因此卷积网络前向计算每次都得到xmin/ymin/xmax/ymax经过head转换成dx,dy,dw,dh，力图让loss最小使这个变换
     最后测试时head计算得到dx,dy,dw,dh，就可以通过delta2bbox()反过来得到xmin,ymin,xmax,ymax
     """
-    # 把xmin,ymin,xmax,ymax转换成x_ctr,y_ctr,w,h
+    # 把anchor的xmin,ymin,xmax,ymax转换成x_ctr,y_ctr,w,h
     px = (prop[...,0] + prop[...,2]) * 0.5
     py = (prop[...,1] + prop[...,3]) * 0.5
     pw = (prop[...,2] - prop[...,0]) + 1.0  
     ph = (prop[...,3] - prop[...,1]) + 1.0
-    
+    # 把gt的xmin,ymin,xmax,ymax转换成xctr,yctr,w,h
     gx = (gt[...,0] + gt[...,2]) * 0.5
     gy = (gt[...,1] + gt[...,3]) * 0.5
     gw = (gt[...,2] - gt[...,0]) + 1.0  
@@ -80,10 +83,36 @@ def delta2bbox(rois,
     bboxes = torch.stack([x1, y1, x2, y2], dim=-1).view_as(deltas)
     return bboxes
 
-# %%
-def landmark2delta():
-    pass
 
+# %%
+def landmark2delta(prop, gt, means, stds):
+    """把正样本anchor作为proposal, 其每个proposal对应landmark作为gt, 找到每个proposal相对gt的偏差，作为学习对象
+    args:
+        prop: (k, 4)代表propsal的anchor(有的算法取的是所有anchor，有的算法取的是正样本的anchor, 这里取正样本的anchor), xmin,ymin,xmax,ymax
+        gt: (k, 5, 2)代表每个proposal的anchor所对应的gt_landmark
+    """
+    # 把anchor的xmin,ymin,xmax,ymax转换成x_ctr,y_ctr,w,h
+    px = (prop[...,0] + prop[...,2]) * 0.5  
+    py = (prop[...,1] + prop[...,3]) * 0.5
+    pw = (prop[...,2] - prop[...,0]) + 1.0  
+    ph = (prop[...,3] - prop[...,1]) + 1.0
+    # 把proposal的坐标扩维度
+    px = px.reshape(-1, 1).expand(gt.size(0), gt.size(1))  # (41, 5)
+    py = py.reshape(-1, 1).expand(gt.size(0), gt.size(1))
+    pw = pw.reshape(-1, 1).expand(gt.size(0), gt.size(1))
+    ph = ph.reshape(-1, 1).expand(gt.size(0), gt.size(1))
+    # 计算偏差
+    dx = (gt[:, :, 0] - px) / pw   # (41, 5)
+    dy = (gt[:, :, 1] - py) / ph   # (41, 5)
+    deltas = torch.stack([dx, dy], dim=-1) # (41, 5, 2)
+    # 归一化
+    means = deltas.new_tensor(means[:2]).reshape(1,-1)   # (1,2)
+    stds = deltas.new_tensor(stds[:2]).reshape(1,-1)      # (1,2)
+    deltas = (deltas - means) / stds    # (n,5,2)-(1,2) / (1,2) -> (n,5,2) / (1,2) -> (n,5,2) 
+    # 展平便于计算loss
+    deltas = deltas.reshape(-1, 10)
+    return deltas  # (41, 10)
+    
 
 def delta2landmark():
     pass

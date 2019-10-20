@@ -17,17 +17,24 @@ def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list, gt_landmarks_
     """
     if gt_landmarks_list is None:
         gt_landmarks_list = [None for _ in anchor_list]
-    pfunc = partial(anchor_match_target, assigner_cfg=assigner_cfg, sampler_cfg=sampler_cfg, means=means, stds=stds)
+    pfunc = partial(anchor_match_target, assigner_cfg=assigner_cfg, 
+                    sampler_cfg=sampler_cfg, means=means, stds=stds)
     targets = list(map(pfunc, anchor_list, gt_bboxes_list, gt_labels_list, gt_landmarks_list))  # (b,) (6,)生成每张图的target
-
+    # targets里边(b,)每张图包含8个变量(8,)，提取相同变量进行堆叠
     bboxes_t = torch.stack([result[0] for result in targets])   # (b,-1,4)
     bboxes_w = torch.stack([result[1] for result in targets])   # (b,-1,4)
     labels_t = torch.stack([result[2] for result in targets])   # (b,-1)
     labels_w = torch.stack([result[3] for result in targets])   # (b,-1)
-    num_pos = sum([result[4].numel() for result in targets])    # (m,)
-    num_neg = sum([result[5].numel() for result in targets])    # (n,)  m+n = b * 8732
+    if targets[0][4] is not None:
+        ldmk_t = torch.stack([result[4] for result in targets])  # (b,-1,10)
+        ldmk_w = torch.stack([result[5] for result in targets])  # (b,-1,10)
+    else:
+        ldmk_t = None
+        ldmk_w = None
+    num_pos = sum([result[6].numel() for result in targets])    # (m,)
+    num_neg = sum([result[7].numel() for result in targets])    # (n,)  m+n = b * 8732
     
-    return bboxes_t, bboxes_w, labels_t, labels_w, num_pos, num_neg
+    return bboxes_t, bboxes_w, labels_t, labels_w, ldmk_t, ldmk_w, num_pos, num_neg
     
 
 def anchor_match_target(anchors, gt_bboxes, gt_labels, gt_ldmks,
@@ -60,11 +67,15 @@ def anchor_match_target(anchors, gt_bboxes, gt_labels, gt_ldmks,
     pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, means, stds)  # 
     bbox_targets[pos_inds] = pos_bbox_targets
     bbox_weights[pos_inds] = 1    
-
-    pos_gt_ldmks = gt_ldmks[pos_assigned_gt_inds]
-#    pos_ldmk_targets = landmark2delta(pos_bboxes, pos_gt_ldmks, means, stds)
-    ldmk_targets[pos_inds] = pos_ldmk_targets
-    ldmk_weights[pos_inds] = 1
+    # 把正样本landmark坐标转换成delta并填入
+    if gt_ldmks is not None:
+        pos_gt_ldmks = gt_ldmks[pos_assigned_gt_inds]  # (k, 5, 2) k为k个正样本
+        pos_ldmk_targets = landmark2delta(pos_bboxes, pos_gt_ldmks, means, stds)  # 展平操作在2delta里边完成, 从(16800,5,2)->(16800,10)
+        ldmk_targets[pos_inds] = pos_ldmk_targets
+        ldmk_weights[pos_inds] = 1
+    else:
+        ldmk_targets = None
+        ldmk_weights = None
     # 5. 把正样本labels填入
     label_targets[pos_inds] = gt_labels[pos_assigned_gt_inds] # 获得正样本对应label
     label_weights[pos_inds] = 1  # 这里设置正负样本权重都为=1， 如果有需要可以提高正样本权重
@@ -192,7 +203,7 @@ def get_centerness_target(pos_bbox_targets):
     return torch.sqrt(centerness_target)  # (k,)
     
 
-def get_points(featmap_sizes, strides, device):
+def get_points(featmap_sizes, strides, device=torch.device('cuda')):
     """计算一张图片所有特征子图的网格中心点坐标集合
     args:
         featmap_sizes: (n_level, )(h, w)

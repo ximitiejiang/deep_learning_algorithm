@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 from model.activation_lib import activation_dict
+from utils.init_weights import common_init_weights
 
 def conv_bn_relu(in_channels, out_channels, kernel_size, 
                  with_bn=False, activation='relu', with_maxpool=False, 
@@ -115,6 +116,9 @@ class FPN(nn.Module):
             x_in = outs[-1]
         
         return tuple(outs)
+    
+    def init_weights(self):
+        common_init_weights(self)
         
 
 # %%
@@ -208,6 +212,9 @@ class FPNSSH(nn.Module):
             layer = eval('self.ssh' + str(i))
             outs[i] = layer(outs[i])
         return outs
+    
+    def init_weights(self):
+        common_init_weights(self)
         
 
 if __name__ == '__main__':

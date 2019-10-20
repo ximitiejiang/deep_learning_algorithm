@@ -437,6 +437,14 @@
    参考：https://discuss.pytorch.org/t/oserror-errno-12-cannot-allocate-memory/24827/3
 
 
+### 训练中报错variable has been modified by an inplace operation：
+
+1. 详细报错信息如下：似乎leaky_relu输出设置成inplace方式不对。
+RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: 
+[torch.cuda.FloatTensor [8, 64, 40, 40]], which is output 0 of LeakyReluBackward1, is at version 2; expected version 1 instead. 
+Hint: enable anomaly detection to find the operation that failed to compute its gradient, with torch.autograd.set_detect_anomaly(True).
+
+
 ### 关于如何提高小物体的检测精度
 
 1. 小物体的检测精度不高，主要有2个原因，第一个是模型没有学习到，所以误检；第二个是模型学习到了但没有检测到，所以漏检
