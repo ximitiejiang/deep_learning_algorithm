@@ -85,25 +85,26 @@ class WIDERFaceDataset(VOCDataset):
         bboxes = []
         labels = []
         landmarks = []
-        for idx, info in enumerate(label_infos):
+        for i, info in enumerate(label_infos):
             # 提取bbox
             xmin = info[0]
             ymin = info[1]
             xmax = info[0] + info[2]
             ymax = info[1] + info[3]
-            bboxes.append([xmin, ymin, xmax, ymax])
             # 提取landmark
             point0 = [info[4], info[5]]
             point1 = [info[7], info[8]]
             point2 = [info[10], info[11]]
             point3 = [info[13], info[14]]
             point4 = [info[16], info[17]]
-            landmarks.append(np.array([point0, point1, point2, point3, point4]))
+            
             # 提取labels
             if point0[0] < 0:     # 如果没有landmark, 则标签定为-1
-                labels.append(-1)
-            else:
-                labels.append(1)# 如果没有landmark, 则标签定为1
+#                labels.append(-1)
+                continue  # TODO: 尝试不考虑label=-1的这种情况
+            bboxes.append([xmin, ymin, xmax, ymax])
+            labels.append(1)# 如果没有landmark, 则标签定为1
+            landmarks.append(np.array([point0, point1, point2, point3, point4]))
         
         return dict(bboxes=np.array(bboxes).astype(np.float32), 
                     labels=np.array(labels).astype(np.int64), 

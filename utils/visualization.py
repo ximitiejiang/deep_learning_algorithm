@@ -113,8 +113,7 @@ def vis_img_bbox(img, bboxes, labels, landmarks=None, class_names=None,
         cv2.rectangle(                  # 画方框
             img, left_top, right_bottom, random_colors[label].tolist(), 
             thickness=thickness)
-        label_text = class_names[       # 准备文字
-            label] if class_names is not None else 'cls {}'.format(label)
+        label_text = class_names[label] if class_names is not None else 'cls {}'.format(label)
         if len(bbox) > 4:
             label_text += ': {:.02f}'.format(bbox[-1])
             

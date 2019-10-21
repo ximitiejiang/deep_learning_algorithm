@@ -84,24 +84,24 @@ def imcrop(img, bboxes, labels, landmarks, size=(640,640)):
         ratio = max(w / width, h / height)  # 这里边有一个大于1
         w, h = math.ceil(w / ratio), math.ceil(h / ratio)
         
-    for _ in range(200):
+    for i in range(200):
         if w == width:
             l = 0
         else:
-            l = random.randrange(width - w)
+            l = random.randrange(width - w)  # 随机出左上角xmin
         if h == height:
             t = 0 
         else:
-            t = random.randrange(height - h)
+            t = random.randrange(height - h)  # 随机出左上角ymin
         # 得到切割的box坐标(xmin,ymin,xmax,ymax)
-        roi = np.array([l, t, l + w, t + h])  # (1, 1)
+        roi = np.array([l, t, l + w, t + h]).astype(np.int64)  # (1, 1)
         # 计算每个bbox跟roi的交集跟bbox自身的占比
         iof = calc_iof_np(bboxes, roi.reshape(1, -1))
         flag = (iof >= 1)
         if not flag.any():  # 如果任何一个占比都没有等于1， 说明没有任何box被包含在roi中，则重新随机一个roi
             continue
         # 保留那些bbox中心点在roi内部的bbox，其他bbox就去掉
-        centers = (bboxes[:, :2] + bboxes[:, 2:])
+        centers = (bboxes[:, :2] + bboxes[:, 2:]) / 2
         mask = np.logical_and(roi[:2] < centers, centers < roi[2:]).all(axis=1)
         bboxes_t = bboxes[mask]
         labels_t = labels[mask]
@@ -114,15 +114,15 @@ def imcrop(img, bboxes, labels, landmarks, size=(640,640)):
         bboxes_t[:, :2] = np.maximum(bboxes_t[:, :2], roi[:2])  # 找交集左上角点
         bboxes_t[:, :2] -= roi[:2]    # 坐标起点变为roi的左上角点
         bboxes_t[:, 2:] = np.minimum(bboxes_t[:, 2:], roi[2:])  # 找交集左上角点
-        bboxes_t[:, 2:] -= roi[2:]    # 坐标起点变为roi的左上角点
+        bboxes_t[:, 2:] -= roi[:2]    # 坐标起点也变为roi的左上角点
         
         landmarks_t[:, :, :2] = landmarks_t[:, :, :2] - roi[:2]  # 先把坐标变换到以roi为起点
-        landmarks_t[:, :, :2] = np.maximum(landmarks_t[:, :, :2], np.array([0, 0]))  # 左上角点如果比0,0小，说明在roi外边，则取0,0
+        landmarks_t[:, :, :2] = np.maximum(landmarks_t[:, :, :2], np.array([0, 0]))  # 左上角点如果比0小，说明在roi外边，则取0
         landmarks_t[:, :, :2] = np.minimum(landmarks_t[:, :, :2], roi[2:] - roi[:2]) # 右下角点如果比w,h大，也说明在roi外边，则取w,h        
         # TODO: 是否需要判断bbox的尺寸至少大于某个范围： 或者直接在数据集中进行过滤
         if bboxes_t.shape[0] == 0:
             continue
-        
+#        print('loops: ', i)
         return img_t, bboxes_t, labels_t, landmarks_t
     # 循环多次都没有随机到合适的图片，则返回原图
     return img, bboxes, labels, landmarks
@@ -513,7 +513,7 @@ class LandmarkTransform():
         self.to_tensor = to_tensor
         
     def __call__(self, landmarks, img_shape, scale_factor, flip):
-        gt_landmarks = landmarks * scale_factor[:2]  # (b,5,2)*(2,)->(b,5,2)
+        gt_landmarks = landmarks * scale_factor  # (b,5,2)*(2,)->(b,5,2)
         if flip:
             gt_landmarks = landmark_flip(gt_landmarks, img_shape, flip_type='h')
         if self.to_tensor:
@@ -653,10 +653,11 @@ def transform_inv(img, bboxes=None, labels=None, landmarks=None, mean=None, std=
     # chw to hwc
     img = img.transpose(1,2,0)
     img = np.ascontiguousarray(img)
+    # denormalize，该步必须在rgb做，因为mean/std的顺序是RGB
+    img = imdenormalize(img, mean, std)      
     # rgb to bgr
     img = img[..., [2,1,0]]     # 该步必须在hwc之后操作
-    # denormalize，该步必须在bgr之后做，因为mean/std的顺序是BGR顺序 (512,512,3) * (3,) + (3,)
-    img = imdenormalize(img, mean, std)  
+
     # 最后截取0-255的无符号整数
     img = np.clip(img, 0, 255).astype(np.uint8)  # 只有uint8的数据格式才能被opencv正确显示
     if show:

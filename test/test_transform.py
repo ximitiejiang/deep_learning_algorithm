@@ -19,7 +19,7 @@ if not path in sys.path:
 cfg_path = '/home/ubuntu/suliang_git/deep_learning_algorithm/demo/retinface_widerface/cfg_detector_retinaface_widerface.py'
 cfg = get_config(cfg_path)
 trainset = get_dataset(cfg.trainset, cfg.transform)
-tmp1 = trainset[91]
+tmp1 = trainset[191]  # tested id91(多人脸), 911(单人脸), 191(里边有-1)
 img = tmp1['img']
 label = tmp1['gt_labels']
 bbox = tmp1['gt_bboxes']

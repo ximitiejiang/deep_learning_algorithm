@@ -129,7 +129,8 @@ transform_val = dict(
         landmark_params=dict(
                 to_tensor=True))
 
-data_root_path='/media/ubuntu/4430C54630C53FA2/SuLiang/MyDatasets/WIDERFace/'
+#data_root_path='/media/ubuntu/4430C54630C53FA2/SuLiang/MyDatasets/WIDERFace/'
+data_root_path='/home/ubuntu/MyDatasets/WIDERFace/'
 trainset = dict(
         type='widerface',
         repeat=0,
