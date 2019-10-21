@@ -49,14 +49,16 @@ def calc_ious_np(bboxes1, bboxes2):
     """numpy版计算两组bboxes中每2个bbox之间的iou(包括所有组合，而不只是位置对应的bbox)
     bb1(m, 4), bb2(n, 4), 假定bb1是gt_bbox，则每个gt_bbox需要跟所有anchor计算iou，
     也就是提取每一个gt，因此先从bb1也就是bb1插入轴，(m,1,4),(n,4)->(m,n,4)，也可以先从bb2插入空轴则得到(n,m,4)"""
+    bb1 = bboxes1
+    bb2 = bboxes2
     # 在numpy环境操作(也可以用pytorch)
-    if isinstance(bboxes1, torch.Tensor):
-        bb1 = bboxes1.numpy()
-    if isinstance(bboxes2, torch.Tensor):
-        bb2 = bboxes2.numpy()
+    if isinstance(bb1, torch.Tensor):
+        bb1 = bb1.numpy()
+    if isinstance(bb2, torch.Tensor):
+        bb2 = bb2.numpy()
     # 计算重叠区域的左上角，右下角坐标
-    xymin = np.max(bb1[:, None, :2] , bb2[:, :2])  # (m,2)(n,2) -> (m,1, 2)(n,2) -> (m,n,2)
-    xymax = np.min(bb1[:, 2:] , bb2[:, None, 2:])  # (m,2)(n,2) -> (m,1, 2)(n,2) -> (m,n,2)
+    xymin = np.maximum(bb1[:, None, :2] , bb2[:, :2])  # (m,2)(n,2) -> (m,1, 2)(n,2) -> (m,n,2)
+    xymax = np.minimum(bb1[:, None, 2:] , bb2[:, 2:])  # (m,2)(n,2) -> (m,1, 2)(n,2) -> (m,n,2)
     # 计算重叠区域w,h
     wh = xymax - xymin # (m,n,2)-(m,n,2) = (m,n,2)
     # 计算重叠面积和两组bbox面积
@@ -67,3 +69,37 @@ def calc_ious_np(bboxes1, bboxes2):
     ious = area / (area1[:, None] + area2 - area)     #(m,n) /[(m,)+(1,n)-(m,n)] -> (m,n) / (m,n)
     
     return ious  # (m,n)
+
+
+# %%
+def calc_iof_np(bboxes, roi):
+    """计算bb1中每一个跟单个roi的交集跟自己bbox的占比多少，一般用来评估这些bbox是否包含在roi中。
+    iou = intersection over union交并比， 
+    iof= intersection over foreground针对前景的交并比
+    args:
+        bboxes: (m, 4)
+        roi: (n, 4)
+    returns:
+        iof: (m, n)
+    """
+    lt = np.maximum(bboxes[:, np.newaxis, :2], roi[:, :2])
+    rb = np.minimum(bboxes[:, np.newaxis, 2:], roi[:, 2:])
+    
+    area = np.prod(rb - lt, axis=2) * (lt < rb).all(axis=2)
+    area_1 = np.prod(bboxes[:, 2:] - bboxes[:, :2], axis=1)
+    iof = area / np.maximum(area_1[:, np.newaxis], 1)
+    return iof
+
+
+# %%
+if __name__ == '__main__':
+    bboxes = np.array([[0,0, 50, 50],
+                      [1,1, 100, 100]])
+    roi = np.array([[60,60,100,100],
+                    [40,40,80,80],
+                    [30,30,70,70]])
+    iof = calc_iof_np(bboxes, roi)    
+    
+    iou = calc_ious_np(bboxes, roi)
+    
+    

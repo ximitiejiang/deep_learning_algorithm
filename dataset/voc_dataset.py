@@ -178,10 +178,10 @@ class VOCDataset(BasePytorchDataset):
             gt_landmarks = ann_dict['landmarks']
         else:
             gt_landmarks = np.zeros((0, 0, 2))
-        
-        # TODO: 增加对gt_landmark的aug transform
+        # 先做数据预增强
         if self.aug_transform is not None:
-            img, gt_bboxes, gt_landmarks = self.aug_transform(img, gt_bboxes, gt_landmarks)
+            img, gt_bboxes, gt_labels, gt_landmarks = self.aug_transform(
+                    img, gt_bboxes, gt_labels, gt_landmarks)
         # basic transform
         if self.img_transform is not None:    
             # img transform

@@ -65,6 +65,68 @@ def onehot_to_label(one_hot_labels):
 
 
 # %% 图像相关变换
+import random
+import math
+from utils.ious import calc_iof_np
+def imcrop(img, bboxes, labels, landmarks, size=(640,640)):
+    """图片切割：在不改变太多图片尺寸的前提下获得某固定尺寸，rescale/resize都有可能较大改变图片尺寸导致bbox比例不受控。
+    所以往往可以先用crop把图片切割到比较接近需要的尺寸，然后在通过rescale/resize细调。
+    注意：切割需要保证至少有一个bbox在图片内部
+    args:
+        img: (h,w,c)
+        size: (w,h)注意这里统一跟imresize的定义方式一样，都是w,h
+    """
+    height, width = img.shape[:2]
+    w, h = size
+    height, width, w, h = float(height), float(width), float(w), float(h) 
+    # 如果要切的尺寸超过了原图尺寸，则先切出等比例缩小的size出来，等后边resize的时候再放大
+    if w > width or h > height:
+        ratio = max(w / width, h / height)  # 这里边有一个大于1
+        w, h = math.ceil(w / ratio), math.ceil(h / ratio)
+        
+    for _ in range(200):
+        if w == width:
+            l = 0
+        else:
+            l = random.randrange(width - w)
+        if h == height:
+            t = 0 
+        else:
+            t = random.randrange(height - h)
+        # 得到切割的box坐标(xmin,ymin,xmax,ymax)
+        roi = np.array([l, t, l + w, t + h])  # (1, 1)
+        # 计算每个bbox跟roi的交集跟bbox自身的占比
+        iof = calc_iof_np(bboxes, roi.reshape(1, -1))
+        flag = (iof >= 1)
+        if not flag.any():  # 如果任何一个占比都没有等于1， 说明没有任何box被包含在roi中，则重新随机一个roi
+            continue
+        # 保留那些bbox中心点在roi内部的bbox，其他bbox就去掉
+        centers = (bboxes[:, :2] + bboxes[:, 2:])
+        mask = np.logical_and(roi[:2] < centers, centers < roi[2:]).all(axis=1)
+        bboxes_t = bboxes[mask]
+        labels_t = labels[mask]
+        landmarks_t = landmarks[mask]
+        # 如果得不到的bbox
+        if bboxes_t.shape[0] == 0:
+            continue
+        # 用roi切割图片，bbox， landmark
+        img_t = img[roi[1]:roi[3], roi[0]:roi[2]]
+        bboxes_t[:, :2] = np.maximum(bboxes_t[:, :2], roi[:2])  # 找交集左上角点
+        bboxes_t[:, :2] -= roi[:2]    # 坐标起点变为roi的左上角点
+        bboxes_t[:, 2:] = np.minimum(bboxes_t[:, 2:], roi[2:])  # 找交集左上角点
+        bboxes_t[:, 2:] -= roi[2:]    # 坐标起点变为roi的左上角点
+        
+        landmarks_t[:, :, :2] = landmarks_t[:, :, :2] - roi[:2]  # 先把坐标变换到以roi为起点
+        landmarks_t[:, :, :2] = np.maximum(landmarks_t[:, :, :2], np.array([0, 0]))  # 左上角点如果比0,0小，说明在roi外边，则取0,0
+        landmarks_t[:, :, :2] = np.minimum(landmarks_t[:, :, :2], roi[2:] - roi[:2]) # 右下角点如果比w,h大，也说明在roi外边，则取w,h        
+        # TODO: 是否需要判断bbox的尺寸至少大于某个范围： 或者直接在数据集中进行过滤
+        if bboxes_t.shape[0] == 0:
+            continue
+        
+        return img_t, bboxes_t, labels_t, landmarks_t
+    # 循环多次都没有随机到合适的图片，则返回原图
+    return img, bboxes, labels, landmarks
+    
 
 def imresize(img, size, interpolation='bilinear', return_scale=False):
     """把图片img尺寸变换成指定尺寸，中间会造成宽高比例变化。
@@ -322,9 +384,17 @@ def label2color(img, pallete='voc'):
     
 # %% 变换类
 class AugTransform():
-    """数据增强变换"""
-    def __init__(self):
-        pass
+    """数据的预增强变换： 一般放在其他所有变换的前面，也称pre_augment
+    主要包括切割(crop)，预填充(expand)，颜色变换(distort)
+    """
+    def __init__(self, crop_size=None):
+        self.crop_size = crop_size
+    
+    def __call__(self, img, bboxes, labels, landmarks):
+        if self.crop_size:
+            img, bboxes, labels, landmarks = imcrop(img, bboxes, labels, landmarks, self.crop_size)
+        return img, bboxes, labels, landmarks
+
 
 class ImgTransform():
     """常规数据集都是hwc, bgr输出，但pytorch操作是在chw,rgb条件下进行。
@@ -554,7 +624,7 @@ class AugmentTransform():
 
 from utils.visualization import vis_img_bbox
 from utils.tools import get_time_str
-def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_names=None,show=False,save=None):
+def transform_inv(img, bboxes=None, labels=None, landmarks=None, mean=None, std=None, class_names=None,show=False,save=None):
     """图片和bbox的逆变换和显示，为了简化处理，不做scale/flip的逆变换，这样便于跟bbox统一比较
     注意，逆变换过程需要注意的地方很多，尽可能用这个函数完成。
     args:
@@ -576,6 +646,10 @@ def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_name
             labels = labels.cpu()
         bboxes = bboxes.numpy()
         labels = labels.numpy()
+    if landmarks is not None:
+        if isinstance(landmarks, torch.Tensor):
+            landmarks = landmarks.cpu()
+        landmarks = landmarks.numpy()
     # chw to hwc
     img = img.transpose(1,2,0)
     img = np.ascontiguousarray(img)
@@ -589,7 +663,7 @@ def transform_inv(img, bboxes=None, labels=None, mean=None, std=None, class_name
         if bboxes is None:  # 只显示img
             cv2.imshow('raw img', img)  # hwc, bgr
         else:   # 同时显示img,bboxes, labels
-            vis_img_bbox(img, bboxes, labels, class_names)
+            vis_img_bbox(img, bboxes, labels, landmarks, class_names)
     if save is not None:
         name = save + get_time_str() + '.jpg'
         cv2.imwrite(name, img)

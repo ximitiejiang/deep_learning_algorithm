@@ -116,7 +116,16 @@ class Runner():
         self.trainset = get_dataset(self.cfg.trainset, self.cfg.transform)
         self.valset = get_dataset(self.cfg.valset, self.cfg.transform_val) # 做验证的变换只做基础变换，不做数据增强
         
-#        tmp1 = self.trainset[91]  # for debug: 可查看dataset __getitem__
+#        tmp1 = self.trainset[91]      # for debug: 可查看dataset __getitem__
+#        img = tmp1['img']
+#        label = tmp1['gt_labels']
+#        bbox = tmp1['gt_bboxes']
+#        ldmk = tmp1['gt_landmarks']
+#        from utils.transform import transform_inv
+#        class_names = self.trainset.CLASSES
+#        label = label - 1 # 恢复从0为起点，从而跟CLASS匹配
+#        transform_inv(img, bbox, label, ldmk, mean=self.cfg.transform.img_params.mean, 
+#                      std=self.cfg.transform.img_params.std, class_names=class_names, show=True)
         
         #创建数据加载器
         self.dataloader = get_dataloader(self.trainset, 

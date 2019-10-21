@@ -90,7 +90,7 @@ def vis_loss_acc(buffer_dict, title='result: '):
 
 
 # %%
-def vis_img_bbox(img, bboxes, labels, class_names=None,
+def vis_img_bbox(img, bboxes, labels, landmarks=None, class_names=None,
         thickness=1, font_scale=0.5):
     """简化版显示img,bboxes,labels(无法筛选score置信度)
     img: (h,w,c)
@@ -106,7 +106,7 @@ def vis_img_bbox(img, bboxes, labels, class_names=None,
     color_list = color_list * 12  # 循环加长到84，可以显示80类的coco
     random_colors = np.stack(color_list, axis=0)  # (7,3)
     # 开始绘制
-    for bbox, label in zip(bboxes, labels):
+    for i, [bbox, label] in enumerate(zip(bboxes, labels)):
         bbox_int = bbox.astype(np.int32)
         left_top = (bbox_int[0], bbox_int[1])
         right_bottom = (bbox_int[2], bbox_int[3])
@@ -127,6 +127,9 @@ def vis_img_bbox(img, bboxes, labels, class_names=None,
         cv2.putText(
             img, label_text, (bbox_int[0], bbox_int[1] - 2),     # 字体选择cv2.FONT_HERSHEY_DUPLEX, 比cv2.FONT_HERSHEY_COMPLEX好一点
             cv2.FONT_HERSHEY_DUPLEX, font_scale, [255,255,255])
+        if landmarks is not None:
+            for point in landmarks[i]:
+                cv2.circle(img, tuple(point), 1, random_colors[label].tolist(), -1)  # 点必须以tuple格式输入才能显示，画填充圆需要设置最后一个为-1
     cv2.imshow('result', img)
     return img
 
