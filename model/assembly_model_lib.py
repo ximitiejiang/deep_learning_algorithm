@@ -71,8 +71,9 @@ class OneStageDetector(nn.Module):
             x = self.neck(x)
         outs = self.bbox_head(x)
         # 计算bbox，label
-        bbox_inputs = outs + (img_metas, self.cfg)
-        bbox_results, label_results = self.bbox_head.get_bboxes(*bbox_inputs)     # (k, 5), (k,)    
+#        bbox_inputs = outs + (img_metas, self.cfg)
+        bbox_results, label_results = self.bbox_head.get_bboxes(
+                **outs, cfg=self.cfg, img_metas=img_metas, **kwargs)     # (k, 5), (k,)    
         
         # 把结果格式转为numpy(因为后续做mAP评估都是在cpu端numpy方式评估)
         if len(imgs) == 1:

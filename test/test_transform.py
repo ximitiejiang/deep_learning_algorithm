@@ -19,13 +19,12 @@ if not path in sys.path:
 cfg_path = '/home/ubuntu/suliang_git/deep_learning_algorithm/demo/retinface_widerface/cfg_detector_retinaface_widerface.py'
 cfg = get_config(cfg_path)
 trainset = get_dataset(cfg.trainset, cfg.transform)
-tmp1 = trainset[191]  # tested id91(多人脸), 911(单人脸), 191(里边有-1)
+tmp1 = trainset[11291]  # tested id91(多人脸), 911(单人脸), 191(里边有-1), 9371(有一张侧脸)
 img = tmp1['img']
 label = tmp1['gt_labels']
 bbox = tmp1['gt_bboxes']
 ldmk = tmp1['gt_landmarks']
 from utils.transform import transform_inv
-class_names = trainset.CLASSES
-label = label - 1 # 恢复从0为起点，从而跟CLASS匹配
+label = label # 恢复从0为起点，从而跟CLASS匹配
 transform_inv(img, bbox, label, ldmk, mean=cfg.transform.img_params.mean, 
-              std=cfg.transform.img_params.std, class_names=class_names, show=True)
+              std=cfg.transform.img_params.std, class_names=None, show=True)

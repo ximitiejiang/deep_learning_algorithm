@@ -33,7 +33,7 @@ class MobileNetV1(nn.Module):
     """
     def __init__(self, 
                  pretrained=None,
-                 out_stages=(1, 2, 3)):
+                 out_stages=(0, 1, 2)):
         super().__init__()
         self.pretrained = pretrained
         self.out_stages = out_stages
@@ -72,7 +72,7 @@ class MobileNetV1(nn.Module):
         outs.append(x)
         x = self.stage3(x)
         outs.append(x)
-        outs = [outs[i-1] for i in self.out_stages]
+        outs = [outs[i] for i in self.out_stages]
         return outs
     
     
@@ -86,3 +86,4 @@ if __name__ == "__main__":
     model.init_weights()
     img = torch.randn(4, 3, 320, 320)
     outs = model(img)
+    outs[0].sum().backward() #反传也没in place的问题

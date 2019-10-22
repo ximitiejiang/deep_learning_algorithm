@@ -93,11 +93,8 @@ def calc_iof_np(bboxes, roi):
 
 # %%
 if __name__ == '__main__':
-    bboxes = np.array([[0,0, 50, 50],
-                      [1,1, 100, 100]])
-    roi = np.array([[60,60,100,100],
-                    [40,40,80,80],
-                    [30,30,70,70]])
+    bboxes = np.zeros((0,4))
+    roi = np.array([[60,60,100,100]])
     iof = calc_iof_np(bboxes, roi)    
     
     iou = calc_ious_np(bboxes, roi)

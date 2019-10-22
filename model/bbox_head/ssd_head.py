@@ -268,45 +268,9 @@ class SSDHead(nn.Module):
         loss_cls = list(map(pfunc, loss_cls, labels_t))   # (b,)
 
         return dict(loss_cls = loss_cls, loss_bbox = loss_bbox)  # {(b,), (b,)} 每张图对应一个分类损失值和一个回归损失值。
-             
-        
-#    def get_one_img_losses(self, cls_scores, bbox_preds, labels, label_weights, 
-#                           bbox_targets, bbox_weights, num_total_samples, 
-#                           neg_pos_ratio, cfg):
-#        """计算单张图的分类回归损失，需要解决3个问题：
-#        1. 为什么要引入负样本算损失？因为样本来自特征图，而特征图转换出来的子样本必然含有负样本，所以必须增加label=0的一类标签，作为21类做分类
-#        2. 为什么正负样本比例是1:3？
-#        3. 为什么损失值的平均因子是正样本个数？也就是单张图的分类损失和回归损失都用整个batch的正样本anchor个数进行了平均。
-#        args:
-#            cls_scores: (n_anchor, 21)
-#            bbox_preds: (n_anchor, 4)
-#            labels: (n_anchor,)
-#            label_weights: (n_anchor, )
-#            bbox_targets: (n_anchor, 4)
-#            bbox_weights: (n_anchor, 4)
-#            num_total_samples: 正样本数
-#            cfg
-#        """
-#        
-#        # 计算分类损失
-#        loss_cls = F.cross_entropy(cls_scores, labels, reduction="none") # (8732)
-#        loss_cls *= label_weights.float()  # (8732)
-#        # OHEM在线负样本挖掘：提取损失中数值最大的前k个，并保证正负样本比例1:3 
-#        loss_cls_pos, loss_cls_neg = ohem(loss_cls, labels, neg_pos_ratio)
-#        # 规约分类损失
-#        loss_cls_pos = loss_cls_pos.sum()
-#        loss_cls_neg = loss_cls_neg.sum()
-#        loss_cls = (loss_cls_pos + loss_cls_neg) / num_total_samples
-#        
-#        # 计算回归损失
-#        loss_reg = weighted_smooth_l1(bbox_preds, bbox_targets,
-#                                      bbox_weights,
-#                                      beta=cfg.loss_reg.beta,
-#                                      avg_factor=num_total_samples)  # ()
-#        return loss_cls, loss_reg
         
                 
-    def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg):
+    def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg, **kwargs):
         """在测试时基于前向计算结果，计算bbox预测类别和预测坐标，此时前向计算后不需要算loss，直接计算bbox的预测
         Args:
             cls_scores(6,)(b,c,h,w): 按层分组

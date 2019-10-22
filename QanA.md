@@ -381,6 +381,8 @@
 1. 原因在于自己初始化的一张图片img是(300, 300)，也就是一张灰度图，且被自己设置成黑色背景了，
    导致所有线条只要不是白色，就是黑色，完全淹没在背景中了。
 
+2. 另一个原因是：opencv显示的图片数据格式必须设置为uint8，否则显示不正确，这个问题也搞了好久。
+
 
 
 ### 其他一些犯过的错误
@@ -401,6 +403,8 @@
     
     - 逐iter查看分类损失和回归损失：一般分类损失较大(单图2~10之间，batch之和在20左右)，回归损失较小(单图1-2之间，batch之和在5左右)，总的loss在30以下。
       确保没有突然的激活变化。
+      
+    - 一个重要调试方法：哪里报错就在哪里设置print()打印可能的size,shape或者值，看看这种报错到底是什么值造成的，然后再取修正这种情况。
 
 4. 做预测也就是取获得get_bbox()的时候，输出的预测格式非常重要且容易出错。正常的预测输出单图预测一般是bbox_pred(k, 5), label_pred(k,)，
    其中bbox的5列包含4列坐标和1列置信度。但是这种输出并不便于进行mAP的计算，所以需要转换成另一种单图预测result(n_class, )(k, 5)，其中
@@ -410,19 +414,6 @@
 
 5. 报错了一个TypeError: 'torch.Size' object is not callable，我把那段程序从头到位看了20遍，一个字母一个字母对过去，也没发现问题在哪。
 然后找了个类似的不报错的程序，又一句话一句话复制粘贴替换，最后终于找到问题，我把data.shape[0]写成了data.shape(0)，这个错误浪费了我2个小时。
-
-
-
-### 关于训练完成以后的任务
-
-1. 模型训练完成以后，会有如下任务
-    - 评估数据集： 由于需要创建dataset/dataloader，所以采用独立函数eval_dataset_det()
-    
-    - 测试单张图片：无需创建数据集，但需要处理单图，所以统一用一个predictor类，初始化时创建模型，调用时计算输出
-    
-    - 测试多张图片：借用单张图片的predictor，以迭代器输出结果，再用vis_all显示
-    
-    - 测试摄像头和视频：借用单图predictor计算单帧，集成到vis_cam中
 
 
 ### 训练进行时突然报错，训练无法进行，验证也无法进行，然后定位到dataloader, 报错内容是OSError:[Errno 12] Cannot allocate memory
@@ -437,6 +428,14 @@
    参考：https://discuss.pytorch.org/t/oserror-errno-12-cannot-allocate-memory/24827/3
 
 
+### 训练中报错，gt_bboxes无法切片
+
+1. 这个问题之所以单独拿出来说，因为gt_bboxes的处理很容易在数据集处理时遗漏对特殊情况的处理，比如bboxes为空，这种情况会在模型中多处产生报错。
+所以一定要在数据集代码区把这个问题处理干净。好的办法是在__getitem__()方法中用while True来获取idx数据，如果len(bbox)=0则随机一个新的idx并continue，
+直到得到bbox正常的数据才return
+
+
+
 ### 训练中报错variable has been modified by an inplace operation：
 
 1. 详细报错信息如下：似乎leaky_relu输出设置成inplace方式不对。
@@ -444,7 +443,32 @@ RuntimeError: one of the variables needed for gradient computation has been modi
 [torch.cuda.FloatTensor [8, 64, 40, 40]], which is output 0 of LeakyReluBackward1, is at version 2; expected version 1 instead. 
 Hint: enable anomaly detection to find the operation that failed to compute its gradient, with torch.autograd.set_detect_anomaly(True).
 
+2. 该报错非常少见，后来在pytorch官网论坛上找到2个帖子，说明了这个问题产生原因：
+https://discuss.pytorch.org/t/encounter-the-runtimeerror-one-of-the-variables-needed-for-gradient-computation-has-been-modified-by-an-inplace-operation/836
+https://discuss.pytorch.org/t/defining-my-model-encounter-a-runtimeerror-one-of-the-variables-needed-for-gradient-computation-has-been-modified-by-an-inplace-operation/27266
 
+原因分析：
+主要是在代码定义时，把某些需要反向传播的变量进行了修改，比如x += 1这是一种in place操作，而x = x + 1则不是in place操作，
+而是先操作再赋值。对于in place的操作如果该变量同时又被别的操作所引用产生修改，就会打乱反向传播，造成错误。
+
+所以我反复寻找代码中类似x +=的操作，最后在FPNSSH中找到一处，fpn_outs[i-1] += F.interpolate(fpn_outs[i], scale_factor=1, mode='nearest')
+改成fpn_outs[i-1] = fpn_outs[i-1] + F.interpolate(fpn_outs[i], scale_factor=2, mode='nearest')即可
+
+
+
+
+### 关于训练完成以后的任务
+
+1. 模型训练完成以后，会有如下任务
+    - 评估数据集： 由于需要创建dataset/dataloader，所以采用独立函数eval_dataset_det()
+    
+    - 测试单张图片：无需创建数据集，但需要处理单图，所以统一用一个predictor类，初始化时创建模型，调用时计算输出
+    
+    - 测试多张图片：借用单张图片的predictor，以迭代器输出结果，再用vis_all显示
+    
+    - 测试摄像头和视频：借用单图predictor计算单帧，集成到vis_cam中
+    
+    
 ### 关于如何提高小物体的检测精度
 
 1. 小物体的检测精度不高，主要有2个原因，第一个是模型没有学习到，所以误检；第二个是模型学习到了但没有检测到，所以漏检

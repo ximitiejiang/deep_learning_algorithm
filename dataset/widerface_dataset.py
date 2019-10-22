@@ -14,6 +14,11 @@ class WIDERFaceDataset(VOCDataset):
     原始下载数据集不能直接使用，需要采用转换成voc格式的xml标注文件，参考：
     https://github.com/open-mmlab/mmdetection/tree/master/configs/wider_face
     https://github.com/sovrasov/wider-face-pascal-voc-annotations
+    对landmark的说明：最原始论文作者repo是https://github.com/deepinsight/insightface/blob/master/RetinaFace/rcnn/dataset/retinaface.py
+    讨论在：https://github.com/deepinsight/insightface/issues/664， https://github.com/deepinsight/insightface/issues/889
+        - labels有3种：-1表示缺少landmark，通常都是因为bbox太小，所以可以直接忽略为背景
+                        0表示很清晰的landmark
+                        1表示不够清晰的landmark，但依然标注了，通常把label=0/1都作为正样本进行训练
     """
     CLASSES = ('face', )
     
@@ -85,6 +90,7 @@ class WIDERFaceDataset(VOCDataset):
         bboxes = []
         labels = []
         landmarks = []
+
         for i, info in enumerate(label_infos):
             # 提取bbox
             xmin = info[0]
@@ -97,15 +103,17 @@ class WIDERFaceDataset(VOCDataset):
             point2 = [info[10], info[11]]
             point3 = [info[13], info[14]]
             point4 = [info[16], info[17]]
-            
             # 提取labels
-            if point0[0] < 0:     # 如果没有landmark, 则标签定为-1
-#                labels.append(-1)
-                continue  # TODO: 尝试不考虑label=-1的这种情况
+            if point0[0] < 0:     # 没有landmark
+                continue
+            else:
+                labels.append(1)  # 其他2种情况，比如label=0(清晰landmark)和label=1(不够清晰但已标记)都算作label=1
             bboxes.append([xmin, ymin, xmax, ymax])
-            labels.append(1)# 如果没有landmark, 则标签定为1
             landmarks.append(np.array([point0, point1, point2, point3, point4]))
-        
+        if len(bboxes) == 0:
+            bboxes = np.zeros((0, 4))
+            labels = [0]
+            landmarks = np.zeros((5, 2))           
         return dict(bboxes=np.array(bboxes).astype(np.float32), 
                     labels=np.array(labels).astype(np.int64), 
                     landmarks=np.array(landmarks).astype(np.float32))

@@ -95,7 +95,7 @@ class RetinaFaceHead(nn.Module):
         # 定义损失函数
         self.loss_cls_fn = CrossEntropyLoss()
         self.loss_bbox_fn = SmoothL1Loss()
-        self.loss_ldmk_fn = SigmoidBinaryCrossEntropyLoss()
+        self.loss_ldmk_fn = SmoothL1Loss()
         
         # 定义anchors
         self.anchor_generators = []
@@ -124,7 +124,7 @@ class RetinaFaceHead(nn.Module):
     
     
     def get_losses(self, cls_scores, bbox_preds, ldmk_preds, 
-                   gt_bboxes, gt_labels, gt_landmarks, cfg):
+                   gt_bboxes, gt_labels, gt_landmarks, cfg, **kwargs):
         """计算损失，通过anchors把3组gt数据转化成target数据，然后分别跟3组预测数据计算损失
         args:
             cls_scores: (b,-1,2)
@@ -151,19 +151,63 @@ class RetinaFaceHead(nn.Module):
         bboxes_t, bboxes_w, labels_t, labels_w, ldmk_t, ldmk_w, num_pos, num_neg = target_result
         
         # 计算分类损失
-        loss_cls = list(map(self.loss_cls_fn, cls_scores, labels_t))
+        loss_cls = list(map(self.loss_cls_fn, cls_scores, labels_t))   # (b,-1,2) and (b,-1)
         loss_cls = [loss_cls[i] * labels_w[i].float() for i in range(len(loss_cls))]
         pfunc = partial(ohem, neg_pos_ratio=self.neg_pos_ratio, avg_factor=num_pos)
         loss_cls = list(map(pfunc, loss_cls, labels_t))
-        # 计算回归损失
-        pfunc = partial(self.loss_bbox_fn, avg_factor=num_pos)
-        loss_bbox = list(map(pfunc, bbox_preds, bboxes_t, bboxes_w))
+        # 计算回归损失: 注意回归损失增加了一个倍数2的权重
+        pfunc = partial(self.loss_bbox_fn, avg_factor=num_pos)         
+        loss_bbox = 2 * list(map(pfunc, bbox_preds, bboxes_t, bboxes_w))    # (b,-1,4) and (b,-1,4)
         # 计算关键点损失
         pfunc = partial(self.loss_ldmk_fn, avg_factor=num_pos)
-        loss_ldmk = list(map(pfunc, ldmk_preds, ldmk_t, ldmk_w))
+        loss_ldmk = list(map(pfunc, ldmk_preds, ldmk_t, ldmk_w))         # (b,-1,10) and (b,-1,10)
         
         return dict(loss_cls=loss_cls, loss_bbox=loss_bbox, loss_ldmk=loss_ldmk)
         
     
-    def get_bboxes(self):
-        pass
+    def get_bboxes(self, cls_scores, bbox_preds, ldmk_preds, img_metas, cfg, *kwargs):
+        """在测试时基于前向计算结果，计算bbox预测类别和预测坐标，此时前向计算后不需要算loss，直接计算bbox的预测
+        Args:
+            cls_scores: (b,-1,2)
+            bbox_preds: (b,-1,4)
+            ldmk_preds: (b,-1,10)
+            img_metas:(b,)
+            cfg:
+        """
+        # 获得每层的grid-anchors
+        # 准备anchors
+        num_imgs = len(img_metas)
+        all_anchors = []
+        for i in range(len(self.featmap_sizes)):
+            device = cls_scores.device
+            all_anchors.append(self.anchor_generators[i].grid_anchors(
+                    self.featmap_sizes[i], self.strides[i], device=device))   
+#        num_anchors = [len(anchor) for anchor in all_anchors]
+        all_anchors = torch.cat(all_anchors, dim=0)
+        all_anchors = [all_anchors for _ in range(num_imgs)]
+#        featmap_sizes = [featmap.size() for featmap in cls_scores]
+#        num_imgs = len(img_metas)
+#        num_levels = len(cls_scores)
+#        multi_layer_anchors = []
+#        device = cls_scores[0].device
+#        for i in range(len(featmap_sizes)):
+#            anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i][2:], 
+#                                            self.anchor_strides[i], device=device)
+#            multi_layer_anchors.append(anchors)  # (6,)(k, 4)
+        
+        # 计算每张图的bbox预测
+        bbox_results = [] 
+        label_results = []
+        for img_id in range(num_imgs):
+            # 去掉batch这个维度，生成单图数据：(6,)(b,c,h,w)->(6,)(c,h,w)
+            cls_score_per_img = [cls_scores[i][img_id].detach() for i in range(num_levels)]
+            bbox_pred_per_img = [bbox_preds[i][img_id].detach() for i in range(num_levels)]
+            
+            img_shape = img_metas[img_id]['scale_shape']     # 这里传入scale_shape是用来clamp转换出来的bbox的坐标范围防止超出图片。
+            scale_factor = img_metas[img_id]['scale_factor'] # scale factor直接判断
+            bbox_result, label_result = self.get_one_img_bboxes(cls_score_per_img, bbox_pred_per_img,
+                                                                multi_layer_anchors, img_shape,
+                                                                scale_factor, cfg)
+            bbox_results.append(bbox_result)
+            label_results.append(label_result)
+        return bbox_results, label_results  

@@ -203,6 +203,7 @@ class Runner():
             self.lr_processor.set_regular_lr_group()  # 设置常规学习率(计算出来并填入optimizer)
             for self.c_iter, data_batch in enumerate(self.dataloader):
                 self.lr_processor.set_warmup_lr_group() # 设置热身学习率(计算出来并填入optimizer)
+                self.optimizer.zero_grad()       # 每个batch的梯度清零
                 # 前向计算
                 outputs = self.batch_processor(self.model, 
                                                data_batch, 
@@ -211,7 +212,6 @@ class Runner():
                 # 反向传播: 注意随时检查梯度是否爆炸
                 outputs['loss'].backward()  # 更新反向传播, 用数值loss进行backward()      
                 self.optimizer.step()   
-                self.optimizer.zero_grad()       # 每个batch的梯度清零
                 # 存放结果
                 self.buffer['loss'].append(outputs.get('loss', torch.tensor(0.)))
                 self.buffer['acc1'].append(outputs.get('acc1', torch.tensor(0.)))

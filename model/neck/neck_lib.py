@@ -163,8 +163,8 @@ class SSH(nn.Module):
         out5x5_tmp = self.conv5x5_1(x)
         out5x5 = self.conv5x5_2(out5x5_tmp)
     
-        out7x7 = self.conv7x7_2(out5x5_tmp)
-        out7x7 = self.conv7x7_3(out7x7)
+        out7x7_tmp = self.conv7x7_2(out5x5_tmp)
+        out7x7 = self.conv7x7_3(out7x7_tmp)
         
         out = torch.cat([out3x3, out5x5, out7x7], dim=1)  # 注意这里dim=1, 因为是在通道方向堆叠(b,c,h,w) c的dim=1
         out = F.relu(out)
@@ -195,23 +195,25 @@ class FPNSSH(nn.Module):
     
     
     def forward(self, x):
-        outs = []
+        fpn_outs = []
         # 计算水平变换
         for i in range(self.num_outs):
             layer = eval('self.lateral' + str(i))
-            outs.append(layer(x[i]))
+            fpn_outs.append(layer(x[i]))
         # 计算上采样和叠加
-        for i in range(len(outs)-1, 0, -1):
-            outs[i-1] += F.interpolate(outs[i], scale_factor=2, mode='nearest')
+        for i in range(len(fpn_outs)-1, 0, -1):
+            fpn_outs[i-1] = fpn_outs[i-1] + F.interpolate(fpn_outs[i], scale_factor=2, mode='nearest')
         # 计算fpn
         for i in range(self.num_outs - 1):
             layer = eval('self.fpn' + str(i))
-            outs[i] = layer(outs[i])
+            fpn_outs[i] = layer(fpn_outs[i])
         # 计算SSH
+        ssh_outs = []
         for i in range(self.num_outs):
             layer = eval('self.ssh' + str(i))
-            outs[i] = layer(outs[i])
-        return outs
+            ssh_outs.append(layer(fpn_outs[i]))
+        return ssh_outs
+    
     
     def init_weights(self):
         common_init_weights(self)

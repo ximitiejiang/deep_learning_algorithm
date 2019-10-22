@@ -82,7 +82,7 @@ def imcrop(img, bboxes, labels, landmarks, size=(640,640)):
     # 如果要切的尺寸超过了原图尺寸，则先切出等比例缩小的size出来，等后边resize的时候再放大
     if w > width or h > height:
         ratio = max(w / width, h / height)  # 这里边有一个大于1
-        w, h = math.ceil(w / ratio), math.ceil(h / ratio)
+        w, h = math.floor(w / ratio), math.floor(h / ratio)
         
     for i in range(200):
         if w == width:
@@ -120,11 +120,9 @@ def imcrop(img, bboxes, labels, landmarks, size=(640,640)):
         landmarks_t[:, :, :2] = np.maximum(landmarks_t[:, :, :2], np.array([0, 0]))  # 左上角点如果比0小，说明在roi外边，则取0
         landmarks_t[:, :, :2] = np.minimum(landmarks_t[:, :, :2], roi[2:] - roi[:2]) # 右下角点如果比w,h大，也说明在roi外边，则取w,h        
         # TODO: 是否需要判断bbox的尺寸至少大于某个范围： 或者直接在数据集中进行过滤
-        if bboxes_t.shape[0] == 0:
-            continue
 #        print('loops: ', i)
         return img_t, bboxes_t, labels_t, landmarks_t
-    # 循环多次都没有随机到合适的图片，则返回原图
+    # 循环多次都没有随机到合适的图片，则返回原图，用resize把原图变为640*640，此时bbox会有比例的变化，不是一种好的结果。
     return img, bboxes, labels, landmarks
     
 
@@ -175,7 +173,7 @@ def imrescale(img, scales, interpolation='bilinear', return_scale=True):
 #    show_scale_compare((img.shape[1],img.shape[0]), new_size, scales)
     
     if return_scale:
-        return new_img, scale_factor
+        return new_img, scale_factor  # 此时scale在w,h方向上相等
     else:
         return new_img
 
@@ -440,6 +438,7 @@ class ImgTransform():
             img = imnormalize(img, self.mean, self.std)
         if self.scale is not None and self.keep_ratio: # 如果是固定比例缩放
             img, scale_factor = imrescale(img, self.scale, return_scale=True)
+            scale_factor = np.array([scale_factor, scale_factor, scale_factor, scale_factor], dtype=np.float32)
         elif self.scale is not None and not self.keep_ratio: #　如果不固定比例缩放
             img, w_scale, h_scale = imresize(img, self.scale, return_scale=True)
             scale_factor = np.array([w_scale, h_scale, w_scale, h_scale], dtype=np.float32) #变成4个scale目的是提供bbox的xmin/ymin/xmax/ymax的缩放比例
@@ -513,7 +512,7 @@ class LandmarkTransform():
         self.to_tensor = to_tensor
         
     def __call__(self, landmarks, img_shape, scale_factor, flip):
-        gt_landmarks = landmarks * scale_factor  # (b,5,2)*(2,)->(b,5,2)
+        gt_landmarks = landmarks * scale_factor[:2]  # (b,5,2)*(2,)->(b,5,2)
         if flip:
             gt_landmarks = landmark_flip(gt_landmarks, img_shape, flip_type='h')
         if self.to_tensor:

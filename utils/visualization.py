@@ -113,7 +113,7 @@ def vis_img_bbox(img, bboxes, labels, landmarks=None, class_names=None,
         cv2.rectangle(                  # 画方框
             img, left_top, right_bottom, random_colors[label].tolist(), 
             thickness=thickness)
-        label_text = class_names[label] if class_names is not None else 'cls {}'.format(label)
+        label_text = class_names[label] if class_names is not None else '{}'.format(label)
         if len(bbox) > 4:
             label_text += ': {:.02f}'.format(bbox[-1])
             
@@ -163,7 +163,7 @@ def vis_bbox(bboxes, img=None):
 
 
 def vis_all_opencv(img, bboxes, scores, labels, class_names=None, score_thr=0, 
-                    instance_colors=None, thickness=1, font_scale=0.6,
+                    instance_colors=None, thickness=1, font_scale=0.5,
                     show=['img','bbox','label'], win_name='cam', 
                     wait_time=0, saveto=None): # 如果输出到文件中则指定路径
     """采用opencv作为底层显示img/bbox/labels
