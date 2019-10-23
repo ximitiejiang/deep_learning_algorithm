@@ -64,36 +64,32 @@ class OneStageDetector(nn.Module):
     def forward_test(self, imgs, img_metas, **kwargs):
         """测试过程的前向计算的底层函数: 只支持单张图片，如果多张图片则需要自定义循环
         """
-        # TODO: 测试过程只需要前向计算而不需要反向传播，是否可以缩减模型尺寸?
         # 特征提取
         x = self.backbone(imgs)
         if self.cfg.neck:
             x = self.neck(x)
         outs = self.bbox_head(x)
         # 计算bbox，label
-#        bbox_inputs = outs + (img_metas, self.cfg)
-        bbox_results, label_results = self.bbox_head.get_bboxes(
-                **outs, cfg=self.cfg, img_metas=img_metas, **kwargs)     # (k, 5), (k,)    
-        
-        # 把结果格式转为numpy(因为后续做mAP评估都是在cpu端numpy方式评估)
-        if len(imgs) == 1:
-            bbox_results = bbox_results[0]
-            label_results = label_results[0]
+        dets = self.bbox_head.get_bboxes(
+                **outs, cfg=self.cfg, img_metas=img_metas, **kwargs) # dict (n_cls,)(m,5)   (n_cls,)(m,)  (n_cls,)(m,10)   
+        # 把结果格式转为numpy(因为后续做mAP评估都是在cpu端numpy方式评估
+#        if dets['bboxes'].shape[0] == 0:
+#            bboxes = np.zeros((0, 5), dtype=np.float32)
+        bboxes = [bbox.cpu().numpy() for bbox in dets['bboxes']]
+        labels = [label.cpu().numpy() for label in dets['labels']]
+        ldmks = [ldmk.cpu().numpy() for ldmk in dets['ldmks']]
+#        # 把结果格式从(k, 5)->(20,)(c,5)
+#        det_bboxes = []
+#        det_labels = []
+#        det_ldmks = []
+#        for i in range(self.bbox_head.num_classes - 1): # 因为预测时的负样本(0)已经被筛掉了，所以这里只找20类range(20)
+#            inds = labels == i + 1    # 注意：从数据集出来到训练以及预测的标签取值范围永远是1-20
+#            det_labels.append(labels[inds, :])
+#            det_bboxes.append(bboxes[inds, :])
+#            det_ldmks.append(ldmks[inds, :])
             
-            if bbox_results.shape[0] == 0:
-                bbox_results = np.zeros((0, 5), dtype=np.float32)
-            else:
-                bbox_results = bbox_results.cpu().numpy()
-                label_results = label_results.cpu().numpy()
-            # 把结果格式从(k, 5)->(20,)(c,5)
-            bbox_det = []
-            for i in range(self.bbox_head.num_classes - 1): # 因为预测时的负样本(0)已经被筛掉了，所以这里只找20类range(20)
-                inds = label_results == i + 1    # 注意：从数据集出来到训练以及预测的标签取值范围永远是1-20
-                bbox_det.append(bbox_results[inds, :])
-            
-            return bbox_det # (n_class,)(k, 5)  不在返回labels了，因为顺序就是labels的号
-        else:
-            raise ValueError('currently only one batch size supported for test.')
+        return dict(bboxes=bboxes, labels=labels, ldmks=ldmks) # bbox(n_cls,)(k, 5)  ldmk(n_cls,)(k,5,2)
+    
 
 
 # %%

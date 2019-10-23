@@ -94,13 +94,13 @@ class DetPredictor():
             img_data = img_loader(img, self.cfg)
             with torch.no_grad():
                 with timer('predict one img'):  # 检测一张图片的时间
-                    bbox_det = self.model(**img_data, return_loss=False)  # (n_class,)(k,5)
-                # 整理成显示需要的形式
-                labels = [np.full((bbox.shape[0],), i, dtype=np.int32) for i, bbox in enumerate(bbox_det)] # 用i作为label填充，由于要获取class name,这里label改成0-19
-                labels = np.concatenate(labels, axis=0)  # (m, )
-                bboxes = np.concatenate(bbox_det, axis=0)  # (m,5)
-                scores = bboxes[:, -1]   # (m,)
-                yield (img, bboxes, scores, labels)
+                    dets = self.model(**img_data, return_loss=False)  # (n_class,)(k,5)
+                # 把按类别的数据合并(这里不需要按类别，只有在evaluation才需要)
+                labels = np.concatenate(dets['labels'], axis=0) - 1  # (m, ) 恢复到0为起点
+                bboxes = np.concatenate(dets['bboxes'], axis=0)  # (m,5)
+                scores = bboxes[:, -1]                           # (m,)
+                ldmks = np.concatenate(dets['ldmks'], axis=0)    # (m,10)
+                yield (img, bboxes, scores, labels, ldmks)
 
 
 # %% 分割模型的评估

@@ -137,14 +137,14 @@ def parse_log(path, show=True):
     with open(path) as f:
         lines = f.readlines()
         data_dict = {'loss': [],
-                     'acc': []}
+                     'acc1': []}
         lines = lines[2:]  # 去除开始2行
         lines = lines[:-1] # 去除最后一行
         for line in lines:
-            loss = float(line.split('\t')[-3].split(' ')[-1])
-            acc = float(line.split('\t')[-2].split(' ')[-1])
+            loss = float(line.split('\t')[1].split(',')[0].split(' ')[-1])
+            acc = float(line.split('\t')[1].split(',')[-1].split(' ')[-1])
             data_dict['loss'].append(loss)
-            data_dict['acc'].append(acc)
+            data_dict['acc1'].append(acc)
     
     if show:
         vis_loss_acc(data_dict)

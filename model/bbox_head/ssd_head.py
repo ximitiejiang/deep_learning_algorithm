@@ -17,7 +17,7 @@ from model.anchor_generator_lib import AnchorGenerator
 from utils.init_weights import xavier_init
 from model.loss_lib import CrossEntropyLoss, SmoothL1Loss
 from model.bbox_regression_lib import delta2bbox
-from model.nms_lib import nms_operation
+from model.nms_lib import nms_wrapper
 from model.bbox_regression_lib import lrtb2bbox
 from model.loss_lib import IouLoss, SigmoidBinaryCrossEntropyLoss, SigmoidFocalLoss
 
@@ -340,26 +340,10 @@ class SSDHead(nn.Module):
         # 训练是基于scale之后img进行的，而最终得到的bbox需要在原图显示，所以要缩放回原图比例
         multi_layer_bboxes = multi_layer_bboxes / multi_layer_bboxes.new_tensor(scale_factor)  # (b,4)/(4,) = (b, 4)
         # 进行nms, 同时生成标签
-        det_bboxes, det_labels = nms_operation(multi_layer_bboxes, multi_layer_scores, **cfg.nms)
+        det_bboxes, det_labels = nms_wrapper(multi_layer_bboxes, multi_layer_scores, **cfg.nms)
         
         return det_bboxes, det_labels  # 坐标和置信度(k,5), 标签(k,)
 
-    
-        
-# %%           
-    
-class RetinaHead(SSDHead):
-    """retina head"""
-    def __init__(self, 
-                 input_size,
-                 num_classes=21,
-                 in_channels=256,
-                 base_scale=4,
-                 loss_cls_cfg=None,
-                 loss_reg_cfg=None,
-                 **kwargs):
-        
-        super().__init__()
         
 
 # %%

@@ -37,4 +37,4 @@ COCO_CLASSES = [
         'scissors', 'teddy_bear', 'hair_drier', 'toothbrush'
     ]
 
-WIDERFACE_CLASSES = ['face']
+WIDERFACE_CLASSES = ['face',]

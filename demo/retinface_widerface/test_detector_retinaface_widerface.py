@@ -22,13 +22,16 @@ def train_retinaface_widerface(cfg, resume_from=None):
     
 if __name__ == "__main__":
     
-    task = 'train'
+    task = 'log'
     cfg_path = './cfg_detector_retinaface_widerface.py'
     cfg = get_config(cfg_path)
     
+    if task == 'log':
+        parse_log(path = '/home/ubuntu/mytrain/retinaface_widerface/20191022_182716.log')
+    
     if task == 'train':  # 模型训练
         train_retinaface_widerface(cfg,
-                                   resume_from = None)
+                                   resume_from = '/home/ubuntu/mytrain/retinaface_widerface/epoch_9.pth')
     
 #    if task == 'eval':  # 数据集评估
 #        parse_log('/home/ubuntu/mytrain/ssd_vgg_widerface/20191008_211622.log')
@@ -43,14 +46,14 @@ if __name__ == "__main__":
 #                         load_device='cuda',
 #                         result_file='/home/ubuntu/mytrain/ssd_vgg_voc/20190928_084133_eval_result.pkl')
 #    
-#    if task == 'test':  # 测试单张图或多张图的结果
-#        img = cv2.imread('/home/ubuntu/MyDatasets/misc/26.jpg')
-#        predictor = DetPredictor(cfg_path,                         
-#                              load_from = '/home/ubuntu/mytrain/ssd_vgg_widerface/epoch_9.pth',
-#                              load_device='cpu')
-#        for results in predictor([img]):
-#            vis_all_opencv(*results, class_names=get_classes('widerface'), 
-#                           score_thr=0.25, show=['img','bbox'])
+    if task == 'test':  # 测试单张图或多张图的结果
+        img = cv2.imread('/home/ubuntu/MyDatasets/misc/26.jpg')
+        predictor = DetPredictor(cfg_path,                         
+                              load_from = '/home/ubuntu/mytrain/retinaface_widerface/epoch_9.pth',
+                              load_device='cpu')
+        for results in predictor([img]):
+            vis_all_opencv(*results, class_names=get_classes('widerface'), 
+                           score_thr=0.1, show=['img','bbox','label','landmark'])
 #    
 #    # 针对widerface的训练结果模型，对小脸比较有效，但对大脸效果很差，因为数据集里边大部分都是小脸，大脸数据太少。
 #    # 所以靠近摄像头反而检不出来，远离摄像头就能检出来。

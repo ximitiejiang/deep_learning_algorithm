@@ -162,9 +162,9 @@ def vis_bbox(bboxes, img=None):
     return img
 
 
-def vis_all_opencv(img, bboxes, scores, labels, class_names=None, score_thr=0, 
+def vis_all_opencv(img, bboxes, scores, labels, ldmks=None, class_names=None, score_thr=0, 
                     instance_colors=None, thickness=1, font_scale=0.5,
-                    show=['img','bbox','label'], win_name='cam', 
+                    show=['img','bbox','label','landmark'], win_name='cam', 
                     wait_time=0, saveto=None): # 如果输出到文件中则指定路径
     """采用opencv作为底层显示img/bbox/labels
     Args:
@@ -203,7 +203,7 @@ def vis_all_opencv(img, bboxes, scores, labels, class_names=None, score_thr=0,
     random_colors = np.stack(color_list, axis=0)  # (7,3)
     random_colors = np.tile(random_colors, (12,1))[:len(class_names),:]  # (84,3) -> (20,3)or(80,3)
 
-    for bbox, label in zip(bboxes, labels):
+    for i, [bbox, label] in enumerate(zip(bboxes, labels)):
         bbox_int = bbox.astype(np.int32)
         left_top = (bbox_int[0], bbox_int[1])
         right_bottom = (bbox_int[2], bbox_int[3])
@@ -219,6 +219,10 @@ def vis_all_opencv(img, bboxes, scores, labels, class_names=None, score_thr=0,
             label_text += ': {:.02f}'.format(bbox[-1])    
         txt_w, txt_h = cv2.getTextSize(
             label_text, cv2.FONT_HERSHEY_DUPLEX, font_scale, thickness = 1)[0]
+        
+        if ldmks is not None and 'landmark' in show:
+            for point in ldmks[i]:
+                cv2.circle(img, tuple(point), 1, random_colors[label].tolist(), -1)  # 点必须以tuple格式输入才能显示，画填充圆需要设置最后一个为-1
         
         if 'label' in show:
             cv2.rectangle(                  # 画文字底色方框
