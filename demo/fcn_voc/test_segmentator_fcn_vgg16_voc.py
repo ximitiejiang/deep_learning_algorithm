@@ -50,10 +50,10 @@ if __name__ == "__main__":
 #                         result_file='/home/ubuntu/mytrain/ssd_vgg_voc/20190928_084133_eval_result.pkl')
     
     if task == 'test':  # 测试单张图或多张图的结果： cpu上0.649 sec， gpu上0.388 sec
-        img = cv2.imread('/home/ubuntu/MyDatasets/misc/000033.jpg')
+        img = cv2.imread('/home/ubuntu/MyDatasets/misc/1.jpg')
         predictor = SegPredictor(cfg_path,                         
-                                 load_from = '/home/ubuntu/mytrain/fcn_vgg_voc/epoch_16.pth',
-                                 load_device='cuda')
+                                 load_from = '/home/ubuntu/mytrain/fcn_vgg_voc/epoch_9.pth',
+                                 load_device='cpu')
         for result in predictor([img]):
             cv2.imshow('seg', result)
     

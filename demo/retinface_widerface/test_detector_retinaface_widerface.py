@@ -26,13 +26,13 @@ if __name__ == "__main__":
     cfg_path = './cfg_detector_retinaface_widerface.py'
     cfg = get_config(cfg_path)
     
-    if task == 'log':
-        parse_log(path = '/home/ubuntu/mytrain/retinaface_widerface/20191022_182716.log')
-    
     if task == 'train':  # 模型训练
         train_retinaface_widerface(cfg,
                                    resume_from = '/home/ubuntu/mytrain/retinaface_widerface/epoch_9.pth')
     
+    if task == 'log':
+        parse_log(path = '/home/ubuntu/mytrain/retinaface_widerface/20191022_182716.log')
+        
 #    if task == 'eval':  # 数据集评估
 #        parse_log('/home/ubuntu/mytrain/ssd_vgg_widerface/20191008_211622.log')
 #        
