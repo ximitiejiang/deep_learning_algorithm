@@ -268,84 +268,38 @@ class SSDHead(nn.Module):
         loss_cls = list(map(pfunc, loss_cls, labels_t))   # (b,)
 
         return dict(loss_cls = loss_cls, loss_bbox = loss_bbox)  # {(b,), (b,)} 每张图对应一个分类损失值和一个回归损失值。
+    
+    
+    def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg, **Kwargs):
+        # 拆包装
+        if cls_scores.shape[0] == 1:
+            cls_scores = cls_scores[0] # (-1,2)
+            bbox_preds = bbox_preds[0] # (-1,4)
+            img_metas = img_metas[0]   # dict
+        else:
+            raise ValueError('only support batch size=1 prediction.')
+        # 准备anchors
+        img_size = img_metas['pad_shape']
+        featmap_sizes = [[ceil(img_size[0]/stride), ceil(img_size[1]/stride)] for stride in self.strides]
+        anchors = []
+        for i in range(len(self.featmap_sizes)):
+            device = cls_scores.device
+            anchors.append(self.anchor_generators[i].grid_anchors(
+                    featmap_sizes[i], self.strides[i], device=device))   
+        anchors = torch.cat(anchors, dim=0)     
         
-                
-    def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg, **kwargs):
-        """在测试时基于前向计算结果，计算bbox预测类别和预测坐标，此时前向计算后不需要算loss，直接计算bbox的预测
-        Args:
-            cls_scores(6,)(b,c,h,w): 按层分组
-            bbox_preds(6,)(b,c,h,w):按层分组
-            img_metas:()
-            cfg:()
-        """
-        # 获得每层的grid-anchors
-        featmap_sizes = [featmap.size() for featmap in cls_scores]
-        num_imgs = len(img_metas)
-        num_levels = len(cls_scores)
-        multi_layer_anchors = []
-        device = cls_scores[0].device
-        for i in range(len(featmap_sizes)):
-            anchors = self.anchor_generators[i].grid_anchors(featmap_sizes[i][2:], 
-                                            self.anchor_strides[i], device=device)
-            multi_layer_anchors.append(anchors)  # (6,)(k, 4)
         # 计算每张图的bbox预测
-        bbox_results = [] 
-        label_results = []
-        for img_id in range(num_imgs):
-            # 去掉batch这个维度，生成单图数据：(6,)(b,c,h,w)->(6,)(c,h,w)
-            cls_score_per_img = [cls_scores[i][img_id].detach() for i in range(num_levels)]
-            bbox_pred_per_img = [bbox_preds[i][img_id].detach() for i in range(num_levels)]
-            
-            img_shape = img_metas[img_id]['scale_shape']     # 这里传入scale_shape是用来clamp转换出来的bbox的坐标范围防止超出图片。
-            scale_factor = img_metas[img_id]['scale_factor'] # scale factor直接判断
-            bbox_result, label_result = self.get_one_img_bboxes(cls_score_per_img, bbox_pred_per_img,
-                                                                multi_layer_anchors, img_shape,
-                                                                scale_factor, cfg)
-            bbox_results.append(bbox_result)
-            label_results.append(label_result)
-        return bbox_results, label_results  
-    
-    
-    def get_one_img_bboxes(self, cls_scores, bbox_preds, multi_layer_anchors,
-                           img_shape, scale_factor, cfg):
-        """"对单张图进行预测：需要对每一特征图层分别处理，所以必须传入以level分组的数据
-        1. cls_score概率化：采用softmax()函数
-        3. 对bbox坐标逆变换delta2bbox()
-        4. 进行nms过滤: 只是把空的bbox过滤(score<0.02)；同时去除重叠bbox；对置信度大小没有管控
-        args:
-            cls_scores: (6,)(c,h,w)
-            bbox_preds: (6,)(c,h,w)
-            multi_layer_anchors: (6,)(k,4)
-            img_shape:
-            scale_factor:
-            cfg:
-            rescale:
-        """
-        # 分别处理每一层特征层
-        multi_layer_bboxes = []
-        multi_layer_scores = []
-        for cls_score, bbox_pred, anchors in zip(cls_scores, bbox_preds, multi_layer_anchors):
-            cls_score = cls_score.permute(1, 2, 0).reshape(-1, self.num_classes) # (c,h,w)->(-1, 21)
-            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-            # 概率化
-            scores = F.softmax(cls_score, dim=1)
-            # 坐标化 
-            bboxes = delta2bbox(anchors, bbox_pred, self.target_means, self.target_stds, img_shape)
-            #保存
-            multi_layer_bboxes.append(bboxes)  
-            multi_layer_scores.append(scores)
-        # 堆叠 
-        multi_layer_bboxes = torch.cat(multi_layer_bboxes)  # (6,)(m, 4) -> (8732, 4)
-        multi_layer_scores = torch.cat(multi_layer_scores)  # (6,)(n, 21)-> (8732, 21)
-        # 训练是基于scale之后img进行的，而最终得到的bbox需要在原图显示，所以要缩放回原图比例
-        multi_layer_bboxes = multi_layer_bboxes / multi_layer_bboxes.new_tensor(scale_factor)  # (b,4)/(4,) = (b, 4)
-        # 进行nms, 同时生成标签
-        det_bboxes, det_labels = nms_wrapper(multi_layer_bboxes, multi_layer_scores, **cfg.nms)
+        scale_factor = img_metas['scale_factor']
         
-        return det_bboxes, det_labels  # 坐标和置信度(k,5), 标签(k,)
+        cls_scores = F.softmax(cls_scores, dim=1) # 概率化
+        bbox_preds = delta2bbox(anchors, bbox_preds, self.target_means, self.target_stds, img_size) # 坐标化     
+        bboxes_preds = bbox_preds / bbox_preds.new_tensor(scale_factor[:4])  # 相对原图的尺寸
+        # nms
+        bboxes, labels, _ = nms_wrapper(bboxes_preds, cls_scores, **cfg.nms) # (n_cls,)(m,5),  (n_cls,)(m,),  (n_cls,)(m,5,2) 
 
+        return dict(bboxes=bboxes, labels=labels)        
         
-
+  
 # %%
 if __name__ == "__main__":
     '''base_anchor的标准数据
@@ -357,29 +311,3 @@ if __name__ == "__main__":
     [[ 18.,  18., 281., 281.],[  6.,   6., 293., 293.],[-37.,  57., 336., 242.],[ 57., -37., 242., 336.]]
     '''
     
-#    import sys, os
-#    path = os.path.abspath("../utils")
-#    if not path in sys.path:
-#        sys.path.insert(0, path)
-    from utils.visualization import vis_bbox
-    name = 'test1'
-    
-    if name == 'test1':  # 检测生成的base anchor是否正确
-        base_sizes, anchor_scales, anchor_ratios, centers  = \
-            get_base_anchor_params(img_size=300, ratio_range=[0.2, 0.9], 
-                                   n_featmap=6, 
-                                   strides=[8,16,32,64,128,300], 
-                                   ratios=[[2],[2, 3],[2, 3],[2, 3],[2],[2]])
-        anchor_generators = []
-        for i in range(len(base_sizes)):
-            anchor_generator = AnchorGenerator(base_sizes[i],
-                                               anchor_scales[i],
-                                               anchor_ratios[i],
-                                               ctr=centers[i],
-                                               scale_major=False)
-            
-            base_anchors = anchor_generator.base_anchors
-            vis_bbox(base_anchors)
-            anchor_generators.append(anchor_generator)
-            
-      

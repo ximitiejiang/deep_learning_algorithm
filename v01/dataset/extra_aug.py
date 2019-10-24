@@ -74,7 +74,7 @@ class PhotoMetricDistortion(object):
 
 
 class Expand(object):
-    """随机放大图片n倍，然后随机把原图放到大图某位置, 相当于抠出原图一部分 (影响bbox)
+    """随机放大图片n倍，然后随机把原图放到大图某位置(影响bbox)
     """
     def __init__(self, mean=(0, 0, 0), to_rgb=True, ratio_range=(1, 4)):
         if to_rgb:

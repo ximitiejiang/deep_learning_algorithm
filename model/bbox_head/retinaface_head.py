@@ -16,7 +16,7 @@ from model.loss_lib import SmoothL1Loss, CrossEntropyLoss
 from model.get_target_lib import get_anchor_target
 from model.bbox_head.ssd_head import ohem
 from model.bbox_regression_lib import delta2bbox, delta2landmark
-from model.nms_lib import nms_wrapper2
+from model.nms_lib import nms_wrapper
 
 class ClassHead(nn.Module):
     """分类模块"""
@@ -204,7 +204,7 @@ class RetinaFaceHead(nn.Module):
         ldmk_preds = delta2landmark(anchors, ldmk_preds, self.target_means, self.target_stds)
         bboxes_preds = bbox_preds / bbox_preds.new_tensor(scale_factor[:4])  # 相对原图的尺寸
         # nms
-        bboxes, labels, ldmks = nms_wrapper2(bboxes_preds, cls_scores, ldmk_preds, **cfg.nms) # (n_cls,)(m,5),  (n_cls,)(m,),  (n_cls,)(m,5,2) 
+        bboxes, labels, ldmks = nms_wrapper(bboxes_preds, cls_scores, ldmk_preds, **cfg.nms) # (n_cls,)(m,5),  (n_cls,)(m,),  (n_cls,)(m,5,2) 
 
         return dict(bboxes=bboxes, labels=labels, ldmks=ldmks) # (n_cls,)(m,5)   (n_cls,)(m,)  (n_cls,)(m,5,2)    
 

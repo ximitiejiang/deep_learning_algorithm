@@ -22,17 +22,18 @@ def train_retinaface_widerface(cfg, resume_from=None):
     
 if __name__ == "__main__":
     
-    task = 'log'
+    task = 'train'
     cfg_path = './cfg_detector_retinaface_widerface.py'
     cfg = get_config(cfg_path)
     
+    if task == 'log':
+        parse_log(paths = ['/home/ubuntu/mytrain/retinaface_widerface/20191022_182716.log',
+                           '/home/ubuntu/mytrain/retinaface_widerface/20191023_180648.log'])
+    
     if task == 'train':  # 模型训练
         train_retinaface_widerface(cfg,
-                                   resume_from = '/home/ubuntu/mytrain/retinaface_widerface/epoch_9.pth')
-    
-    if task == 'log':
-        parse_log(path = '/home/ubuntu/mytrain/retinaface_widerface/20191022_182716.log')
-        
+                                   resume_from = '/home/ubuntu/mytrain/retinaface_widerface/epoch_21.pth')
+
 #    if task == 'eval':  # 数据集评估
 #        parse_log('/home/ubuntu/mytrain/ssd_vgg_widerface/20191008_211622.log')
 #        
@@ -49,13 +50,12 @@ if __name__ == "__main__":
     if task == 'test':  # 测试单张图或多张图的结果
         img = cv2.imread('/home/ubuntu/MyDatasets/misc/26.jpg')
         predictor = DetPredictor(cfg_path,                         
-                              load_from = '/home/ubuntu/mytrain/retinaface_widerface/epoch_9.pth',
+                              load_from = '/home/ubuntu/mytrain/retinaface_widerface/epoch_21.pth',
                               load_device='cpu')
         for results in predictor([img]):
             vis_all_opencv(*results, class_names=get_classes('widerface'), 
-                           score_thr=0.1, show=['img','bbox','label','landmark'])
-#    
-#    # 针对widerface的训练结果模型，对小脸比较有效，但对大脸效果很差，因为数据集里边大部分都是小脸，大脸数据太少。
+                           score_thr=0.15, show=['img','bbox','label','landmark'])
+
 #    # 所以靠近摄像头反而检不出来，远离摄像头就能检出来。
 #    if task == 'video': 
 #        src = 0  # src可以等于int(cam_id), str(video path), list(img_list)

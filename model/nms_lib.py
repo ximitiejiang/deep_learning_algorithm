@@ -11,14 +11,14 @@ import numpy as np
 
 """
 nms = dict(
-        type = 'nms',        # soft_nms, nms, simple
+        type = 'nms',        # softnms, nms, nms_dubug, softnms_debug
         score_thr = 0.02,    # 最小score： 目的是筛除大部分空bbox
         max_per_img = 200,   # 最大bbox个数
         params = dict(
                 iou_thr=0.5) # 重叠度大于0.5的bbox则去除
         )
 """
-def nms_wrapper2(bboxes, scores, ldmks=None, type=None, score_thr=None, max_per_img=None, params=None):
+def nms_wrapper(bboxes, scores, ldmks=None, type=None, score_thr=None, max_per_img=None, params=None):
     """重写nms wrapper: nms目的是基于bbox和score进行重复bbox的筛除
     args:
         bboxes(m, 4)
@@ -48,26 +48,11 @@ def nms_wrapper2(bboxes, scores, ldmks=None, type=None, score_thr=None, max_per_
         bbox_outs.append(dets)
         ldmk_outs.append(ldmks)
         label_outs.append(labels)
-#    if bbox_outs:  # 是不是应该用len(bbox_outs) > 0
-#        # 合并所有类
-#        bbox_outs = torch.cat(bbox_outs, dim=0).reshape(-1, 5)
-#        ldmk_outs = torch.cat(ldmk_outs, dim=0)
-#        label_outs = torch.cat(label_outs, dim=0)
-#        if bbox_outs.shape[0] > max_per_img:
-#            _, inds = bbox_outs[:, -1].sort(descending=True)
-#            inds = inds[:max_per_img]
-#            bbox_outs = bbox_outs[inds]
-#            label_outs = label_outs[inds]
-#            ldmk_outs = ldmk_outs[inds]
-#    else:
-#        bbox_outs = bbox_outs.new_zeros((0, 5))
-#        label_outs = label_outs.new_zeros((0,), dtype=torch.long)
-#        ldmk_outs = ldmk_outs.new_zeros((0,10))
     return bbox_outs, label_outs, ldmk_outs   # (n_cls,)(m,5),  (n_cls,)(m,),  (n_cls,)(m,5,2) 
         
 
 def nms_op(dets, iou_thr, type=None):
-    """用来定义nms
+    """用来定义选择具体nms op.
     args:
         dets(m,5)
         type: nms, softnms, nms_debug，softnms_debug 其中debug版本表示用纯python/cpu版本的nms做调试用
@@ -82,20 +67,16 @@ def nms_op(dets, iou_thr, type=None):
         dets_np = dets.detach().cpu().numpy()    
     else:
         raise ValueError('input data should be tensor type.')
-    
     # 选择nms
     if dets_np.shape[0] == 0:
         keep = []
-
     if type == 'nms_debug':
         keep = py_cpu_nms(dets, iou_thr)
     elif type == 'softnms_debug':
         keep = py_cpu_soft_nms(dets, iou_thr)    
-
     elif type == 'softnms':
         from model.nms.cpu_soft_nms import cpu_soft_nms
         keep = cpu_soft_nms(dets, iou_thr)
-
     elif type == 'nms':
         if device_id >= 0:  # 如果是gpu tensor
             from model.nms.gpu_nms import gpu_nms
@@ -106,9 +87,11 @@ def nms_op(dets, iou_thr, type=None):
     keep = dets.new_tensor(keep, dtype=torch.long)  # 恢复tensor
     return keep
     
+
+# %% 底层nms操作  
     
 def py_cpu_nms(dets, iou_thr):
-    """Pure Python NMS baseline."""
+    """纯python的cpu nms"""
     x1 = dets[:, 0]
     y1 = dets[:, 1]
     x2 = dets[:, 2]
@@ -116,8 +99,8 @@ def py_cpu_nms(dets, iou_thr):
     scores = dets[:, 4]
 
     areas = (x2 - x1 + 1) * (y2 - y1 + 1)
-    order = scores.argsort()[::-1]
-
+    order = scores.argsort()[::-1]  # 核心就是一句话，排序提取最大值，然后剩余的筛除超过iou阈值的部分，然后循环
+                                    # 所以核心就是获取order，搬到keep, 然后直到order搬空
     keep = []
     while order.size > 0:
         i = order[0]
@@ -137,116 +120,78 @@ def py_cpu_nms(dets, iou_thr):
 
     return keep
 
-def py_cpu_soft_nms(dets, iou_thr):
-    pass
+def py_cpu_soft_nms(dets, iou_thr, sigma=0.5, Nt=0.5, method=2, threshold=0.1):
+    """纯python的cpu soft nms"""
+    box_len = len(dets)   # box的个数
+    for i in range(box_len):
+        tmpx1, tmpy1, tmpx2, tmpy2, ts = dets[i, 0], dets[i, 1], dets[i, 2], dets[i, 3], dets[i, 4]
+        max_pos = i
+        max_scores = ts
 
+        # get max box
+        pos = i+1
+        while pos < box_len:
+            if max_scores < dets[pos, 4]:
+                max_scores = dets[pos, 4]
+                max_pos = pos
+            pos += 1
 
-# %%
-def nms_wrapper(bboxes, scores, type, score_thr=0.02, max_per_img=200, params=None):
-    """ 这是nms wrapper, 对输出bbox坐标和bbox得分进行过滤，同时生成预测标签，且调用底层的nms函数。   
-    1. nms wrapper操作过程：
-        - bbox置信度的初筛(主要通过设置最低阈值)： 用于去除大部分空的bbox
-        - bbox坐标的过滤(主要通过nms): 用于去除大部分重叠的bbox
-        - bbox标签的获取：基于分类输出的列号来获得label
-    2. nms的基本原理：
-        - 
-    3. 理解nms函数调用过程
-        (1). 顶层：用python的nms wrapper获取数据，并根据设置来调用不同类型的nms函数
-        (2). 中间层：用cython定义不同类型的nms函数，包括cpu_nms, gpu_nms, cpu_soft_nms
-            - cython作为中间的粘合语言，既可以被python调用，又可以调用c/c++/cuda语言，
-              且cython不调用别的语言，pyx生成的代码亦可以比python执行速度快数倍。
-            - cython编写cpu版本的cpu_nms, cpu_soft_nms，由于变量优化，依然比python源码要快数倍
-        (3). 底层：用cuda编写_nms函数给gpu_nms来调用
-            - 编写.hpp头文件和.cu源文件，然后通过setup.py进行整体编译
-            - setup.py文件的执行过程：
-    
-    args:
-        bboxes:(n_anchors, 4)
-        scores:(n_anchors, 21)
-        type: 表示nms类型, nms或soft_nms
-        score_thr: score的阈值
-        max_per_img: 一张图上最多输出多少bbox
-        params: 表示nms对象需要的参数，主要提供iou_thr=0.5，表示大于?
-    """
-    num_classes = scores.shape[1]
-    # 获得nms操作对象：可以是nms， soft_nms
-    nms_op = get_nms_op(type)
-    
-    nmsed_bboxes = []
-    nmsed_labels = []
-    # 分别评估一张图片结果的每一个类
-    for i in range(1, num_classes): # 1-20
-        # 筛除大部分空bbox
-        cls_inds = scores[:, i] > score_thr
-        _bboxes = bboxes[cls_inds, :]    #(k, 4)
-        _scores = scores[cls_inds, i]    #(k, )只提取该类的score
-        # 组合bbox和score
-        bbox_and_score = torch.cat([_bboxes, _scores.reshape(-1, 1)], dim=1) # (n, 5)
-        # 执行nms: 过滤重叠bbox
-        keep = nms_op(bbox_and_score, **params)  # (k, 5)
-        bbox_and_score = bbox_and_score[keep, :]
-        cls_labels = bboxes.new_full((bbox_and_score.shape[0], ), i, dtype=torch.long)  # (k,)赋值对应标签值为(1-20)中的一类
-        # 保存nms结果
-        nmsed_bboxes.append(bbox_and_score)
-        nmsed_labels.append(cls_labels)
-    # 如果有输出结果
-    if nmsed_bboxes:
-        nmsed_bboxes = torch.cat(nmsed_bboxes).reshape(-1, 5)
-        nmsed_labels = torch.cat(nmsed_labels)
-        # 如果输出结果超过上线，则取得分最高的前一部分
-        if nmsed_bboxes.shape[0] > max_per_img:
-            _, inds = nmsed_bboxes[:, -1].sort(descending=True)
-            inds = inds[:max_per_img]
-            nmsed_bboxes = nmsed_bboxes[inds]
-            nmsed_labels = nmsed_labels[inds]
-    # 如果没有结果，则输出空
-    else:
-        nmsed_bboxes = bboxes.new_zeros((0, 5))
-        nmsed_labels = bboxes.new_zeros((0,), dtype=torch.long)
-    
-    return nmsed_bboxes, nmsed_labels  # (k, 5)包含bbox坐标和置信度，(k,)包含标签
-    
+        # add max box as a detection
+        dets[i, :] = dets[max_pos, :]
 
-def get_nms_op(nms_type):
-    nms_dict = {
-            'nms': nms}
-    nms_func = nms_dict[nms_type]
-    return nms_func
+        # swap ith box with position of max box
+        dets[max_pos, 0] = tmpx1
+        dets[max_pos, 1] = tmpy1
+        dets[max_pos, 2] = tmpx2
+        dets[max_pos, 3] = tmpy2
+        dets[max_pos, 4] = ts
 
-# %%
-"""
+        # 将置信度最高的 box 赋给临时变量
+        tmpx1, tmpy1, tmpx2, tmpy2, ts = dets[i, 0], dets[i, 1], dets[i, 2], dets[i, 3], dets[i, 4]
 
-"""
-#from model.cpu_soft_nms import cpu_soft_nms
+        pos = i+1
+        # NMS iterations, note that box_len changes if detection boxes fall below threshold
+        while pos < box_len:
+            x1, y1, x2, y2 = dets[pos, 0], dets[pos, 1], dets[pos, 2], dets[pos, 3]
 
-def nms(preds, iou_thr):
-    """基本版nms: 链接到cpu_nms或gpu_nms, 
-    如果是numpy则用cpu_nms，而如果是tensor，则链接到gpu_nms
-    args:
-        preds: (k, 5)包括4个坐标和1个置信度score
-        iou_thr: 重叠阈值，高于该阈值则代表两个bbox重叠，删除其中score比较低的
-    """
-    # 进行格式变换
-    if isinstance(preds, torch.Tensor):
-        device_id = preds.get_device()  # 获得输入的设备号， cpu=-1, cuda= 0~n
-        preds_np = preds.detach().cpu().numpy()
-    elif isinstance(preds, np.ndarray):
-        device_id = None
-        preds_np = preds   
-    # 进行nms: 需要采用numpy送入函数
-    if preds_np.shape[0] == 0:
-        keep = []
-    elif device_id is not None and device_id >= 0:  # 如果是gpu tensor
-        from model.nms.gpu_nms import gpu_nms
-        keep = gpu_nms(preds_np, iou_thr, device_id=device_id)
-        keep = preds.new_tensor(keep, dtype=torch.long)  # 恢复tensor
-    elif device_id is None or device_id == -1:    # 如果是numpy或cpu tensor
-        from model.nms.cpu_nms import cpu_nms
-        keep = cpu_nms(preds_np, iou_thr)
+            area = (x2 - x1 + 1)*(y2 - y1 + 1)
+
+            iw = (min(tmpx2, x2) - max(tmpx1, x1) + 1)
+            ih = (min(tmpy2, y2) - max(tmpy1, y1) + 1)
+            if iw > 0 and ih > 0:
+                overlaps = iw * ih
+                ious = overlaps / ((tmpx2 - tmpx1 + 1) * (tmpy2 - tmpy1 + 1) + area - overlaps)
+
+                if method == 1:    # 线性
+                    if ious > Nt:
+                        weight = 1 - ious
+                    else:
+                        weight = 1
+                elif method == 2:  # gaussian
+                    weight = np.exp(-(ious**2) / sigma)
+                else:              # original NMS
+                    if ious > Nt:
+                        weight = 0
+                    else:
+                        weight = 1
+
+                # 赋予该box新的置信度
+                dets[pos, 4] = weight * dets[pos, 4]
+
+                # 如果box得分低于阈值thresh，则通过与最后一个框交换来丢弃该框
+                if dets[pos, 4] < threshold:
+                    dets[pos, 0] = dets[box_len-1, 0]
+                    dets[pos, 1] = dets[box_len-1, 1]
+                    dets[pos, 2] = dets[box_len-1, 2]
+                    dets[pos, 3] = dets[box_len-1, 3]
+                    dets[pos, 4] = dets[box_len-1, 4]
+
+                    box_len = box_len-1
+                    pos = pos-1
+            pos += 1
+
+    keep = [i for i in range(box_len)]
     return keep
-    
-
-
 
 
 

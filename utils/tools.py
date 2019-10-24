@@ -132,19 +132,23 @@ def loadvar(path):
 
 # %%
 from utils.visualization import vis_loss_acc
-def parse_log(path, show=True):
-    """解析log文件"""
-    with open(path) as f:
-        lines = f.readlines()
-        data_dict = {'loss': [],
-                     'acc1': []}
-        lines = lines[2:]  # 去除开始2行
-        lines = lines[:-1] # 去除最后一行
-        for line in lines:
-            loss = float(line.split('\t')[1].split(',')[0].split(' ')[-1])
-            acc = float(line.split('\t')[1].split(',')[-1].split(' ')[-1])
-            data_dict['loss'].append(loss)
-            data_dict['acc1'].append(acc)
+def parse_log(paths, show=True):
+    """解析log文件: paths代表1到多个log文件"""
+    data_dict = {'loss': [],
+                 'acc1': []}
+    if isinstance(paths, str):
+        paths = [paths]
+    for path in paths:
+        with open(path) as f:
+            lines = f.readlines()
+
+            lines = lines[3:]  # 去除开始2行
+            lines = lines[:-1] # 去除最后一行
+            for line in lines:
+                loss = float(line.split('\t')[1].split(',')[0].split(' ')[-1])
+                acc = float(line.split('\t')[1].split(',')[-1].split(' ')[-1])
+                data_dict['loss'].append(loss)
+                data_dict['acc1'].append(acc)
     
     if show:
         vis_loss_acc(data_dict)

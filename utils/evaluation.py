@@ -99,8 +99,11 @@ class DetPredictor():
                 labels = np.concatenate(dets['labels'], axis=0) - 1  # (m, ) 恢复到0为起点
                 bboxes = np.concatenate(dets['bboxes'], axis=0)  # (m,5)
                 scores = bboxes[:, -1]                           # (m,)
-                ldmks = np.concatenate(dets['ldmks'], axis=0)    # (m,10)
-                yield (img, bboxes, scores, labels, ldmks)
+                if dets.get('ldmks', None) is not None:
+                    ldmks = np.concatenate(dets['ldmks'], axis=0)    # (m,10)
+                    yield (img, bboxes, scores, labels, ldmks)
+                else:
+                    yield (img, bboxes, scores, labels)
 
 
 # %% 分割模型的评估
