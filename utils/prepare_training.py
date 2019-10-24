@@ -422,17 +422,17 @@ def get_model(cfg):
 
 def get_model_wrapper(model, cfg):
     """为模型添加外壳：生成并行式模型或者分布式模型"""
-    if cfg.gpus is None:
+    if cfg.gpus is None:  # cpu模型
         return model
 
     # 并行式模型
     if cfg.parallel and len(cfg.gpus) > 1 and torch.cuda.device_count() > 1:  # 判断并行式，gpu个数
         model = nn.DataParallel(model)
-    # 总成模型判断是否分布式
+    # 分布式模型
     elif cfg.distribute and len(cfg.gpus) > 1 and os.environ.get('RANK', None) is not None:  # 判断分布式，gpu个数，且dist启动
          local_rank = os.environ['RANK']
          model = DistributedDataParallel(model, 
-                                        device_ids=[local_rank],   # 模型所在的进程号：说明模型会送入相应
+                                        device_ids=[local_rank],   # 模型所在的进程号：说明模型会送入相应进程
                                         output_device=local_rank)  # 模型
     return model
 

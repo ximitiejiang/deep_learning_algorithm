@@ -68,8 +68,9 @@ def onehot_to_label(one_hot_labels):
 import random
 import math
 from utils.ious import calc_iof_np
+
 def imcrop(img, bboxes, labels, landmarks, size=(640,640)):
-    """图片切割：在不改变太多图片尺寸的前提下获得某固定尺寸，rescale/resize都有可能较大改变图片尺寸导致bbox比例不受控。
+    """图片切割：在不改变太多图片尺寸的前提下获得某固定尺寸，rescale/resize都有可能较大改变图片尺寸(尤其是缩小尺寸)导致bbox比例不受控。
     所以往往可以先用crop把图片切割到比较接近需要的尺寸，然后在通过rescale/resize细调。
     注意：切割需要保证至少有一个bbox在图片内部
     args:

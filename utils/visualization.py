@@ -163,9 +163,9 @@ def vis_bbox(bboxes, img=None):
 
 
 def vis_all_opencv(img, bboxes, scores, labels, ldmks=None, class_names=None, score_thr=0, 
-                    instance_colors=None, thickness=1, font_scale=0.5,
-                    show=['img','bbox','label','landmark'], win_name='cam', 
-                    wait_time=0, saveto=None): # 如果输出到文件中则指定路径
+                   instance_colors=None, thickness=1, font_scale=0.5,
+                   show=['img','bbox','label','landmark'], win_name='cam', 
+                   wait_time=0, saveto=None): # 如果输出到文件中则指定路径
     """采用opencv作为底层显示img/bbox/labels
     Args:
         img (str or ndarray): The image to be displayed.

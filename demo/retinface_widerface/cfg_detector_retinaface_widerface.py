@@ -64,13 +64,13 @@ head = dict(
                 ratios=(1),
                 target_means=(.0, .0, .0, .0),
                 target_stds=(0.1, 0.1, 0.2, 0.2),
-                neg_pos_ratio=3))
+                neg_pos_ratio=7))
 
 assigner = dict(
         type='max_iou_assigner',
         params=dict(
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.5,
+                pos_iou_thr=0.35,
+                neg_iou_thr=0.35,
                 min_pos_iou=0.))
 
 sampler = dict(
