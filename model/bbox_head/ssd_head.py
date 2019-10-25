@@ -186,7 +186,7 @@ class SSDHead(nn.Module):
         self.num_classes = num_classes
         self.cls_out_channels = num_classes
         self.anchor_strides = anchor_strides
-        self.featmap_sizes = [[ceil(input_size[0]/stride), ceil(input_size[1]/stride)] for stride in anchor_strides]
+
         self.target_means = target_means
         self.target_stds = target_stds 
         self.neg_pos_ratio = neg_pos_ratio
@@ -224,6 +224,7 @@ class SSDHead(nn.Module):
                 xavier_init(m, distribution="uniform", bias=0)
         
     def forward(self, x):
+        self.featmap_sizes = [feat.shape[2:] for feat in x] 
         cls_scores = []
         bbox_preds = []
         for feat, cls_conv, reg_conv in zip(x, self.cls_convs, self.reg_convs):
@@ -280,12 +281,11 @@ class SSDHead(nn.Module):
             raise ValueError('only support batch size=1 prediction.')
         # 准备anchors
         img_size = img_metas['pad_shape']
-        featmap_sizes = [[ceil(img_size[0]/stride), ceil(img_size[1]/stride)] for stride in self.strides]
         anchors = []
         for i in range(len(self.featmap_sizes)):
             device = cls_scores.device
             anchors.append(self.anchor_generators[i].grid_anchors(
-                    featmap_sizes[i], self.strides[i], device=device))   
+                    self.featmap_sizes[i], self.strides[i], device=device))   
         anchors = torch.cat(anchors, dim=0)     
         
         # 计算每张图的bbox预测

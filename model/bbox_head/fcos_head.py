@@ -7,6 +7,7 @@ Created on Thu Oct 17 22:34:58 2019
 """
 import torch
 import torch.nn as nn
+from math import ceil
 from model.loss_lib import SigmoidFocalLoss, IouLoss, SigmoidBinaryCrossEntropyLoss
 from utils.init_weights import normal_init, bias_init_with_prob
 from model.get_target_lib import get_points, get_point_target, get_centerness_target
@@ -54,6 +55,7 @@ class FCOSHead(nn.Module):
     """fcos无anchor的head
     """
     def __init__(self,
+                 input_size = (1333, 800),
                  num_classes=21,
                  in_channels=256,  # 堆叠卷积的输入通道数(不包括做变换的卷积层)
                  out_channels=256, # 堆叠卷积的输出通道数
@@ -92,7 +94,7 @@ class FCOSHead(nn.Module):
         for m in self.bbox_heads.modules():
             normal_init(m.conv, std=0.01)
         bias_cls = bias_init_with_prob(0.01)
-        normal_init(self.cls_heads.fcos_cls, std=0.01, bias=bias_cls)
+        normal_init(self.fcos_cls, std=0.01, bias=bias_cls)
         normal_init(self.fcos_reg, std=0.01)
         normal_init(self.fcos_centerness, std=0.01)
     
@@ -102,6 +104,8 @@ class FCOSHead(nn.Module):
         args:
             x: 表示5层特征(5,)，每层(b, 256, h, w)
         """
+        # 前向计算每次更新featmap size， 分别给get loss, get bbox用
+        self.featmap_sizes = [feat.shape[2:] for feat in x]  
         # 分别计算每一张特征图(b,c,h,w), 共计5张
         scores = [cls_head(feat) for cls_head, feat in zip(self.cls_heads, x)]
         cls_scores = [self.fcos_cls(score) for score in scores]
@@ -135,12 +139,12 @@ class FCOSHead(nn.Module):
             img_metas: (b,) 按batch分组
         """
         num_imgs = len(img_metas)
-        featmap_sizes = [featmap.shape[-2:] for featmap in cls_scores] # (5,) (h,w)
         device = cls_scores.get_device()
         # 计算网格中心点
-        points = get_points(featmap_sizes, self.strides, device) # (5,)(k,2)
+        points = get_points(self.featmap_sizes, self.strides, device) # (5,)(k,2)
         num_level_points = [pt.shape[0] for pt in points]
-
+        all_points = torch.cat([
+                point.repeat(num_imgs, 1) for point in points]) # (5,)(k,2) -> (5*k, 2)注意points的堆叠，需要在内层先配出batch的数量出来,然后再按照外层的特征层数堆叠
         # 计算target
         labels, bbox_targets = get_point_target(
                 points, self.regress_ranges, gt_bboxes, num_level_points) # labels(5,)(m,),  bbox_targets(5,)(m,4) 
@@ -156,9 +160,8 @@ class FCOSHead(nn.Module):
         all_centernesses = torch.cat([
                 centerness.permute(0,2,3,1).reshape(-1)
                 for centerness in centernesses])          # (5,)(b,1,h,w)->(5*b*h*w,20)
-        # 注意points的堆叠，需要在内层先配出batch的数量出来,然后再按照外层的特征层数堆叠
-        all_points = torch.cat([
-                point.repeat(num_imgs, 1) for point in points]) # (5,)(k,2) -> (5*k, 2)
+
+
         all_labels = torch.cat(labels)    # (5*k, )
         all_bbox_targets = torch.cat(bbox_targets) # (5*k, 4)
         

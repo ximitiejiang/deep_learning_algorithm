@@ -50,7 +50,7 @@ class LandmarkHead(nn.Module):
     def __init__(self, in_channels, num_anchors, num_points):
         super().__init__()
         self.num_points = num_points
-        self.conv1x1 = nn.Conv2d(in_channels, num_anchors * num_points, 1, stride=1, padding=0)
+        self.conv1x1 = nn.Conv2d(in_channels, num_anchors * 2 * num_points, 1, stride=1, padding=0)
     
     def forward(self, x):
         out = self.conv1x1(x)
@@ -65,7 +65,7 @@ class RetinaFaceHead(nn.Module):
                  input_size=(640, 640),
                  in_channels=(64, 64, 64), 
                  num_classes=2,
-                 num_landmarks=10,
+                 num_landmarks=5,
                  base_sizes=(16, 64, 256),
                  strides=(8, 16, 32),
                  scales=(1, 2),
@@ -79,7 +79,7 @@ class RetinaFaceHead(nn.Module):
         self.target_stds = target_stds
         self.neg_pos_ratio = neg_pos_ratio
         self.num_classes = num_classes
-        self.featmap_sizes = [[ceil(input_size[0]/stride), ceil(input_size[1]/stride)] for stride in strides]
+
         scales = [scales] if isinstance(scales, int) else scales
         ratios = [ratios] if isinstance(ratios, int) else ratios  # 如果输入的是单个数，比如2，或(2)，则需要转换成list
         num_anchors = len(scales) * len(ratios)
@@ -115,6 +115,8 @@ class RetinaFaceHead(nn.Module):
     
     
     def forward(self, x):
+        self.featmap_sizes = [feat.shape[2:] for feat in x]
+        
         cls_scores = [self.class_head[i](x[i]) for i in range(len(x))] #(3,) (b,-1,2)
         cls_scores = torch.cat(cls_scores, dim=1) # (b,-1,2)
         
@@ -145,7 +147,6 @@ class RetinaFaceHead(nn.Module):
             device = cls_scores.device
             all_anchors.append(self.anchor_generators[i].grid_anchors(
                     self.featmap_sizes[i], self.strides[i], device=device))   
-#        num_anchors = [len(anchor) for anchor in all_anchors]
         all_anchors = torch.cat(all_anchors, dim=0)
         all_anchors = [all_anchors for _ in range(num_imgs)]
         # 开始计算target
@@ -189,12 +190,11 @@ class RetinaFaceHead(nn.Module):
             raise ValueError('only support batch size=1 prediction.')
         # 准备anchors
         img_size = img_metas['pad_shape']
-        featmap_sizes = [[ceil(img_size[0]/stride), ceil(img_size[1]/stride)] for stride in self.strides]
         anchors = []
         for i in range(len(self.featmap_sizes)):
             device = cls_scores.device
             anchors.append(self.anchor_generators[i].grid_anchors(
-                    featmap_sizes[i], self.strides[i], device=device))   
+                    self.featmap_sizes[i], self.strides[i], device=device))   
         anchors = torch.cat(anchors, dim=0)     
         # 计算单张图的bbox预测
         scale_factor = img_metas['scale_factor']
