@@ -145,8 +145,14 @@ def parse_log(paths, show=True):
             lines = lines[3:]  # 去除开始2行
             lines = lines[:-1] # 去除最后一行
             for line in lines:
-                loss = float(line.split('\t')[1].split(',')[0].split(' ')[-1])
-                acc = float(line.split('\t')[1].split(',')[-1].split(' ')[-1])
+                try:
+                    loss = float(line.split('\t')[1].split(',')[0].split(' ')[-1])
+                except:
+                    print(line)
+                try:
+                    acc = float(line.split('\t')[1].split(',')[-1].split(' ')[-1])
+                except:
+                    print(line)
                 data_dict['loss'].append(loss)
                 data_dict['acc1'].append(acc)
     

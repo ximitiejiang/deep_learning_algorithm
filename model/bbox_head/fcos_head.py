@@ -23,7 +23,7 @@ def conv3x3_group(inc, outc, stride=1, padding=1):
 
 class ClassHead(nn.Module):
     """分类模块: 负责单层特征层"""
-    def __init__(self, in_channels, num_classes=21, stacked_convs):
+    def __init__(self, in_channels, num_classes=21, stacked_convs=4):
         super().__init__()
         self.num_classes = num_classes
         self.cls_convs = nn.ModuleList()
@@ -38,7 +38,7 @@ class ClassHead(nn.Module):
 
 class BboxHead(nn.Module):
     """bbox回归模块: 负责单层特征"""
-    def __init__(self, in_channels, stacked_convs):
+    def __init__(self, in_channels, stacked_convs=4):
         super().__init__()
         self.bbox_convs = nn.ModuleList()
         for _ in range(stacked_convs):

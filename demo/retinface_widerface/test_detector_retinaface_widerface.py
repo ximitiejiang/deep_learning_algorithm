@@ -22,13 +22,14 @@ def train_retinaface_widerface(cfg, resume_from=None):
     
 if __name__ == "__main__":
     
-    task = 'train'
+    task = 'log'
     cfg_path = './cfg_detector_retinaface_widerface.py'
     cfg = get_config(cfg_path)
     
     if task == 'log':
         parse_log(paths = ['/home/ubuntu/mytrain/retinaface_widerface/20191022_182716.log',
-                           '/home/ubuntu/mytrain/retinaface_widerface/20191023_180648.log'])
+                           '/home/ubuntu/mytrain/retinaface_widerface/20191023_180648.log',
+                           '/home/ubuntu/mytrain/retinaface_widerface/20191024_184201.log'])
     
     if task == 'train':  # 模型训练
         train_retinaface_widerface(cfg,
