@@ -14,9 +14,11 @@ fcos的结构基于RetinaNet
 **关于损失函数**
 1. 分类损失：focalloss，用于解决正负样本不平衡问题
     - 为什么focal loss能够解决正负样本不平衡问题
-        A: 相当于对损失增加权重，loss = weight * crossentropy(), 其中weight = at*pt, 
-        而at = a*t +(1-a)*(1-t), pt = (p*t)+(1-p)*(1-t)
-        
+        A: 相当于对损失增加权重，loss = weight * crossentropy(), 其中at = a*t +(1-a)*(1-t), pt = (p*t)+(1-p)*(1-t)
+        则weight = at * (1 - pt)， 控制逻辑：at=0.25(t=1)或at=0.75(t=0)，从而实现正负样本比例1:3
+        pt=p(t=1)或pt=1-p(t=0)，从而(1-pt)^gamma可以抑制正样本的高p以及负样本的低p，也就是抑制了简单样本。
+        注意，计算weight时需要采用经过sigmoid之后的概率值，而计算二值交叉熵又需要未经过sigmoid的原始输出，因为二值交叉熵集成了sigmoid.
+                
     - 为什么能用二值交叉熵公式来计算多分类问题并用在focal loss的内部实现上：
         A: 多分类问题用多分类交叉熵公式，本质上也是用的-log(p(x)*q(x))，只不过因为先用softmax对一行数据处理过，得到了一组和为1的概率值，
         然后计算-log(p*q)时本质也是对每一类的概率单独计算-log，而由于q采用独热编码的label形式代表概率，从而只会提取到唯一的label对应的那一类-log()值作为损失值。
@@ -24,7 +26,7 @@ fcos的结构基于RetinaNet
         例如：一组(b, 21)的预测跟一组(b,)的label，用多分类是先对每行(21,)这21个数取softmax概率归一化，然后对每个数计算-log()，并只返回独热编码对应label的那个-log()值。
         例如一组(b,20)的预测跟一组(b,)的label，用二分类是
         
-2. 中心度损失：二值交叉熵，利用他来计算一个概率，
+2. 中心度损失：二值交叉熵，这里中心度的定义是c=sqrt(min(l,r)/max(l,r) * min(t,b)/max(t,b))，从而用c来描述预测是否在中心。
    注意：pytorch中多分类交叉熵只能接受long类型标签来计算概率，但二分类交叉熵能接受小数标签来计算概率。
 
 3. 回归损失：iouloss，类似于smoothl1，都是用来评估bbox的4个坐标点。只不过smoothl1是把pred(m,4)-target(m,4)

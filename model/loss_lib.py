@@ -59,7 +59,7 @@ class SigmoidBinaryCrossEntropyLoss(nn.Module):
 
 # %% 
 class SigmoidFocalLoss(nn.Module):
-    """多类别focalloss：内部自带sigmoid
+    """多类别focalloss：内部自带sigmoid，所以输入pred不需要预先做sigmoid处理。
     Focal loss的基本原理：在原有交叉熵基础上
     注意：类别数目上不能包含背景类别，即voc(20), coco(80)
     args:
@@ -80,27 +80,18 @@ class SigmoidFocalLoss(nn.Module):
             loss = loss.sum() / avg_factor
         return loss
 
-def focal_loss(pred, target, alpha, gamma):
-    """focal loss底层函数"""
-    pred_sigmoid = pred.sigmoid()
-    pt = pred * target + (1 - pred) * (1 - target)
+def focal_loss(pred, target, alpha=0.25, gamma=2.0):
+    """focal loss底层函数: alpha是正负样本比例控制参数，gamma是难样本控制参数
+    focal_loss = - at*(1-pt)^gamma * log(pt), 其中at = a*t+(1-a)(1-t), pt = p*t+(1-p)(1-t)
+    当t=1时
+    """
+    pred_s = pred.sigmoid()  # 用真实概率p进行weight的计算，但二值交叉熵输入非概率化p，因为内部自带了sigmoid
+    pt = pred_s * target + (1 - pred_s) * (1 - target)
     at = alpha * target + (1 - alpha) * (1 - target)
-    loss = pt * at * F.binary_cross_entropy(pred, target, reduction='none')
+    weight = at * (1 - pt).pow(gamma)
+    loss = F.binary_cross_entropy(pred, target, weight, reduction='none')
     return loss
 
-def sigmoid_focal_loss(pred,
-                       target,
-                       weight,
-                       gamma=2.0,
-                       alpha=0.25,
-                       reduction='elementwise_mean'):
-    pred_sigmoid = pred.sigmoid()
-    pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
-    weight = (alpha * target + (1 - alpha) * (1 - target)) * weight
-    weight = weight * pt.pow(gamma)
-    return F.binary_cross_entropy_with_logits(
-        pred, target, weight, reduction=reduction)
-       
 
 # %%
 class SmoothL1Loss(nn.Module):
