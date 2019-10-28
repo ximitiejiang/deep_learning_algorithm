@@ -32,22 +32,22 @@ def nms_wrapper(bboxes, scores, ldmks=None, type=None, score_thr=None, max_per_i
     if ldmks is None:
         ldmks = bboxes.new_zeros((0, 0, 2))
     n_cls = scores.shape[1]
-    for i in range(1, n_cls):  # 按类别
+    for i in range(1, n_cls):  # 按类别: 但不再考虑背景的筛选
         # score过滤
         cls_inds = scores[:, i] > score_thr
-        bboxes = bboxes[cls_inds, :]  # (n, 4)
-        scores = scores[cls_inds, i]  # (n,)
-        ldmks = ldmks[cls_inds, :]    # (n,5,2)
+        _bboxes = bboxes[cls_inds, :]  # (n, 4)
+        _scores = scores[cls_inds, i]  # (n,)
+        _ldmks = ldmks[cls_inds, :] if len(ldmks) > 0 else ldmks    # (n,5,2)
         # nms过滤
-        dets = torch.cat([bboxes, scores.reshape(-1,1)], dim=1) #(n,5)
-        keep = nms_op(dets, **params, type=type)
-        dets = dets[keep, :]
-        ldmks = ldmks[keep, :]
-        labels = dets.new_full((dets.shape[0], ), i, dtype=torch.long)  # (n,) 从1到n_cls-1
+        _dets = torch.cat([_bboxes, _scores.reshape(-1,1)], dim=1) #(n,5)
+        keep = nms_op(_dets, **params, type=type)
+        _dets = _dets[keep, :]
+        _ldmks = _ldmks[keep, :] if len(_ldmks) > 0 else _ldmks
+        _labels = _dets.new_full((_dets.shape[0], ), i, dtype=torch.long)  # (n,) 从1到n_cls-1
         # 保存
-        bbox_outs.append(dets)
-        ldmk_outs.append(ldmks)
-        label_outs.append(labels)
+        bbox_outs.append(_dets)
+        ldmk_outs.append(_ldmks)
+        label_outs.append(_labels)
     return bbox_outs, label_outs, ldmk_outs   # (n_cls,)(m,5),  (n_cls,)(m,),  (n_cls,)(m,5,2) 
         
 
@@ -70,7 +70,7 @@ def nms_op(dets, iou_thr, type=None):
     # 选择nms
     if dets_np.shape[0] == 0:
         keep = []
-    if type == 'nms_debug':
+    elif type == 'nms_debug':
         keep = py_cpu_nms(dets, iou_thr)
     elif type == 'softnms_debug':
         keep = py_cpu_soft_nms(dets, iou_thr)    

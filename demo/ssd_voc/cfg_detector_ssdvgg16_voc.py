@@ -23,7 +23,7 @@ img_size = (300, 300)
 lr_processor = dict(
         type='list',
         params = dict(
-                step=[5, 8],       # 代表第2个(从1开始算)
+                step=[10, 20],       # 代表第2个(从1开始算)
                 lr = [0.0005, 0.0001],
                 warmup_type='linear',
                 warmup_iters=500,
@@ -32,7 +32,7 @@ lr_processor = dict(
 logger = dict(
                 log_level='INFO',
                 log_dir=work_dir,
-                interval=1)
+                interval=10)
 
 model = dict(
         type='one_stage_detector')

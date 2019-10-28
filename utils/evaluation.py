@@ -38,7 +38,7 @@ def eval_dataset_det(cfg_path,
         cfg.resume_from = resume_from
     
     dataset = get_dataset(cfg.valset, cfg.transform_val)
-    dataloader = get_dataloader(dataset, cfg.valloader)
+    dataloader = get_dataloader(dataset, cfg.valloader, len(cfg.gpus))
     
     model = get_model(cfg)
     device = torch.device(cfg.load_device)
@@ -52,7 +52,7 @@ def eval_dataset_det(cfg_path,
         for c_iter, data_batch in enumerate(dataloader):
             with torch.no_grad():  # 停止反向传播，只进行前向计算
                 bbox_det = batch_detector(model, data_batch, 
-                                          device, return_loss=False)
+                                          device, return_loss=False)['bboxes']  # 提取bbox即可(n_cls,)(m,5)
                 # 显示进度
                 if c_iter % 100 == 0:    
                     print('%d / %d finished predict.'%(c_iter, len(dataset)))

@@ -82,3 +82,38 @@ padding到(576,1024,3)，从而得到的三个下采样特征图是(72,128,3)(36
 2. 在retinaface的调试中，源程序设置的neg:pos比例为7:1，
 
 
+### 部署到Jetson Nano
+**关于jetson nano的硬件安装和系统镜像烧录**
+1. 硬件安装和软件烧录：
+    - 核心板部分基本都集成了，就是在安装无线wifi卡的时候，需要把核心板从母版上拆下来(参考https://cloud.tencent.com/developer/article/1421906)
+      同是安装wifi卡前，需要把橙色保护膜剪开个缺口把螺丝固定处漏出来。(更简单的方式是采用那种360随身usb wifi即可)
+    - 软件安装很简单，只需要把nvidia的镜像文件烧录到一个新的microSD卡里边即可，烧录工具采用开源的Etcher。
+    - 然后通电，就能点亮屏幕了。如果使用的是小型7寸屏，需要从母板usb额外提供一根电源线给显示屏，同时母板上J48需要增加短路帽。
+
+
+**关于启动摄像头**
+1. jetson nano支持的摄像头有2种，一种usb类型，另一种是树莓派CSI排线接口的摄像头(但必须是IMX219 sensor，比如Raspberry Pi Camera Module v2)
+参考：https://mp.weixin.qq.com/s?__biz=MjM5NTE3Nzk4MQ==&mid=2651234579&idx=1&sn=7f10f030e9c60b15c6805fa1ea495347&chksm=bd0e75818a79fc977693c16d7eb4dd87709eab82542687208d5ba34cfcc877a2da68ab6a106b&scene=21#wechat_redirect
+摄像头排线安装好以后，检查linux系统是否识别出来的方法是终端运行：ls /dev/vid*, 如果显示了/dev/video0就说明已经识别出来了。
+此时就可以通过opencv等各种方式启动摄像头了。
+
+2. 终端启动CSI摄像头： 参考https://www.yahboom.com/build.html?id=2504&cid=301
+    - nvgstcapture-1.0 启动
+    - nvgstcapture-1.0 --prev-res=3 表示预览视频的分辨率、高度、宽度，其中的数值是从2-12，每个数值代表一个宽高分辨率
+    - nvgstcapture-1.0 --cus-prev-res=1920x1080 表示自定义预览视频分辨率
+    - q + 回车 表示关闭摄像头
+    - j + 回车 表示捕获图片
+
+3. 代码启动摄像头：
+
+
+
+**关于TensorRT**
+1. TensorRt是Nvidia针对神经网络在inference阶段设计的加速器。其优化主要包括：
+    - 合并某些层的操作：比如conv和relu一起做完，从而省去多次内存读写的花费时间
+    - 采用FP16或int8来加速运算：inference阶段对梯度计算的精度要求没有训练阶段那么高，所以可以用低精度数据来加速运算
+    - 对卷积核的计算算法进行优化：卷积计算占了整个计算量的80%，根据卷积核大小和输入超参数来确定用那种算法进行卷积
+    - 对同一输入的多个并行分支可以采用parallel的机制并行计算
+    
+
+**关于安装MNN**

@@ -285,7 +285,7 @@ class SSDHead(nn.Module):
         for i in range(len(self.featmap_sizes)):
             device = cls_scores.device
             anchors.append(self.anchor_generators[i].grid_anchors(
-                    self.featmap_sizes[i], self.strides[i], device=device))   
+                    self.featmap_sizes[i], self.anchor_strides[i], device=device))   
         anchors = torch.cat(anchors, dim=0)     
         
         # 计算每张图的bbox预测

@@ -77,17 +77,10 @@ class OneStageDetector(nn.Module):
 #            bboxes = np.zeros((0, 5), dtype=np.float32)
         bboxes = [bbox.cpu().numpy() for bbox in dets['bboxes']]
         labels = [label.cpu().numpy() for label in dets['labels']]
-        ldmks = [ldmk.cpu().numpy() for ldmk in dets['ldmks']]
-#        # 把结果格式从(k, 5)->(20,)(c,5)
-#        det_bboxes = []
-#        det_labels = []
-#        det_ldmks = []
-#        for i in range(self.bbox_head.num_classes - 1): # 因为预测时的负样本(0)已经被筛掉了，所以这里只找20类range(20)
-#            inds = labels == i + 1    # 注意：从数据集出来到训练以及预测的标签取值范围永远是1-20
-#            det_labels.append(labels[inds, :])
-#            det_bboxes.append(bboxes[inds, :])
-#            det_ldmks.append(ldmks[inds, :])
-            
+        if dets.get('ldmks', None) is not None:
+            ldmks = [ldmk.cpu().numpy() for ldmk in dets['ldmks']]
+        else:
+            ldmks = None            
         return dict(bboxes=bboxes, labels=labels, ldmks=ldmks) # bbox(n_cls,)(k, 5)  ldmk(n_cls,)(k,5,2)
     
 

@@ -39,13 +39,13 @@ class timer(ContextDecorator):
         print('timer: %s elapse %.3f seconds.'%(self.time_id, elapse))
 
 
-@timer('aa')
+@timer('aa')                  # 使用方式1
 def hello(sec):
     for i in range(5):
         time.sleep(sec)
 
 def hello2(sec):
-    with timer('position1'):
+    with timer('position1'):  # 使用方式2
         for i in range(5):
             time.sleep(sec)
     
