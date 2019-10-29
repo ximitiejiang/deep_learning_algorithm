@@ -32,7 +32,7 @@ with trt.Builder(TRT_LOGGER) as builder, builder.create_builder_config() as conf
 ```
 
 
-### 序列化一个模型
+### 模型序列化与反序列化
 1. 序列化一个模型是指把engine转化为一个格式化可存储的数据结构，方便后续进行inference，从而避免每次都要把模型转化为engine(比较费时)，而是先
 保存序列化模型，然后反序列化模型为engine则很快。最终的inference则是用engine来进行。
 2. 序列化的模型并不具有通用性，他跟操作体统，GPU类型，tensorRT版本都有关系。
@@ -41,7 +41,8 @@ with trt.Builder(TRT_LOGGER) as builder, builder.create_builder_config() as conf
 seri_model = engine.serialize()
 ```
 
-4. 反序列化模型：需要先创建一个runtime运行时对象
+4. 反序列化模型：也就是重新把序列化模型转换成engine用来进行推理。
+    - 反序列化需要先创建一个runtime运行时对象
 
 
 5. 保存序列化模型和读取序列化模型：
