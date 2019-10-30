@@ -6,12 +6,14 @@ Created on Sun Sep 22 22:15:27 2019
 @author: ubuntu
 """
 import torch
+import torch.nn.functional as F
 import numpy as np
 from utils.prepare_training import get_config, get_dataset, get_dataloader, get_model
 from utils.checkpoint import load_checkpoint
 from utils.transform import to_device, ImgTransform
 from utils.visualization import vis_loss_acc
 from utils.tools import accuracy
+from utils.tools import timer 
 
 # %% 检测问题
 from model.runner_lib import batch_detector
@@ -68,7 +70,7 @@ def eval_dataset_det(cfg_path,
     voc_eval(all_bbox_cls, dataset, iou_thr=0.5)
     
     
-from utils.tools import timer    
+   
 class DetPredictor():
     """用于对图片(非数据集的情况)进行预测计算，生成待显示的数据
     src: 可以输入img or img_list
@@ -166,11 +168,23 @@ def eval_dataset_cls(cfg_path, device=None):
     print('ACC on dataset: %.3f', n_correct/len(dataset))
 
 
-class ClsPredictor(DetPredictor):
+class ClsPredictor():
     """分类问题的单图或多图预测器"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, cfg_path, load_from=None, load_device=None):
+        super().__init__()
         self.type = 'cls'
+        # 准备验证所用的对象
+        self.cfg = get_config(cfg_path)
+        # 为了便于eval，不必常去修改cfg里边的设置，直接在func里边添加2个参数即可
+        if load_from is not None:
+            self.cfg.load_from = load_from
+        if load_device is not None:
+            self.cfg.load_device = load_device
+        self.model = get_model(self.cfg)
+        self.device = torch.device(self.cfg.load_device)
+        if self.cfg.load_from is not None or self.cfg.resume_from is not None:
+            load_checkpoint(self.model, self.cfg.load_from, self.device)
+        self.model = self.model.to(self.device)
     
     # TODO: 待完成   
     def __call__(self, src):
@@ -179,9 +193,11 @@ class ClsPredictor(DetPredictor):
         for img in src:
             img_data = img_loader(img, self.cfg)
             with torch.no_grad():
-                cls_score = self.model(**img_data, return_loss=False)  # (1,21,480,480)
-                pred = torch.argmax(cls_score.squeeze(), dim=0).cpu().data.numpy()  # (h, w)为每个像素的类别(0-20)
-                yield pred
+                with timer('pytorch_inference'):
+                    cls_score = self.model(**img_data, return_loss=False)
+                    pred = torch.argmax(cls_score.squeeze(), dim=0).cpu().data.numpy().item()
+                    score = F.softmax(cls_score, dim=0)[pred].cpu().data.numpy()
+                yield (pred, score)
                 
                 
 # %% 一些support函数

@@ -36,10 +36,13 @@ class OneStageDetector(nn.Module):
         self.init_weights()
     
     def init_weights(self):
-        self.backbone.init_weights()
-        if self.cfg.neck:
-            self.neck.init_weights()
-        self.bbox_head.init_weights()
+        if self.cfg.resume_from is not None or self.cfg.load_from is not None:  # 如果是恢复训练或加载权重，则不初始化
+            return
+        else:
+            self.backbone.init_weights()
+            if self.cfg.neck:
+                self.neck.init_weights()
+            self.bbox_head.init_weights()
         
         
     def forward(self, imgs, img_metas, return_loss=True, **kwargs):
@@ -103,10 +106,13 @@ class Segmentator(nn.Module):
         self.init_weights()
     
     def init_weights(self):
-        self.backbone.init_weights()
-        if self.cfg.neck:
-            self.neck.init_weights()
-        self.seg_head.init_weights()
+        if self.cfg.resume_from is not None or self.cfg.load_from is not None:  # 如果是恢复训练或加载权重，则不初始化
+            return
+        else:
+            self.backbone.init_weights()
+            if self.cfg.neck:
+                self.neck.init_weights()
+            self.seg_head.init_weights()
     
     def forward(self, imgs, return_loss=True, **kwargs):
         if return_loss:
@@ -150,11 +156,14 @@ class Classifier(nn.Module):
         self.init_weights()
 
     def init_weights(self):
-        self.backbone.init_weights()
-        if self.cfg.neck:
-            self.neck.init_weights()
-        if self.cfg.head:
-            self.cls_head.init_weights()
+        if self.cfg.resume_from is not None or self.cfg.load_from is not None:  # 如果是恢复训练或加载权重，则不初始化
+            return
+        else:
+            self.backbone.init_weights()
+            if self.cfg.neck:
+                self.neck.init_weights()
+            if self.cfg.head:
+                self.cls_head.init_weights()
     
     def forward(self, imgs, return_loss=True, **kwargs):
         if return_loss:
@@ -179,12 +188,13 @@ class Classifier(nn.Module):
         return out_dict
     
     def forward_test(self, imgs, **kwargs):
-        x = self.backbone(imgs)
+        outs = self.backbone(imgs)
         if self.cfg.neck:
-            x = self.neck(x)
-        outs = self.cls_head(x)  
+            outs = self.neck(outs)
+        if self.cfg.cls_head:
+            outs = self.cls_head(outs)  
         # TODO: 处理分割数据结果
-        return outs
+        return outs.reshape(-1)  # (n_cls,)
     
     def get_losses(self, preds, labels):
         """用于代替head的get_loss"""

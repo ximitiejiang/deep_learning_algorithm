@@ -1,5 +1,5 @@
 # This sample uses an MNIST PyTorch model to create a TensorRT Inference Engine
-from demo.onnx2trt.model import MnistModel
+from demo.trt_pytorch_mnist.model import MnistModel
 from PIL import Image
 import numpy as np
 

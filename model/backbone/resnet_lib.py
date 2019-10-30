@@ -182,8 +182,6 @@ class ResNet(nn.Module):
         if self.classify_classes is not None:
             self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1,1))      #　注意: adaptiveAvgpool用力输出任意w,h的特征图，这里是把w,h收缩为一个点，即w=h=1
             self.fc = nn.Linear(in_channels, self.classify_classes)  # 注意：由于adaptiveAvgpool已经把w,h收缩到1,所以全连接的输入神经元个数就是层数，也就是前面已经乘expansion的结果。不能用out_channel因为没乘expansion.
-        # 权重初始化
-        self.init_weights()
             
     def forward(self, x):
         # 先执行前面的4个层

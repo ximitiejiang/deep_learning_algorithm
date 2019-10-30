@@ -100,17 +100,17 @@ def allocate_buffers(engine):
     outputs = []
     bindings = []
     stream = cuda.Stream()
-    for binding in engine:
+    for binding in engine:   # binding相当于一组字符串名称，包括'data','prob', engine可以切片， engine[0]='data', engine[1]='prob'
         size = trt.volume(engine.get_binding_shape(binding)) * engine.max_batch_size
         dtype = trt.nptype(engine.get_binding_dtype(binding))
         # Allocate host and device buffers
-        host_mem = cuda.pagelocked_empty(size, dtype)  # 就是创建一个array数组作为主内存
-        device_mem = cuda.mem_alloc(host_mem.nbytes)
+        host_mem = cuda.pagelocked_empty(size, dtype)  # (784,)是把img拉直的一个一维数组，作为主机的缓存
+        device_mem = cuda.mem_alloc(host_mem.nbytes)   # obj，可以int(obj)，是所占的GPU内存比特数
         # Append the device buffer to device bindings.
         bindings.append(int(device_mem))
         # Append to the appropriate list.
         if engine.binding_is_input(binding):
-            inputs.append(HostDeviceMem(host_mem, device_mem))
+            inputs.append(HostDeviceMem(host_mem, device_mem))  # (2,) 分别是data和prob
         else:
             outputs.append(HostDeviceMem(host_mem, device_mem))
     return inputs, outputs, bindings, stream

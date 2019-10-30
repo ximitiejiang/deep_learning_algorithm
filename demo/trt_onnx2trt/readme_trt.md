@@ -1,4 +1,9 @@
+# 用tensorRT进行深度神经网络的部署
+
+
 ### 关于tensorRT
+1. 当前最新版本是tensorRT6.0, 需要匹配cuda9.0+cudnn7.6.3以上, 或者cuda9.2+cudnn7.6.3以上。
+由于我安装的cuda9.0是conda里边的配置是cuda9.0+cudnn7.1.4，他没有新版本的cuda9.0+cudnn7.6.3，所以cudnn也就没法升级除非把cuda版本提上去，但担心有其他不匹配问题，所以暂时不升了。
 
 
 ### C++ API和python API
@@ -33,8 +38,8 @@ with trt.Builder(TRT_LOGGER) as builder, builder.create_builder_config() as conf
 
 
 ### 模型序列化与反序列化
-1. 序列化一个模型是指把engine转化为一个格式化可存储的数据结构，方便后续进行inference，从而避免每次都要把模型转化为engine(比较费时)，而是先
-保存序列化模型，然后反序列化模型为engine则很快。最终的inference则是用engine来进行。
+1. 序列化一个模型是指把engine转化为一个格式化可存储的数据结构，方便后续进行inference，从而避免每次都要把模型转化为engine(比较费时)，
+而是先保存序列化模型，然后反序列化模型为engine则很快。最终的inference则是用engine来进行。
 2. 序列化的模型并不具有通用性，他跟操作体统，GPU类型，tensorRT版本都有关系。
 3. 序列化模型生成：就是生成modelstream, 这种序列化模型也叫作plan file, 所以生成序列化模型的子程序也叫作make_plan()
 ```
@@ -73,9 +78,25 @@ with engine.create_execution_context() as context:  #进一步创建一个contex
     return h_output　　　　  # 返回输出
 ```
 
-### 模型的部署
-1. 模型的部署，是指对序列化模型也就是plan，拷贝到目标机器上，执行相关的分类、回归、检测、分割任务。前面都是make_plan()，后边就是execute_plan()
-2. 
+
+
+### 调试：
+1. 报错：pycuda._driver.LogicError: explicit_context_dependent failed: invalid device context - no currently active context?
+也就是在预分配host，device内存的时候就报错了h_input = cuda.pagelocked_empty(trt.volume(engine.get_binding_shape(0)), dtype=trt.nptype(cfg.DTYPE))
+
+问题原因：pycuda.driver没有初始化，导致无法得到context，需要在导入pycuda.driver后再导入pycuda.autoinit
+```
+import pycuda.driver as cuda
+import pycuda.autoinit
+```
+
+2. 报错：UnicodeDecodeError: 'utf-8' codec can't decode byte 0xaa in position 8: invalid start byte
+也就是在逆序列化已保存的engine加载到内存中时，在engine = runtime.deserialize_cuda_engine(f.read())时报错
+
+问题原因：在打开导入序列化模型时，需要采用'rb'模式才能读，否则不能读取，即在读取序列化模型时，需要做3件事
+    - 打开文件，必须用rb模式：with open(cfg.work_dir + 'serialized.engine', 'rb') as f
+    - 创建runtime：trt.Runtime(logger) as runtime
+    - 基于runtime生成反序列化模型：engine = runtime.deserialize_cuda_engine(f.read())
 
 
 ### 如何用python来优化性能
