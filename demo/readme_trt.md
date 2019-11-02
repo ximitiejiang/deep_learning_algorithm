@@ -99,5 +99,11 @@ import pycuda.autoinit
     - 基于runtime生成反序列化模型：engine = runtime.deserialize_cuda_engine(f.read())
 
 
+
+
+### 关于onnx
+1. onnx最核心就是一个onnx.proto文件，通过了解protobuf的知识，可以知道proto文件的编译和读写方式。
+
+
 ### 如何用python来优化性能
 参考：nvidia的tensorRT developer guide手册中的'How do i optimize my python performance?'

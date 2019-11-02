@@ -1,0 +1,2 @@
+2019-10-10 14:02:53,509 - INFO - Start running, host: ubuntu@ubun, work_dir: /home/ubuntu/suliang_git/deep_learning_algorithm/v01/work_dirs/retinanet_voc
+2019-10-10 14:02:53,511 - INFO - workflow: [('train', 1)], max: 20 epochs
