@@ -129,7 +129,7 @@ class SegPredictor(DetPredictor):
                 # (h,w,3)这一步不算是分割的时间，但转换耗时较长，影响cam实时显示
                 # TODO: 考虑换成PIL.Image提取然后转换到cv2显示
                 pred_img = label2color(pred, 'voc')   
-                yield pred_img
+                yield [pred_img]
                 
                 
                 
@@ -197,7 +197,7 @@ class ClsPredictor():
                     cls_score = self.model(**img_data, return_loss=False)
                     pred = torch.argmax(cls_score.squeeze(), dim=0).cpu().data.numpy().item()
                     score = F.softmax(cls_score, dim=0)[pred].cpu().data.numpy()
-                yield (pred, score)
+                yield [pred, score]
                 
                 
 # %% 一些support函数

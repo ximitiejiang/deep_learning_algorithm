@@ -102,8 +102,117 @@ import pycuda.autoinit
 
 
 ### 关于onnx
-1. onnx最核心就是一个onnx.proto文件，通过了解protobuf的知识，可以知道proto文件的编译和读写方式。
+1. onnx后缀的文件，内核是基于protobuf进行数据结构定义的，通过了解protobuf的知识，可以知道proto文件的编译和读写方式。
+2. onnx文件，都共享一个onnx.proto文件，这就是基于protobuf生成的模型数据结构，该proto文件基本内容包括：
+```
+// copyright Facebook Inc. and Microsoft Corporation. 可见是facebook和微软一起，基于google的协议定制的数据结构
+syntax = "proto2"；
+// Nodes: 也就是模型的每一层：conv, relu...
+message NodeProto{
+    repeated string input = 1;
+    repeated string output = 2;
+    optional string name = 3;
+    optional string op_type = 4;
+    repeated AttributeProto attribute = 5;
+    optional string doc_string = 6;
+    optional string domain = 7;
+}
+// Models: 也就是整个模型最大的集合，包含图和版本信息等
+message ModelProto{
+    optional int64 ir_version = 1;
+    optional string producer_name = 2;
+    optional string producer_version = 3;
+    optional string domain = 4;
+    optional int64 model_version = 5;
+    optional string doc_string = 6;
+    optional GrapProto graph = 7;
+}
 
+// Graphs: 也就是模型的构造和权重(最核心部分)
+message GraphProto{
+    repeated NodeProto node = 1;
+    optional string name = 2;
+    repeated TesnorProto initializer = 5;  // 即所有权重
+    ...
+}
+```
+
+3. 读取一个onnx文件：如下是一个已经读取出来的onnx模型如下，可见他的数据是安装onnx.proto定义的结构进行存放的：
+```
+ir_version: 1
+producer_name: "pytorch"
+producer_version: "0.2"
+domain: "com.facebook"
+// graph信息：包含每个node
+graph {
+  // 第一个node：也就是网络第一层，为一个conv  
+  node {
+    input: "1"
+    input: "2"
+    output: "11"
+    op_type: "Conv"
+    attribute {
+      name: "kernel_shape"
+      ints: 5
+      ints: 5
+    }
+    attribute {
+      name: "strides"
+      ints: 1
+      ints: 1
+    }
+    attribute {
+      name: "pads"
+      ints: 2
+      ints: 2
+      ints: 2
+      ints: 2
+    }
+    attribute {
+      name: "dilations"
+      ints: 1
+      ints: 1
+    }
+    attribute {
+      name: "group"
+      i: 1
+    }
+  }
+  // 第二个node: 也就是网络第二层, 为一个add操作
+  node {
+    input: "11"
+    input: "3"
+    output: "12"
+    op_type: "Add"
+    attribute {
+      name: "broadcast"
+      i: 1
+    }
+    attribute {
+      name: "axis"
+      i: 1
+    }
+  }
+  // 第三个node：也就是第三层，为一个relu
+  node {
+    input: "12"
+    output: "13"
+    op_type: "Relu"
+  }
+}
+  ...
+// graph之外的其他信息
+name: "torch-jit-export"
+initializer {
+dims: 64
+dims: 1
+dims: 5
+dims: 5
+data_type: FLOAT
+name: "2"
+raw_data: "\034
+
+```
 
 ### 如何用python来优化性能
 参考：nvidia的tensorRT developer guide手册中的'How do i optimize my python performance?'

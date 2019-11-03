@@ -8,7 +8,8 @@ Created on Wed Sep 25 16:38:08 2019
 def get_classes(dataset_name):
     classes_dict = {'voc': VOC_CLASSES,
                     'coco': COCO_CLASSES,
-                    'widerface': WIDERFACE_CLASSES}
+                    'widerface': WIDERFACE_CLASSES,
+                    'imagenet': IMAGENET_CLASSES}
     return classes_dict[dataset_name]
 
 
@@ -17,8 +18,6 @@ VOC_CLASSES = [
         'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 'person',
         'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor'
     ]
-
-
 
 
 COCO_CLASSES = [
@@ -37,4 +36,18 @@ COCO_CLASSES = [
         'scissors', 'teddy_bear', 'hair_drier', 'toothbrush'
     ]
 
+
 WIDERFACE_CLASSES = ['face',]
+
+
+def imagenet_labels(label_file):
+    """获得imagenet label"""
+    labels = []
+    with open(label_file) as f:
+        lines = f.readlines()   # 1000行标签
+        for line in lines:
+            label = line[10:-1]
+            labels.append(label)
+    return labels
+
+IMAGENET_CLASSES = imagenet_labels('imagenet_labels.txt')

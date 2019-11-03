@@ -398,9 +398,9 @@ def vis_cam(src, predictor, class_names=None, score_thr=None):
         if predictor.type == 'det':
             for results in predictor(img):
                 vis_all_opencv(*results, class_names, score_thr)
-        elif predictor.type == 'seg':
+        elif predictor.type == 'seg' or predictor.type=='trt':
             for result in predictor(img):
-                cv2.imshow('seg', result)
+                cv2.imshow(predictor.type, result[0])
                 
 
 

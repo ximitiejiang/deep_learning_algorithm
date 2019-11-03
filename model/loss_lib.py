@@ -5,6 +5,7 @@ Created on Thu Oct 10 21:22:44 2019
 
 @author: ubuntu
 """
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,6 +17,12 @@ from utils.ious import calc_ious_tensor
    同时处理损失的权重和缩减问题
 
 """
+
+def softmax(x):
+    """numpy版本softmax函数, x(m,)为一维数组"""
+    exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))  # 在np.exp(x - C), 相当于对x归一化，防止因x过大导致exp(x)无穷大使softmax输出无穷大 
+    return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
+
 
 # %%
 class CrossEntropyLoss(nn.Module):
