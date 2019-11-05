@@ -7,7 +7,7 @@ Created on Wed Oct 30 08:10:13 2019
 """
 import cv2
 import tensorrt as trt
-from utils.onnx import inference_trt, TRTPredictor
+from utils.onnx import TRTPredictor
 from utils.dataset_classes import get_classes
 from utils.visualization import vis_cam
 """
@@ -35,11 +35,12 @@ if __name__ == '__main__':
     if task == 'integrate':
         labels = get_classes('imagenet')
         model_path = '/home/ubuntu/mytrain/onnx_to_trt/serialized.engine'
-        input_size = (224, 224) # (w, h)
-        for result in inference_trt(model_path, cfg.imgs_path, input_size, labels, True):
-            pred, score = result
-            print('pred: %s [%.4f]'%(pred, score))    
-    
+        input_size = (224, 224) # (w, h)  
+        predictor = TRTPredictor(model_path, input_size, labels)
+        img = cv2.imread(cfg.imgs_path[0]);  # 也可以先打开所有img
+        for result in predictor([img]):
+            cv2.imshow('result', result[0])
+            
     
     if task == 'cam':
         labels = get_classes('imagenet')
@@ -52,7 +53,6 @@ if __name__ == '__main__':
     if task == 'infe_pt': # 用pytorch推理，对比时间消耗
         from utils.evaluation import ClsPredictor   
         labels = get_classes('imagenet')
-        
         cfg_path = 'cfg_classifier_resnet50_imagenet.py'
         img_id = 1
         gt_label = cfg.gt_labels[img_id]
@@ -63,7 +63,7 @@ if __name__ == '__main__':
         pred, score = list(predictor([img]))[0]
         pred = labels[pred]
         print('pred: %s [%.4f], gt: %s'%(pred, score, gt_label))
-        
+    
         """
         比对结果：只考虑计算模型计算时间，其他图片预处理等时间都不考虑，即trt的do_inference()，和pytorch的model forward()
         1. tensorRT inference时间: 0.061s

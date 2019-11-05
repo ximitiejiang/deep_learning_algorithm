@@ -50,4 +50,4 @@ def imagenet_labels(label_file):
             labels.append(label)
     return labels
 
-IMAGENET_CLASSES = imagenet_labels('imagenet_labels.txt')
+#IMAGENET_CLASSES = imagenet_labels('utils/imagenet_labels.txt')
