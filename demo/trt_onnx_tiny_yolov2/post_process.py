@@ -104,7 +104,7 @@ class PostprocessYOLO(object):
         # Scale boxes back to original image shape:
         width, height = resolution_raw
         image_dims = [width, height, width, height]
-        boxes = boxes * image_dims    # 把box恢复原始尺寸
+        boxes = boxes * image_dims    # 把box放大到cam width, cam_height
 
         # Using the candidates from the previous (loop) step, we apply the non-max suppression
         # algorithm that clusters adjacent bounding boxes to a single bounding box:

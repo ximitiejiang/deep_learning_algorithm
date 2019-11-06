@@ -27,9 +27,9 @@ def img_loader(img_raw, pagelocked_buffer, input_size,
     
     img = img_raw[...,[2, 1, 0]]; # 先to rgb
     img = imnormalize(img / 255, mean, std)  # 再归一化 hwc,rgb
-    img = img_raw.transpose([2, 0, 1]).astype(trt.nptype(trt.float32)) # chw, rgb
+    img = img.transpose([2, 0, 1]).astype(trt.nptype(trt.float32)) # chw, rgb
 
-    np.copyto(pagelocked_buffer, img.reshape(-1,))  # (c*h*w, )展平送入GPU
+    np.copyto(pagelocked_buffer, img.reshape(-1,))  # (c*h*w, )展平送入GPU，这一步所有的都要做，有的做法是直接hin = img(即因为分配的内存hin是展平的，所把不展平的img放入也会自动展平)
     return img_raw
 
 
@@ -48,6 +48,7 @@ def get_engine(model_path, logger=None, saveto=None):
     
     # 如果是onnx模型，则需要先转化为engine    
     elif model_path.split('.')[-1] == 'onnx':
+        print('start transfer onnx model...')
         with trt.Builder(logger) as builder, builder.create_network() as network, trt.OnnxParser(network, logger) as parser: # with + 局部变量便于释放内存
             builder.max_workspace_size = 1*1 << 20
             builder.max_batch_size = 1
@@ -62,12 +63,29 @@ def get_engine(model_path, logger=None, saveto=None):
     return engine
 
 
+def allocate_buffers(engine):
+    # 分配内存： 分配内存可以实现分配，因为他只分配一次，是所有图片共享
+    hin = cuda.pagelocked_empty(trt.volume(engine.get_binding_shape(0)), dtype=trt.nptype(trt.float32))  # (c*h*w,)把输入图片拉直的一维数组
+    hout = cuda.pagelocked_empty(trt.volume(engine.get_binding_shape(1)), dtype=trt.nptype(trt.float32)) # (n_cls,)输出预测的一维数组
+    din = cuda.mem_alloc(hin.nbytes)    #　为GPU设备分配内存
+    dout = cuda.mem_alloc(hout.nbytes)    
+    stream = cuda.Stream()              # 创建stream流来拷贝输入输出，进行推理
+    buffers = Dict(hin=hin, hout=hout, din=din, dout=dout, stream=stream)
+    return buffers
+
+
+def do_inference(buffers, context):
+    # 进行推断，最后的结果就在buffers.hout
+    cuda.memcpy_htod_async(buffers.din, buffers.hin, buffers.stream)  # 数据从host(cpu)送入device(GPU)
+    context.execute_async(bindings=[int(buffers.din), int(buffers.dout)], stream_handle=buffers.stream.handle)  # 执行推断
+    cuda.memcpy_dtoh_async(buffers.hout, buffers.dout, buffers.stream)# 把预测结果从GPU返回cpu: device to host
+    buffers.stream.synchronize()  # 同步
+
+
 def softmax(x):
     """numpy版本softmax函数, x(m,)为一维数组"""
     exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))  # 在np.exp(x - C), 相当于对x归一化，防止因x过大导致exp(x)无穷大使softmax输出无穷大 
     return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
-
-
 
 
 class TRTPredictor():
@@ -86,12 +104,7 @@ class TRTPredictor():
         # 创建context
         self.context = self.engine.create_execution_context()
         # 分配内存： 分配内存可以实现分配，因为他只分配一次，是所有图片共享
-        hin = cuda.pagelocked_empty(trt.volume(self.engine.get_binding_shape(0)), dtype=trt.nptype(trt.float32))  # (c*h*w,)把输入图片拉直的一维数组
-        hout = cuda.pagelocked_empty(trt.volume(self.engine.get_binding_shape(1)), dtype=trt.nptype(trt.float32)) # (n_cls,)输出预测的一维数组
-        din = cuda.mem_alloc(hin.nbytes)    #　为GPU设备分配内存
-        dout = cuda.mem_alloc(hout.nbytes)    
-        self.buffers = Dict(hin=hin, hout=hout, din=din, dout=dout)
-        self.stream = cuda.Stream()              # 创建stream流来拷贝输入输出，进行推理
+        self.buffers = allocate_buffers(self.engine)
         
     def __call__(self, src):
         # 开始预测
@@ -100,10 +113,7 @@ class TRTPredictor():
         for img in src:
             img_raw = img_loader(img, self.buffers.hin, self.input_size)
             # do inference
-            cuda.memcpy_htod_async(self.buffers.din, self.buffers.hin, self.stream)  # 数据从host(cpu)送入device(GPU)
-            self.context.execute_async(bindings=[int(self.buffers.din), int(self.buffers.dout)], stream_handle=self.stream.handle)  # 执行推断
-            cuda.memcpy_dtoh_async(self.buffers.hout, self.buffers.dout, self.stream)# 把预测结果从GPU返回cpu: device to host
-            self.stream.synchronize()
+            do_inference(self.buffers, self.context)
             # 结果解析
             pred = np.argmax(self.buffers.hout)   # 第几个label
             score = np.max(softmax(self.buffers.hout))
