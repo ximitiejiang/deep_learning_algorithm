@@ -4,7 +4,16 @@
 ### 关于tensorRT
 1. 当前最新版本是tensorRT6.0, 需要匹配cuda9.0+cudnn7.6.3以上, 或者cuda9.2+cudnn7.6.3以上。
 由于我安装的cuda9.0是conda里边的配置是cuda9.0+cudnn7.1.4，他没有新版本的cuda9.0+cudnn7.6.3，所以cudnn也就没法升级除非把cuda版本提上去，但担心有其他不匹配问题，所以暂时不升了。
-
+tensorRT的安装比较简单，只要之前通过conda安装过cuda toolkit，则下载tar安装包(deb形式容易安装失败)，解压缩，并把路径导入系统路径文件中，这样c++ api就可以使用了。
+如果需要python api，则再进入解压缩包里边的python文件夹，运行其中一个跟自己系统匹配的whl文件，我是采用：
+`pip install tensorrt-6.0.1.5-cp37-none-linux_x86_64.whl`
+然后安装Pythongraphsugeon:
+```
+cd TensorRT-6.x.x.x/graphsurgeon
+pip install graphsurgeon-0.4.1-py2.py3-none-any.whl
+```
+然后安装pycuda: `pip install 'pycuda>=2019.1.1'`
+最后检查是否安装成功：`python    import tensorrt as trt`
 
 ### C++ API和python API
 1. 一般来说，c++和python api都很类似都能支持项目需求，但在一些性能要求很高(实时性敏感)，安全要求很高(自动驾驶)的场景，c++是更好选择。
@@ -91,14 +100,36 @@ import pycuda.autoinit
 ```
 
 2. 报错：UnicodeDecodeError: 'utf-8' codec can't decode byte 0xaa in position 8: invalid start byte
-也就是在逆序列化已保存的engine加载到内存中时，在engine = runtime.deserialize_cuda_engine(f.read())时报错
-
+也就是在逆序列化已保存的engine加载到内存中时，在engine = runtime.deserialize_cuda_engine(f.read())时报错。
 问题原因：在打开导入序列化模型时，需要采用'rb'模式才能读，否则不能读取，即在读取序列化模型时，需要做3件事
     - 打开文件，必须用rb模式：with open(cfg.work_dir + 'serialized.engine', 'rb') as f
     - 创建runtime：trt.Runtime(logger) as runtime
     - 基于runtime生成反序列化模型：engine = runtime.deserialize_cuda_engine(f.read())
 
 
+3. 报错：yolov2_onnx模型出来的预测结果总是置信度太低，没有准确性可言。
+问题原因：
+    - 自己的代码里边对输出的bbox没有做处理就送去显示了，但实际上yolov2的输出形式是(xmin,ymin,w,h)，需要转化为(xmin,ymin,xmax,ymax)
+    - 自己的代码里边多写了对预测图片的归一化操作，实际的预测过程不需要归一化。
+
+
+4. 报错：[libprotobuf ERROR google/protobuf/io/zero_copy_stream_impl_lite.cc:155] Cannot allocate buffer larger than kint32max for StringOutputStream.
+*** ValueError: Unable to convert message to str
+这个错误是在yolov3转换到onnx的过程中，在生成graph时报出，也就是graph无法正确生成，并且是在helper.py文件中的make_graph()函数最后graph返回时报错，我当时怀疑
+graph应该已经生成为什么还会报错。网上搜了下，https://blog.csdn.net/qq_22764813/article/details/85626501，有人说是protobuf的bug，也即是graph文件太大，应该想办法减小graph大小，
+一种方式是升级protobuf从3.0到3.6.1版本。
+
+
+5. 报错：onnx.onnx_cpp2py_export.checker.ValidationError: Op registered for Upsample is deprecated in domain_version of 11
+
+==> Context: Bad node spec: input: "085_convolutional_lrelu" output: "086_upsample" name: "086_upsample" op_type: "Upsample" attribute 
+{ name: "mode" s: "nearest" type: STRING } attribute { name: "scales" floats: 1 floats: 1 floats: 2 floats: 2 type: FLOATS }
+问题原因：onnx更新太快了，在官方1.5.1以后就取消了upsample层，所以对yolov3报错了。而我的onnx是安装的1.6.1，不过话说回来upsample取消，那用啥? interpolate? 那就要么更改yolov3的模型换掉upsample然后重新训练，要么没辙。
+参考https://devtalk.nvidia.com/default/topic/1052153/jetson-nano/tensorrt-backend-for-onnx-on-jetson-nano/1
+修改方式是先降级onnx到1.4.1
+pip uninstall onnx
+pip install onnx==1.4.1
+可惜我用conda安装的onnx，居然没有旧版本可用，想conda uninstall onnx，提示我要下载600M的东西，我x，安装时10M不到，卸载要动600M...
 
 
 ### 关于onnx

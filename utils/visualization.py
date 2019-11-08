@@ -367,19 +367,26 @@ def vis_dataset_one_class(dataset, class_name, saveto=None, show=None):
     
 # %%
 
-def vis_cam(src, predictor, class_names=None, score_thr=None):
+def vis_cam(src, predictor, class_names=None, score_thr=None, resolution=None):
     """用于对摄像头数据进行检测
     args:
         src: int(表示cam_id) or str(表示video文件路径)
         predictor: 表示预测计算器，用来创建模型，计算显示需要的输出(img, bboxes, scores, labels)
+        resolution: (w, h)用来在cam放大或者缩小显示
     """
     # 如果是int则为cam_id, 如果是str则为video path
     if isinstance(src, (int, str)):
         if isinstance(src, int):
             cam_id = src
             capture = cv2.VideoCapture(cam_id)
+            if resolution is not None:
+                capture.set(cv2.CAP_PROP_FRAME_WIDTH, resolution[0])
+                capture.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution[1])
         elif isinstance(src, str):
             capture = cv2.VideoCapture(src)
+            if resolution is not None:
+                capture.set(cv2.CAP_PROP_FRAME_WIDTH, resolution[0])
+                capture.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution[1])
         assert capture.isOpened(), 'Cannot capture source'
     # 循环预测
     print('Press "Esc", "q" or "Q" to exit.')
@@ -397,10 +404,18 @@ def vis_cam(src, predictor, class_names=None, score_thr=None):
         # 返回迭代器
         if predictor.type == 'det':
             for results in predictor(img):
+                if resolution is not None:  # 改变显示分辨率
+                    from utils.transform import imresize
+                    results[0], ws, hs = imresize(results[0], resolution, return_scale=True)  # img缩放
+                    scale_factor = np.array([ws, hs, ws, hs], dtype=np.float32)
+                    results[1] = results[1] * scale_factor                      # bbox缩放
                 vis_all_opencv(*results, class_names, score_thr)
-        elif predictor.type == 'seg' or predictor.type=='trt':
+        elif predictor.type in ['seg', 'cls']:
             for result in predictor(img):
-                cv2.imshow(predictor.type, result[0])
+                if resolution is not None:  # 改变显示分辨率
+                    from utils.transform import imresize
+                    result = imresize(result[0], resolution)
+                cv2.imshow(predictor.type, result)
                 
 
 

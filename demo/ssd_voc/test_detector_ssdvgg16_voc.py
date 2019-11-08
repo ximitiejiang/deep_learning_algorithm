@@ -22,7 +22,7 @@ def train_ssd(cfg_path, resume_from=None):
     
 if __name__ == "__main__":
     
-    task = 'log'
+    task = 'train'
     cfg_path = './cfg_detector_ssdvgg16_voc.py'
     cfg = get_config(cfg_path)
     

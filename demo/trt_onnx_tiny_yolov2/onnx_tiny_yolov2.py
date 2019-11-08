@@ -18,6 +18,18 @@ from utils.onnx import img_loader, get_engine, allocate_buffers, do_inference
 from utils.visualization import vis_all_opencv
 from demo.trt_onnx_tiny_yolov2.post_process import PostprocessYOLO
 
+"""
+这部分算法主要参考：https://github.com/tsutof/tiny_yolov2_onnx_cam
+1. 手动下载yolov2的onnx模型：https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/tiny_yolov2
+2. 指定模型对应的标签：该onnx模型是在voc数据集下训练得到，所以要获得voc的标签列表
+3. 指定该模型的输入图片尺寸(416,416)，以及输出尺寸(1,125,13,13)
+4. 指定该模型对输入图片的预处理过程：注意inference不需要对img进行归一化。
+    - resize到(416,416)
+5. 
+"""
+
+
+
 class cfg():
     work_dir = '/home/ubuntu/mytrain/onnx_tiny_yolov2/'
 #    model_path = '/home/ubuntu/MyWeights/onnx/tiny_yolov2/Model.onnx'
@@ -41,7 +53,10 @@ class cfg():
             num_categories =  20)
     
 
-def inference_tiny_yolov2(src):
+def inference_img():
+    pass
+
+def inference_cam_tiny_yolov2(src):
     """采用tiny yolov2的onnx模型进行预测"""
     # 对摄像头进行设置
     FPS=30
@@ -75,8 +90,7 @@ def inference_tiny_yolov2(src):
         if ch == 27 or ch == ord('q') or ch == ord('Q'):
             break
         # img loader之后图片会送入GPU
-        _ = img_loader(img_raw, buffers.hin, cfg.img_size, cfg.mean, cfg.std)  # chw
-        # 开始预测
+        _ = img_loader(img_raw, buffers.hin, cfg.img_size, None, None)  # 注意yolov2 inference不需要normalize
         do_inference(buffers, context)
         # 对结果进行处理
         hout = [buffers.hout.reshape(cfg.output_shape)]  # 把得到的GPU展平数据恢复形状(1,125,13,13), 同时放入list中作为多个特征图的一张，只不过这里只使用了一张特征图
@@ -92,8 +106,8 @@ def inference_tiny_yolov2(src):
         vis_all_opencv(img_raw, bboxes, scores, labels,
                        win_name=frame_info,
                        class_names=categories, 
-                       score_thr=0.1)
+                       score_thr=0.3)
     cap.release()
 
 if __name__ == "__main__":
-    inference_tiny_yolov2(src=0)
+    inference_cam_tiny_yolov2(src=0)

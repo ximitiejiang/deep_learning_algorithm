@@ -7,7 +7,7 @@ Created on Wed Oct 30 08:10:13 2019
 """
 import cv2
 import tensorrt as trt
-from utils.onnx import TRTPredictor
+from utils.onnx import ClsTRTPredictor
 from utils.dataset_classes import get_classes
 from utils.visualization import vis_cam
 """
@@ -36,7 +36,7 @@ if __name__ == '__main__':
         labels = get_classes('imagenet')
         model_path = '/home/ubuntu/mytrain/onnx_to_trt/serialized.engine'
         input_size = (224, 224) # (w, h)  
-        predictor = TRTPredictor(model_path, input_size, labels)
+        predictor = ClsTRTPredictor(model_path, input_size, labels)
         img = cv2.imread(cfg.imgs_path[0]);  # 也可以先打开所有img
         for result in predictor([img]):
             cv2.imshow('result', result[0])
@@ -46,8 +46,8 @@ if __name__ == '__main__':
         labels = get_classes('imagenet')
         model_path = '/home/ubuntu/mytrain/onnx_to_trt/serialized.engine'
         input_size = (224, 224) # (w, h)
-        predictor = TRTPredictor(model_path, input_size, labels)
-        vis_cam(0, predictor, labels)    
+        predictor = ClsTRTPredictor(model_path, input_size, labels)
+        vis_cam(0, predictor, labels, resolution=(800, 800))    
     
     
     if task == 'infe_pt': # 用pytorch推理，对比时间消耗
