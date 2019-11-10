@@ -88,50 +88,6 @@ with engine.create_execution_context() as context:  #进一步创建一个contex
 ```
 
 
-
-### 调试：
-1. 报错：pycuda._driver.LogicError: explicit_context_dependent failed: invalid device context - no currently active context?
-也就是在预分配host，device内存的时候就报错了h_input = cuda.pagelocked_empty(trt.volume(engine.get_binding_shape(0)), dtype=trt.nptype(cfg.DTYPE))
-
-问题原因：pycuda.driver没有初始化，导致无法得到context，需要在导入pycuda.driver后再导入pycuda.autoinit
-```
-import pycuda.driver as cuda
-import pycuda.autoinit
-```
-
-2. 报错：UnicodeDecodeError: 'utf-8' codec can't decode byte 0xaa in position 8: invalid start byte
-也就是在逆序列化已保存的engine加载到内存中时，在engine = runtime.deserialize_cuda_engine(f.read())时报错。
-问题原因：在打开导入序列化模型时，需要采用'rb'模式才能读，否则不能读取，即在读取序列化模型时，需要做3件事
-    - 打开文件，必须用rb模式：with open(cfg.work_dir + 'serialized.engine', 'rb') as f
-    - 创建runtime：trt.Runtime(logger) as runtime
-    - 基于runtime生成反序列化模型：engine = runtime.deserialize_cuda_engine(f.read())
-
-
-3. 报错：yolov2_onnx模型出来的预测结果总是置信度太低，没有准确性可言。
-问题原因：
-    - 自己的代码里边对输出的bbox没有做处理就送去显示了，但实际上yolov2的输出形式是(xmin,ymin,w,h)，需要转化为(xmin,ymin,xmax,ymax)
-    - 自己的代码里边多写了对预测图片的归一化操作，实际的预测过程不需要归一化。
-
-
-4. 报错：[libprotobuf ERROR google/protobuf/io/zero_copy_stream_impl_lite.cc:155] Cannot allocate buffer larger than kint32max for StringOutputStream.
-*** ValueError: Unable to convert message to str
-这个错误是在yolov3转换到onnx的过程中，在生成graph时报出，也就是graph无法正确生成，并且是在helper.py文件中的make_graph()函数最后graph返回时报错，我当时怀疑
-graph应该已经生成为什么还会报错。网上搜了下，https://blog.csdn.net/qq_22764813/article/details/85626501，有人说是protobuf的bug，也即是graph文件太大，应该想办法减小graph大小，
-一种方式是升级protobuf从3.0到3.6.1版本。
-
-
-5. 报错：onnx.onnx_cpp2py_export.checker.ValidationError: Op registered for Upsample is deprecated in domain_version of 11
-
-==> Context: Bad node spec: input: "085_convolutional_lrelu" output: "086_upsample" name: "086_upsample" op_type: "Upsample" attribute 
-{ name: "mode" s: "nearest" type: STRING } attribute { name: "scales" floats: 1 floats: 1 floats: 2 floats: 2 type: FLOATS }
-问题原因：onnx更新太快了，在官方1.5.1以后就取消了upsample层，所以对yolov3报错了。而我的onnx是安装的1.6.1，不过话说回来upsample取消，那用啥? interpolate? 那就要么更改yolov3的模型换掉upsample然后重新训练，要么没辙。
-参考https://devtalk.nvidia.com/default/topic/1052153/jetson-nano/tensorrt-backend-for-onnx-on-jetson-nano/1
-修改方式是先降级onnx到1.4.1
-pip uninstall onnx
-pip install onnx==1.4.1
-可惜我用conda安装的onnx，居然没有旧版本可用，想conda uninstall onnx，提示我要下载600M的东西，我x，安装时10M不到，卸载要动600M...
-
-
 ### 关于onnx
 1. onnx后缀的文件，内核是基于protobuf进行数据结构定义的，通过了解protobuf的知识，可以知道proto文件的编译和读写方式。
 2. onnx文件，都共享一个onnx.proto文件，这就是基于protobuf生成的模型数据结构，该proto文件基本内容包括：
@@ -245,5 +201,51 @@ raw_data: "\034
 
 ```
 
+
 ### 如何用python来优化性能
 参考：nvidia的tensorRT developer guide手册中的'How do i optimize my python performance?'
+
+
+
+### 调试：
+1. 报错：pycuda._driver.LogicError: explicit_context_dependent failed: invalid device context - no currently active context?
+也就是在预分配host，device内存的时候就报错了h_input = cuda.pagelocked_empty(trt.volume(engine.get_binding_shape(0)), dtype=trt.nptype(cfg.DTYPE))
+
+问题原因：pycuda.driver没有初始化，导致无法得到context，需要在导入pycuda.driver后再导入pycuda.autoinit
+```
+import pycuda.driver as cuda
+import pycuda.autoinit
+```
+
+2. 报错：UnicodeDecodeError: 'utf-8' codec can't decode byte 0xaa in position 8: invalid start byte
+也就是在逆序列化已保存的engine加载到内存中时，在engine = runtime.deserialize_cuda_engine(f.read())时报错。
+问题原因：在打开导入序列化模型时，需要采用'rb'模式才能读，否则不能读取，即在读取序列化模型时，需要做3件事
+    - 打开文件，必须用rb模式：with open(cfg.work_dir + 'serialized.engine', 'rb') as f
+    - 创建runtime：trt.Runtime(logger) as runtime
+    - 基于runtime生成反序列化模型：engine = runtime.deserialize_cuda_engine(f.read())
+
+
+3. 报错：yolov2_onnx模型出来的预测结果总是置信度太低，没有准确性可言。
+问题原因：
+    - 自己的代码里边对输出的bbox没有做处理就送去显示了，但实际上yolov2的输出形式是(xmin,ymin,w,h)，需要转化为(xmin,ymin,xmax,ymax)
+    - 自己的代码里边多写了对预测图片的归一化操作，实际的预测过程不需要归一化。
+
+
+4. 报错：[libprotobuf ERROR google/protobuf/io/zero_copy_stream_impl_lite.cc:155] Cannot allocate buffer larger than kint32max for StringOutputStream.
+*** ValueError: Unable to convert message to str
+这个错误是在yolov3转换到onnx的过程中，在生成graph时报出，也就是graph无法正确生成，并且是在helper.py文件中的make_graph()函数最后graph返回时报错，我当时怀疑
+graph应该已经生成为什么还会报错。网上搜了下，https://blog.csdn.net/qq_22764813/article/details/85626501，有人说是protobuf的bug，也即是graph文件太大，应该想办法减小graph大小，
+一种方式是升级protobuf从3.0到3.6.1版本。
+
+
+5. 报错：onnx.onnx_cpp2py_export.checker.ValidationError: Op registered for Upsample is deprecated in domain_version of 11
+
+==> Context: Bad node spec: input: "085_convolutional_lrelu" output: "086_upsample" name: "086_upsample" op_type: "Upsample" attribute 
+{ name: "mode" s: "nearest" type: STRING } attribute { name: "scales" floats: 1 floats: 1 floats: 2 floats: 2 type: FLOATS }
+问题原因：onnx更新太快了，在官方1.5.1以后就取消了upsample层，所以对yolov3报错了。而我的onnx是安装的1.6.1，不过话说回来upsample取消，那用啥? interpolate? 那就要么更改yolov3的模型换掉upsample然后重新训练，要么没辙。
+参考https://devtalk.nvidia.com/default/topic/1052153/jetson-nano/tensorrt-backend-for-onnx-on-jetson-nano/1
+修改方式是先降级onnx到1.4.1
+pip uninstall onnx
+pip install onnx==1.4.1
+可惜我用conda安装的onnx，居然没有旧版本可用，想conda uninstall onnx，提示我要下载600M的东西，我x，安装时10M不到，卸载要动600M...
+
