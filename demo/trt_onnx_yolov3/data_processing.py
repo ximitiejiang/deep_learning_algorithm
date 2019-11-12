@@ -2,7 +2,7 @@ import math
 from PIL import Image
 import numpy as np
 import os
-
+from PIL import ImageDraw
 
 # YOLOv3-608 has been trained with these 80 categories from COCO:
 # Lin, Tsung-Yi, et al. "Microsoft COCO: Common Objects in Context."
@@ -18,6 +18,34 @@ ALL_CATEGORIES = load_label_categories(LABEL_FILE_PATH)
 # Let's make sure that there are 80 classes, as expected for the COCO data set:
 CATEGORY_NUM = len(ALL_CATEGORIES)
 assert CATEGORY_NUM == 80
+
+def draw_bboxes(image_raw, bboxes, confidences, categories, all_categories, bbox_color='blue'):
+    """Draw the bounding boxes on the original input image and return it.
+
+    Keyword arguments:
+    image_raw -- a raw PIL Image
+    bboxes -- NumPy array containing the bounding box coordinates of N objects, with shape (N,4).
+    categories -- NumPy array containing the corresponding category for each object,
+    with shape (N,)
+    confidences -- NumPy array containing the corresponding confidence for each object,
+    with shape (N,)
+    all_categories -- a list of all categories in the correct ordered (required for looking up
+    the category name)
+    bbox_color -- an optional string specifying the color of the bounding boxes (default: 'blue')
+    """
+    draw = ImageDraw.Draw(image_raw)
+    print(bboxes, confidences, categories)
+    for box, score, category in zip(bboxes, confidences, categories):
+        x_coord, y_coord, width, height = box
+        left = max(0, np.floor(x_coord + 0.5).astype(int))
+        top = max(0, np.floor(y_coord + 0.5).astype(int))
+        right = min(image_raw.width, np.floor(x_coord + width + 0.5).astype(int))
+        bottom = min(image_raw.height, np.floor(y_coord + height + 0.5).astype(int))
+
+        draw.rectangle(((left, top), (right, bottom)), outline=bbox_color)
+        draw.text((left, top - 12), '{0} {1:.2f}'.format(all_categories[category], score), fill=bbox_color)
+
+    return image_raw
 
 
 class PreprocessYOLO(object):
@@ -92,7 +120,8 @@ class PostprocessYOLO(object):
                  yolo_anchors,
                  obj_threshold,
                  nms_threshold,
-                 yolo_input_resolution):
+                 yolo_input_resolution,
+                 num_categories):
         """Initialize with all values that will be kept when processing several frames.
         Assuming 3 outputs of the network in the case of (large) YOLOv3.
 
@@ -110,6 +139,7 @@ class PostprocessYOLO(object):
         self.object_threshold = obj_threshold
         self.nms_threshold = nms_threshold
         self.input_resolution_yolo = yolo_input_resolution
+        self.num_categories = num_categories
 
     def process(self, outputs, resolution_raw):
         """Take the YOLOv3 outputs generated from a TensorRT forward pass, post-process them
@@ -141,7 +171,7 @@ class PostprocessYOLO(object):
         dim1, dim2 = height, width
         dim3 = 3
         # There are CATEGORY_NUM=80 object categories:
-        dim4 = (4 + 1 + CATEGORY_NUM)
+        dim4 = (4 + 1 + self.num_categories)
         return np.reshape(output, (dim1, dim2, dim3, dim4))
 
     def _process_yolo_output(self, outputs_reshaped, resolution_raw):

@@ -19,9 +19,8 @@ def img_loader(img_raw, pagelocked_buffer, input_size,
                mean=None, std=None):
     """加载单张图片，进行归一化，并放入到锁页内存
     注意：这里的锁页内存就是用来存放输入图片的，所以是allocate buffer里边的hin
+    同时锁页内存中的数据只能送入拉直展平的一维数组。
     """
-#    img_raw = Image.open(img_path)    # rgb (Image读入的直接就是rgb格式了，所以无需再从bgr2rgb)
-#    img_raw = cv2.imread(img_path)
     w, h = input_size
     img_raw = imresize(img_raw, (w, h))  # hwc, bgr
     
@@ -65,23 +64,58 @@ def get_engine(model_path, logger=None, saveto=None):
 
 
 def allocate_buffers(engine):
-    # 分配内存： 分配内存可以实现分配，因为他只分配一次，是所有图片共享
-    hin = cuda.pagelocked_empty(trt.volume(engine.get_binding_shape(0)), dtype=trt.nptype(trt.float32))  # (c*h*w,)把输入图片拉直的一维数组
-    hout = cuda.pagelocked_empty(trt.volume(engine.get_binding_shape(1)), dtype=trt.nptype(trt.float32)) # (n_cls,)输出预测的一维数组
-    din = cuda.mem_alloc(hin.nbytes)    #　为GPU设备分配内存
-    dout = cuda.mem_alloc(hout.nbytes)    
-    stream = cuda.Stream()              # 创建stream流来拷贝输入输出，进行推理
-    buffers = Dict(hin=hin, hout=hout, din=din, dout=dout, stream=stream)
-    return buffers
+    """预分配GPU的计算内存：engine.get_binding_shape获得的是engine的输入输出形状
+    returns
+        inputs: (1,) (hin, din), 一般代表一路展平的输入，比如hin=[(1108992,)], din一般是nbytes看不到，但可通过in(din)看到一个数值
+        outputs: (n,) (hout, dout), 一般代表多路展平的输出，比如hout = [(92055,)(368220,)(1472880,)]
+        bindings: (1+n,) (int(din or dout))
+    """
+    inputs = []
+    outputs = []
+    bindings = []
+    stream = cuda.Stream()
+    for binding in engine:
+        size = trt.volume(engine.get_binding_shape(binding)) * engine.max_batch_size
+        dtype = trt.nptype(engine.get_binding_dtype(binding))
+        # Allocate host and device buffers
+        host_mem = cuda.pagelocked_empty(size, dtype)
+        device_mem = cuda.mem_alloc(host_mem.nbytes)
+        # Append the device buffer to device bindings.
+        bindings.append(int(device_mem))
+        # Append to the appropriate list.
+        if engine.binding_is_input(binding):
+            inputs.append([host_mem, device_mem])
+        else:
+            outputs.append([host_mem, device_mem])
+    return [inputs, outputs, bindings, stream]      
+    
+#    dins = []
+#    hins = []
+#    douts = []
+#    houts = []
+#    for binding in engine:
+#        size = trt.volume(engine.get_binding_shape(binding)) * engine.max_batch_size)
+#        dtype = trt.nptype(trt.float32)
+#        hin = cuda.pagelocked_empty(size, dtype
+#        hins.append(hin)   # (c*h*w,)把输入图片拉直的一维数组
+#        houts.append(cuda.pagelocked_empty(trt.volume(engine.get_binding_shape(1)), dtype=trt.nptype(trt.float32))) # (n_cls,)输出预测的一维数组
+#        dins.append(cuda.mem_alloc(hin.nbytes))    #　为GPU设备分配内存
+#        douts.append(cuda.mem_alloc(hout.nbytes))    
+#    stream = cuda.Stream()              # 创建stream流来拷贝输入输出，进行推理
+#    buffers = Dict(hin=hins, hout=houts, din=dins, dout=douts, stream=stream)  # 字典中每个元素都是list
+#    return buffers
 
 
-def do_inference(buffers, context):
+def do_inference(context, inputs, outputs, bindings, stream, batch_size=1):
+    """如果要用trt做推断，则模型返回的每层特征图的预测结构都必须是单个数据，比如3层特征图，就输出3个tensor，每个tensor包含了pred(类别), score(置信度),bbox(坐标) 
+    这样便于trt内部进行展平计算，因为展平计算有利于卷积计算优化(是整个计算的核心)
+    """
     # 进行推断，最后的结果就在buffers.hout
-    cuda.memcpy_htod_async(buffers.din, buffers.hin, buffers.stream)  # 数据从host(cpu)送入device(GPU)
-    context.execute_async(bindings=[int(buffers.din), int(buffers.dout)], stream_handle=buffers.stream.handle)  # 执行推断
-    cuda.memcpy_dtoh_async(buffers.hout, buffers.dout, buffers.stream)# 把预测结果从GPU返回cpu: device to host
-    buffers.stream.synchronize()  # 同步
-
+    [cuda.memcpy_htod_async(input[1], input[0], stream) for input in inputs]   # 数据从host(cpu)送入device(GPU)
+    context.execute_async(batch_size=batch_size, bindings=bindings, stream_handle=stream.handle) # 执行推断
+    [cuda.memcpy_dtoh_async(output[0], output[1], stream) for output in outputs]# 把预测结果从GPU返回cpu: device to host
+    stream.synchronize()  # 同步
+    return [output[0] for output in outputs]   # (n,)返回输出的hout，即展平的计算结果
 
 def softmax(x):
     """numpy版本softmax函数, x(m,)为一维数组"""
@@ -113,9 +147,9 @@ class DetTRTPredictor():
         for img in src:
             img_raw = img_loader(img, self.buffers.hin, self.input_size)
             # do inference
-            do_inference(self.buffers, self.context)
+            trt_result = do_inference(self.context, *self.buffers)
             # 结果解析
-            hout = [self.buffers.hout.reshape(self.output_shape)]  # 把得到的GPU展平数据恢复形状(1,125,13,13), 同时放入list中作为多个特征图的一张，只不过这里只使用了一张特征图
+            hout = [trt_result.reshape(self.output_shape)]  # 把得到的GPU展平数据恢复形状(1,125,13,13), 同时放入list中作为多个特征图的一张，只不过这里只使用了一张特征图
             bboxes, labels, scores = self.postprocessor.process(hout, self.resolution)  # (k,4), (k,), (k,), 图片会被放大到cam_width, cam_height
             # 调整bbox的形式从(x,y,w,h)到(xmin,ymin,xmax,ymax)
             bboxes[:,2:] = bboxes[:, 2:] + bboxes[:, :2]

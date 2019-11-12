@@ -201,6 +201,9 @@ raw_data: "\034
 
 ```
 
+### 关于读取onnx模型
+1. onnx模型的可视化：可采用netron
+
 
 ### 如何用python来优化性能
 参考：nvidia的tensorRT developer guide手册中的'How do i optimize my python performance?'
@@ -238,7 +241,7 @@ graph应该已经生成为什么还会报错。网上搜了下，https://blog.cs
 一种方式是升级protobuf从3.0到3.6.1版本。
 
 
-5. 报错：onnx.onnx_cpp2py_export.checker.ValidationError: Op registered for Upsample is deprecated in domain_version of 11
+5. 报错：onnx.onnx_cpp2py_export.checker.ValidationError: Op registered for Upsample is deprecated in domain_version of 11.
 
 ==> Context: Bad node spec: input: "085_convolutional_lrelu" output: "086_upsample" name: "086_upsample" op_type: "Upsample" attribute 
 { name: "mode" s: "nearest" type: STRING } attribute { name: "scales" floats: 1 floats: 1 floats: 2 floats: 2 type: FLOATS }

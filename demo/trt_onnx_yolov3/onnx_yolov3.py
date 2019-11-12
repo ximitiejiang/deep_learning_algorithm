@@ -16,21 +16,22 @@ import pycuda.autoinit
 from utils.dataset_classes import get_classes
 from utils.onnx import img_loader, get_engine, allocate_buffers, do_inference
 from utils.visualization import vis_all_opencv
-from demo.trt_onnx_tiny_yolov2.post_process import PostprocessYOLO
-from demo.trt_onnx_yolov3.data_processing import PreprocessYOLO, PostprocessYOLO
+from demo.trt_onnx_yolov3.data_processing import PreprocessYOLO, PostprocessYOLO, draw_bboxes
 
 """
 这部分算法主要参考：Object Detection With The ONNX TensorRT Backend In Python
-0. 忽略了把yolov3原本的权重转化为onnx的过程，因为onnx高版本已经取消支持upsample，只能用onnx<1.4的版本来转换，这里偷懒直接用onnx官方repo里边现成onnx.
-1. 手动下载yolov3的onnx模型：https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/yolov3
-2. 卡在parser.parse(model.read())上面，报错[TensorRT] ERROR: Parameter check failed at: ../builder/Network.cpp::addInput::671, condition: isValidDims(dims, hasImplicitBatchDimension())
-怀疑还是因为model里边包含upsample而我的onnx不支持? 但这是tensorRT报错阿，难道tensorRT也不支持?
+1. 如果直接用yolov3的原始权重转换为onnx则因为onnx从1.5版之后不再支持upsample层而导致报错。
+2. 如果跳过原始权重转onnx这步，采用onnx官网上的onnx现成模型(从https://github.com/onnx/models/tree/master/vision/object_detection_segmentation/yolov3下载)，
+则卡在parser.parse(model.read())上面，报错[TensorRT] ERROR: Parameter check failed at: ../builder/Network.cpp::addInput::671, condition: isValidDims(dims, hasImplicitBatchDimension())
+3. 改用trt源码的yolov3原始权重转换为onnx，会卡在转出的onnx进行onnx.checker上，于是删除这句，然后保存onnx能够跑通。
+同时采用这个版本的onnx是可以进行接下来的验证。所以下面的源码都是基于这个版本的onnx而不是从onnx官网下载的现成onnx.
+
 """
 
 class cfg():
     work_dir = '/home/ubuntu/mytrain/onnx_yolov3/'
-    model_path = '/home/ubuntu/MyWeights/onnx/yolov3/yolov3.onnx'
-#    model_path = work_dir + 'serialized.engine'
+#    model_path = '/home/ubuntu/MyWeights/onnx/yolov3/yolov3.onnx'
+    model_path = '/home/ubuntu/MyWeights/onnx/yolov3/my_trt_model/yolov3.trt'  #采用自定义的模型
     img_size = (608, 608)   # 代表输入模型的图片尺寸
 #    output_shape = [1, 125, 13, 13]
     output_shape = [(1, 255, 19, 19), (1, 255, 38, 38), (1, 255, 76, 76)]
@@ -80,11 +81,25 @@ def inference_yolov3(src):
     preprocessor = PreprocessYOLO(cfg.img_size)
     postprocessor = PostprocessYOLO(**cfg.postprocess_params)
     
-    task = 'cam'
+    task = 'img'
     if task == 'img':
-        """图片预处理方式：先resize到hwc(608,608,3), 然后除以255， 然后变换到chw,然后变换到(1,c,h,w),"""
         img_path = '/home/ubuntu/MyDatasets/misc/dog.jpg'
-        img_raw, img = preprocessor(img_path)
+        img_raw, img = preprocessor.process(img_path)
+        img_raw_size = img_raw.size      # (w,h)获取原始图片尺寸
+        
+        results = do_inference(context, *buffers)  # 报错：bindings[x] != nullptr
+        
+        results = [result.reshape(shape) for result, shape in zip(results, cfg.output_shape)]
+        
+        boxes, classes, scores = postprocessor.process(results, (img_raw_size))
+        # 绘图
+        if boxes is None:
+            boxes = np.zeros((0, 4))
+            labels = np.zeros((0,))
+            scores = np.zeros((0,))
+        
+        img = draw_bboxes(img_raw, boxes, scores, classes, categories)
+        cv2.imshow('result', img)
         
     
     elif task == 'cam':
@@ -101,7 +116,7 @@ def inference_yolov3(src):
             # 开始预测
             do_inference(buffers, context)
             # 对结果进行处理
-            hout = [buffers.hout.reshape(cfg.output_shape)]  # 把得到的GPU展平数据恢复形状(1,125,13,13), 同时放入list中作为多个特征图的一张，只不过这里只使用了一张特征图
+            hout = [buffers.hout.reshape(cfg.output_shape)]  # 把得到的GPU展平数据恢复形状[(1, 255, 19, 19), (1, 255, 38, 38), (1, 255, 76, 76)], 255 = 5*
             bboxes, labels, scores = postprocessor.process(hout, (cam_width, cam_height))  # (k,4), (k,), (k,), 图片会被放大到cam_width, cam_height
             # 调整bbox的形式从(x,y,w,h)到(xmin,ymin,xmax,ymax)
             bboxes[:,2:] = bboxes[:, 2:] + bboxes[:, :2]
