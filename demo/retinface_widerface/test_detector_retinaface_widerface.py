@@ -22,7 +22,7 @@ def train_retinaface_widerface(cfg, resume_from=None):
     
 if __name__ == "__main__":
     
-    task = 'log'
+    task = 'test'
     cfg_path = './cfg_detector_retinaface_widerface.py'
     cfg = get_config(cfg_path)
     

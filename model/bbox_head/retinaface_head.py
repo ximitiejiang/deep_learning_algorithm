@@ -101,7 +101,7 @@ class RetinaFaceHead(nn.Module):
         self.loss_bbox_fn = SmoothL1Loss()
         self.loss_ldmk_fn = SmoothL1Loss()
         
-        # 定义anchors
+        # 定义anchors: 基于retinaface的
         self.anchor_generators = []
         for i in range(len(in_channels)):
             ctr = ((strides[i] - 1.) / 2, (strides[i] - 1.) / 2)

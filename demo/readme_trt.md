@@ -231,24 +231,41 @@ import pycuda.autoinit
 3. 报错：yolov2_onnx模型出来的预测结果总是置信度太低，没有准确性可言。
 问题原因：
     - 自己的代码里边对输出的bbox没有做处理就送去显示了，但实际上yolov2的输出形式是(xmin,ymin,w,h)，需要转化为(xmin,ymin,xmax,ymax)
-    - 自己的代码里边多写了对预测图片的归一化操作，实际的预测过程不需要归一化。
+    - 自己的代码里边多写了对预测图片的归一化操作，yolov2的实际的预测过程不需要归一化（但其他的是需要的，比如yolov3）。
 
 
-4. 报错：[libprotobuf ERROR google/protobuf/io/zero_copy_stream_impl_lite.cc:155] Cannot allocate buffer larger than kint32max for StringOutputStream.
-*** ValueError: Unable to convert message to str
-这个错误是在yolov3转换到onnx的过程中，在生成graph时报出，也就是graph无法正确生成，并且是在helper.py文件中的make_graph()函数最后graph返回时报错，我当时怀疑
-graph应该已经生成为什么还会报错。网上搜了下，https://blog.csdn.net/qq_22764813/article/details/85626501，有人说是protobuf的bug，也即是graph文件太大，应该想办法减小graph大小，
-一种方式是升级protobuf从3.0到3.6.1版本。
-
-
-5. 报错：onnx.onnx_cpp2py_export.checker.ValidationError: Op registered for Upsample is deprecated in domain_version of 11.
-
+4. 报错：onnx.onnx_cpp2py_export.checker.ValidationError: Op registered for Upsample is deprecated in domain_version of 11.
 ==> Context: Bad node spec: input: "085_convolutional_lrelu" output: "086_upsample" name: "086_upsample" op_type: "Upsample" attribute 
 { name: "mode" s: "nearest" type: STRING } attribute { name: "scales" floats: 1 floats: 1 floats: 2 floats: 2 type: FLOATS }
 问题原因：onnx更新太快了，在官方1.5.1以后就取消了upsample层，所以对yolov3报错了。而我的onnx是安装的1.6.1，不过话说回来upsample取消，那用啥? interpolate? 那就要么更改yolov3的模型换掉upsample然后重新训练，要么没辙。
 参考https://devtalk.nvidia.com/default/topic/1052153/jetson-nano/tensorrt-backend-for-onnx-on-jetson-nano/1
 修改方式是先降级onnx到1.4.1
+```
 pip uninstall onnx
 pip install onnx==1.4.1
+```
 可惜我用conda安装的onnx，居然没有旧版本可用，想conda uninstall onnx，提示我要下载600M的东西，我x，安装时10M不到，卸载要动600M...
 
+
+### 关于硬件jetson nano
+
+1. 硬件安装和软件烧录：
+    - 核心板部分基本都集成了，就是在安装无线wifi卡的时候，需要把核心板从母版上拆下来(参考https://cloud.tencent.com/developer/article/1421906)
+      同是安装wifi卡前，需要把橙色保护膜剪开个缺口把螺丝固定处漏出来。(更简单的方式是采用那种360随身usb wifi即可)
+    - 系统安装很简单，只需要把nvidia的镜像文件烧录到一个新的microSD卡里边即可，烧录工具采用开源的Etcher。
+    - 然后通电，就能点亮屏幕了。如果使用的是小型7寸屏，需要从母板usb额外提供一根电源线给显示屏，同时母板上J48需要增加短路帽。
+
+
+2. 启动摄像头：jetson nano支持的摄像头有2种，一种usb类型，另一种是树莓派CSI排线接口的摄像头(但必须是IMX219 sensor，比如Raspberry Pi Camera Module v2)
+参考：https://mp.weixin.qq.com/s?__biz=MjM5NTE3Nzk4MQ==&mid=2651234579&idx=1&sn=7f10f030e9c60b15c6805fa1ea495347&chksm=bd0e75818a79fc977693c16d7eb4dd87709eab82542687208d5ba34cfcc877a2da68ab6a106b&scene=21#wechat_redirect
+摄像头排线安装好以后，检查linux系统是否识别出来的方法是终端运行：ls /dev/vid*, 如果显示了/dev/video0就说明已经识别出来了。
+此时就可以通过opencv等各种方式启动摄像头了。
+
+2. 终端启动CSI摄像头： 参考https://www.yahboom.com/build.html?id=2504&cid=301
+    - nvgstcapture-1.0 启动
+    - nvgstcapture-1.0 --prev-res=3 表示预览视频的分辨率、高度、宽度，其中的数值是从2-12，每个数值代表一个宽高分辨率
+    - nvgstcapture-1.0 --cus-prev-res=1920x1080 表示自定义预览视频分辨率
+    - q + 回车 表示关闭摄像头
+    - j + 回车 表示捕获图片
+
+3. 代码启动摄像头：

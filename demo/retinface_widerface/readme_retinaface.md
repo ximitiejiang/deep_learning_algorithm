@@ -13,7 +13,7 @@ Retinaface的一切
 
 **关于监督信息landmark关键点**
 1. 为了提高对小的人脸检测精度，引入了人脸的5个关键点，分别表示左眼，右眼，鼻子，嘴巴左角，嘴巴右角
-
+  
 
 **关于如何定义训练target**
 1. cls_score的target: 每个anchor的类别概率的预测是典型分类问题，
@@ -27,8 +27,12 @@ Retinaface的一切
 1. 由于retinaface的核心目标是对人脸进行检测，所以他的检测anchor都采用了方形的anchor，也就是说对
 
 2. retinaface获取anchor尺寸的过程：
-    - 定义了3个base size=(16,64,256)给3个特征图，也就是在3个特征图上分别对小脸(远)，中等人脸(中)，大脸(近)进行检测。
+    - 源码定义了3组anchormin_size[[16,32],[64,128],[256,512]], 对应anchor的尺寸范围，转换到这里就是base size=(16,64,256)给3个特征图，也就是在3个特征图上分别对小脸(远)，中等人脸(中)，大脸(近)进行检测。
     - 定义了
+
+**关于预训练模型**
+1. 如果采用mobilenet025, 则预训练模型权重需要手动下载
+2. 如果采用resnet50，则预训练模型权重采用pytorch自带的权重。
 
 
 **关于输入图片尺寸**
@@ -83,41 +87,5 @@ padding到(576,1024,3)，从而得到的三个下采样特征图是(72,128,3)(36
 
 
 ### 部署
-**关于jetson nano的硬件安装和系统镜像烧录**
-1. 硬件安装和软件烧录：
-    - 核心板部分基本都集成了，就是在安装无线wifi卡的时候，需要把核心板从母版上拆下来(参考https://cloud.tencent.com/developer/article/1421906)
-      同是安装wifi卡前，需要把橙色保护膜剪开个缺口把螺丝固定处漏出来。(更简单的方式是采用那种360随身usb wifi即可)
-    - 系统安装很简单，只需要把nvidia的镜像文件烧录到一个新的microSD卡里边即可，烧录工具采用开源的Etcher。
-    - 然后通电，就能点亮屏幕了。如果使用的是小型7寸屏，需要从母板usb额外提供一根电源线给显示屏，同时母板上J48需要增加短路帽。
 
 
-**关于启动摄像头**
-1. jetson nano支持的摄像头有2种，一种usb类型，另一种是树莓派CSI排线接口的摄像头(但必须是IMX219 sensor，比如Raspberry Pi Camera Module v2)
-参考：https://mp.weixin.qq.com/s?__biz=MjM5NTE3Nzk4MQ==&mid=2651234579&idx=1&sn=7f10f030e9c60b15c6805fa1ea495347&chksm=bd0e75818a79fc977693c16d7eb4dd87709eab82542687208d5ba34cfcc877a2da68ab6a106b&scene=21#wechat_redirect
-摄像头排线安装好以后，检查linux系统是否识别出来的方法是终端运行：ls /dev/vid*, 如果显示了/dev/video0就说明已经识别出来了。
-此时就可以通过opencv等各种方式启动摄像头了。
-
-2. 终端启动CSI摄像头： 参考https://www.yahboom.com/build.html?id=2504&cid=301
-    - nvgstcapture-1.0 启动
-    - nvgstcapture-1.0 --prev-res=3 表示预览视频的分辨率、高度、宽度，其中的数值是从2-12，每个数值代表一个宽高分辨率
-    - nvgstcapture-1.0 --cus-prev-res=1920x1080 表示自定义预览视频分辨率
-    - q + 回车 表示关闭摄像头
-    - j + 回车 表示捕获图片
-
-3. 代码启动摄像头：
-
-
-
-**关于TensorRT**
-1. TensorRt是Nvidia针对神经网络在inference阶段设计的加速器。其优化主要包括：
-    - 合并某些层的操作：比如conv和relu一起做完，从而省去多次内存读写的花费时间
-    - 采用FP16或int8来加速运算：inference阶段对梯度计算的精度要求没有训练阶段那么高，所以可以用低精度数据来加速运算
-    - 对卷积核的计算算法进行优化：卷积计算占了整个计算量的80%，根据卷积核大小和输入超参数来确定用那种算法进行卷积
-    - 对同一输入的多个并行分支可以采用parallel的机制并行计算
-2. TensorRT的安装：
-    - 如果只是安装tensorRT的C++版本，则只需要预先装好cuda/cudnn，然后把tar安装包解压缩到一个文件夹，然后添加该文件夹的lib目录到系统目录即可完成。
-    - 如果安装tensorRT的python版本，则除了预装cuda/cudnn，解压缩和添加目录之外，还需要安装python的whl文件，python的graphsugeon, 以及python的pycuda。    
-
-
-
-**关于安装MNN**

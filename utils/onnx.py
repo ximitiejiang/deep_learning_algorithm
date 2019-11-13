@@ -145,7 +145,7 @@ class DetTRTPredictor():
         if isinstance(src, np.ndarray):
             src = [src]
         for img in src:
-            img_raw = img_loader(img, self.buffers.hin, self.input_size)
+            img_raw = img_loader(img, self.buffers[0][0], self.input_size)  #加载到hin
             # do inference
             trt_result = do_inference(self.context, *self.buffers)
             # 结果解析

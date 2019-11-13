@@ -89,11 +89,11 @@ def inference_cam_tiny_yolov2(src):
         ch = cv2.waitKey(1)
         if ch == 27 or ch == ord('q') or ch == ord('Q'):
             break
-        # img loader之后图片会送入GPU
-        _ = img_loader(img_raw, buffers.hin, cfg.img_size, None, None)  # 注意yolov2 inference不需要normalize
-        do_inference(buffers, context)
+        # img loader之后图片会送入GPU: 这里buffers切片第一个0是inputs,第2个0是第一个input, 第3个0是hin
+        _ = img_loader(img_raw, buffers[0][0][0], cfg.img_size, None, None)  # 注意yolov2 inference不需要normalize
+        hout = do_inference(context, *buffers)  # list，每个元素是一个特征图的device输出hout
         # 对结果进行处理
-        hout = [buffers.hout.reshape(cfg.output_shape)]  # 把得到的GPU展平数据恢复形状(1,125,13,13), 同时放入list中作为多个特征图的一张，只不过这里只使用了一张特征图
+        hout = [hout[0].reshape(cfg.output_shape)]  # 把得到的GPU展平数据恢复形状(1,125,13,13), 同时放入list中作为多个特征图的一张，只不过这里只使用了一张特征图
         bboxes, labels, scores = postprocessor.process(hout, (cam_width, cam_height))  # (k,4), (k,), (k,), 图片会被放大到cam_width, cam_height
         # 调整bbox的形式从(x,y,w,h)到(xmin,ymin,xmax,ymax)
         bboxes[:,2:] = bboxes[:, 2:] + bboxes[:, :2]
