@@ -3,6 +3,7 @@
 
 ### 关于tensorRT
 1. 当前最新版本是tensorRT6.0, 需要匹配cuda9.0+cudnn7.6.3以上, 或者cuda9.2+cudnn7.6.3以上。
+安装主要参考官方文档，采用tar安装包安装的。中文版安装指南可以参考oldpan博客：https://oldpan.me/archives/use-tensorrt-speed-up-deep-learning-1
 由于我安装的cuda9.0是conda里边的配置是cuda9.0+cudnn7.1.4，他没有新版本的cuda9.0+cudnn7.6.3，所以cudnn也就没法升级除非把cuda版本提上去，但担心有其他不匹配问题，所以暂时不升了。
 tensorRT的安装比较简单，只要之前通过conda安装过cuda toolkit，则下载tar安装包(deb形式容易安装失败)，解压缩，并把路径导入系统路径文件中，这样c++ api就可以使用了。
 如果需要python api，则再进入解压缩包里边的python文件夹，运行其中一个跟自己系统匹配的whl文件，我是采用：
