@@ -232,7 +232,7 @@ class SSDHead(nn.Module):
             bbox_preds.append(reg_conv(feat))   # (6,)(b,-1,4)
         cls_scores = torch.cat(cls_scores, dim=1)        # (b,-1,21)
         bbox_preds = torch.cat(bbox_preds, dim=1)        # (b,-1,4)
-        return dict(cls_scores=cls_scores, bbox_preds=bbox_preds) 
+        return cls_scores, bbox_preds   # 注意：模型终端head的输出，最好不要用dict，否则onnx无法导出，当前onnx只支持(tuple,list,variables)
     
     def get_losses(self, cls_scores, bbox_preds, gt_bboxes, gt_labels, cfg, **kwargs): # 用kwargs兼容ldmk
         """在训练时基于前向计算结果，计算损失

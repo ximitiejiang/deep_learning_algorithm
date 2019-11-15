@@ -61,7 +61,7 @@ class OneStageDetector(nn.Module):
         outs = self.bbox_head(x)  # 获得分类和回归的预测值cls_score, bbox_preds
         # 计算损失
 #        loss_inputs = outs + (gt_bboxes, gt_labels, gt_landmarks, self.cfg) # 去掉img_metas
-        losses = self.bbox_head.get_losses(**outs, cfg=self.cfg, **kwargs)
+        losses = self.bbox_head.get_losses(*outs, cfg=self.cfg, **kwargs)
         return losses
         
     def forward_test(self, imgs, img_metas, **kwargs):
@@ -74,7 +74,7 @@ class OneStageDetector(nn.Module):
         outs = self.bbox_head(x)
         # 计算bbox，label
         dets = self.bbox_head.get_bboxes(
-                **outs, cfg=self.cfg, img_metas=img_metas, **kwargs) # dict (n_cls,)(m,5)   (n_cls,)(m,)  (n_cls,)(m,10)   
+                *outs, cfg=self.cfg, img_metas=img_metas, **kwargs) # dict (n_cls,)(m,5)   (n_cls,)(m,)  (n_cls,)(m,10)   
         # 把结果格式转为numpy(因为后续做mAP评估都是在cpu端numpy方式评估
 #        if dets['bboxes'].shape[0] == 0:
 #            bboxes = np.zeros((0, 5), dtype=np.float32)
@@ -86,8 +86,18 @@ class OneStageDetector(nn.Module):
             ldmks = None            
         return dict(bboxes=bboxes, labels=labels, ldmks=ldmks) # bbox(n_cls,)(k, 5)  ldmk(n_cls,)(k,5,2)
     
-
-
+    def forward_dummy(self, img):
+        """用于onnx模型转出: img要求batchsize=1, 即(1,3,h,w)
+        参考：https://github.com/open-mmlab/mmdetection/pull/1082
+        注意：由于onnx模型仅支持保存模型本体权重，所以只能获得bbox_head的输出，后续操作需要放在post_process.
+        """
+        x = self.backbone(img)
+        if self.cfg.neck:
+            x = self.neck(x)
+        x = self.bbox_head(x)
+        return x
+        
+    
 # %%
 class Segmentator(nn.Module):
     """语义分割或实例分割集成模型

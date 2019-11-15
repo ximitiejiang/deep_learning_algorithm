@@ -7,6 +7,9 @@
     - resnet18: 主要采用
     - resnet50: 主要采用
     - mobilenet: 主要采用1x1+3x3的模块进行堆叠，1x1负责调整通道数，3x3负责调整模型尺寸(下采样)
+    ```
+    
+    ```
 2. neck
     - FPN: 主要包括1组1x1, 一组上采样+融合，一组3x3，其中1x1为了把通道数调成一致，上采样则把尺寸调成一致，通道数和尺寸一致了才能进行相加融合。
       而最后的3x3则是为了消除叠加效应。
@@ -587,3 +590,77 @@ https://discuss.pytorch.org/t/defining-my-model-encounter-a-runtimeerror-one-of-
                     size=(38,38)    size=(38,38)    size=(38,38)    size=(38,38)    size=(38,38)    size=(38,38)
         (2). 采用？？？卷积来进行特征融合，让浅层特征也能包含更多的语义信息。
         
+### YOLOV3物体检测算法的总结
+1. backbone: 为darknet53也就是53个卷积层，总体结构如下(https://blog.csdn.net/qq_37541097/article/details/81214953)
+```
+img            3   416x416
+conv  3x3      32
+
+conv  3x3  s2  64  208x208     # 用一个conv3x3一方面下采样减小尺寸，一方面增加通道数 
+1xconvs        64              # convs代表基础模块(conv1x1 + conv3x3)
+residual                       # 用一个短路回路，保证模块级别的梯度不会爆炸或者消失
+
+conv  3x3  s2  128 104x104     
+2xconvs        128
+residual
+
+conv  3x3  s2  256 52x52
+8xconvs        256
+residual                       # (out2: 256x52x52) 
+
+conv  3x3  s2  512 26x26
+8xconvs        512 
+residual                       # (out1: 512x26x26) 
+
+conv  3x3  s2  1024 13x13
+4xconvs        1024         
+residual                       # (out0: 1024x13x13)
+
+``` 
+- backbone的基础模块是1x1+3x3的结构：每个这样的基础模块都会包含一个residual的短路回路(类似resnet).
+跟resnet的区别在于：resnet的下采样是放在module里边来做的，也就是每组module的第一个模块会有下采样，所有对应residual分支上1x1也会带下采样。
+而darknet的改变在于他单独出来一个conv3x3做下采样，这样所有的moduel就都统一了，residual的1x1也就不分是否带不带下采样，结构上比resnet更简洁。
+```
+Conv2d(64, 32, 1, stride=1, bias=False)             # conv1x1
+BatchNorm2d(32)
+LeakyReLU(negtive_slop=0.1)
+Conv2d(32, 64, 3, stride=1, padding=1, bias=False)  # conv3x3
+BatchNorm2d(32)
+LeakyReLU(negtive_slop=0.1)
+
+residual_layer                    # 采用add
+```
+
+- backbone输出的特征层的融合：
+因此第一层输出是最深层输出，没有融合，第二层输出中中间层，跟最深的第一层进行了融合，融合方式是concatenate
+第三层作为最浅层再跟前两层的融合结果做融合，融合方式concatenate。融合之前为了能够concatenate，都对前一层进行上采样，让两层特征size相同才能融合
+注意：这里跟retinanet的区别在于，yolov3的特征融合是采用concatenate方式，而FPN的特征融合是采用add
+```
+# retinanet的FPN特征融合
+conv1x1      # (64, 40, 40)
+upsample     # (64, 80, 80)
+add          # (64, 80, 80)+(64, 80, 80) -> (64, 80, 80)
+
+# yolov3的特征融合
+conv1x1      # (256, 13, 13)
+upsample     # (256, 26, 26)
+concat       # cat[(256, 26, 26),(512, 26,26)] -> (768, 26, 26)
+```
+
+- 最终的特征输出：特征融合之后就进入head模型(也就是这里的yolo_layer)，主要进行展平特征，生成anchor,计算损失
+其中展平特征主要是让通道数匹配最后的需求(配出总计anchor个数)：比如85 = 80(每类置信度) + 4(坐标) + 1(类别)，768=16*16*3, 3072=32*32*3, 12288=64*64*3，也就是特征图尺寸*3个anchor 
+```
+// 比较好理解的输出
+yolov3_outputs   #(3,) (1, 3*85, 13, 13),(1, 3*85, 26, 26),(1, 3*85, 52, 52)
+
+// 该版本yolov3的输出(本repo)
+yolov3_outputs    #(3,) (8, 768, 85),(8, 3072, 85),(8, 12288, 85)   # 注意这里768=16*16*3
+
+// 其他版本yolov3的输出(onnx的输出)
+yolov3_outputs    #(3,) (1, 255, 13, 13),(1, 255, 26, 26),(1, 255, 52, 52),  注意这里255=85*3
+```
+
+### 数据流汇总
+- batch数据：img(8,3,480,480), targets(52, 6), 其中的6列中：第1列是图片号(0-7), 第2-5列是bbox相对图片的坐标(x,y,w,h), 第6列是标签
+- backbone输出：(3,)(b, 256, 52, 52),(b, 512, 26, 26),(1024, 13, 13)
+- yolo head输出：(3,)(b, 255, 13, 13),(b, 255, 26, 26),(b, 255, 52, 52)

@@ -759,7 +759,7 @@ def main():
     del builder
 
     # Perform a sanity check on the ONNX model definition:
-    """TODO: onnx转换出来但没有通过check. 这里先把checker注释掉后则可以保存为onnx"""
+    """TODO: onnx转换出来但没有通过check. 这里先把checker注释掉了，可以保存为onnx"""
 #    onnx.checker.check_model(yolov3_model_def)
 
     # Serialize the generated ONNX graph to this file:

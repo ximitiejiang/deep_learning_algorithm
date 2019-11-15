@@ -27,7 +27,8 @@ if __name__ == "__main__":
     cfg = get_config(cfg_path)
     
     if task == 'train':  # 模型训练
-        train_ssd(cfg, resume_from=None)
+        train_ssd(cfg, 
+                  resume_from=None)
     
     if task == 'log':
         parse_log(paths = ['/home/ubuntu/mytrain/ssd_vgg_voc/20191025_182352.log'])

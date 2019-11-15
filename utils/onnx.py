@@ -6,6 +6,7 @@ Created on Sun Nov  3 10:45:33 2019
 @author: ubuntu
 """
 import numpy as np
+import torch
 import cv2
 import tensorrt as trt
 import pycuda.driver as cuda
@@ -13,7 +14,31 @@ import pycuda.autoinit
 from addict import Dict
 from utils.tools import timer 
 from utils.transform import imresize, imnormalize
+from utils.prepare_training import get_config, get_model
+from utils.checkpoint import load_checkpoint
 
+def onnx_exporter(cfg, output_path):
+    """把一个pytorch模型转换成onnx模型，对模型的要求：
+    1. 模型需要有forward_dummy()函数的实施，如下是一个实例：
+    def forward_dummy(self, img):
+        x = self.extract_feat(img)
+        x = self.bbox_head(x)
+        return x
+    2. 模型的终端输出即head端的输出必须是tuple/list/variable类型，不能是dict，否则当前pytorch.onnx不支持导出。
+    """
+    img_shape = (1, 3) + cfg.img_size
+    dummy_input = torch.randn(img_shape, device='cuda')
+    # 创建配置和创建模型
+    model = get_model(cfg).cuda()
+    if cfg.load_from is not None:
+        _ = load_checkpoint(model, cfg.load_from)
+    else:
+        raise ValueError('need to assign checkpoint path to load from.')
+    # 指定模型的前向通道
+    model.forward = model.forward_dummy
+    # 导出模型
+    torch.onnx.export(model, dummy_input, output_path, verbose=True)
+    
 
 def img_loader(img_raw, pagelocked_buffer, input_size, 
                mean=None, std=None):

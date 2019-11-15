@@ -34,7 +34,12 @@ class cfg():
     model_path = '/home/ubuntu/MyWeights/onnx/yolov3/my_trt_model/yolov3.trt'  #采用自定义的模型
     img_size = (608, 608)   # 代表输入模型的图片尺寸
 #    output_shape = [1, 125, 13, 13]
-    output_shape = [(1, 255, 19, 19), (1, 255, 38, 38), (1, 255, 76, 76)]
+    output_shape = [(1, 255, 19, 19), (1, 255, 38, 38), (1, 255, 76, 76)]   # 这里255 = 85*3, 3个anchor和每个anchor的85个预测值
+    """不同yolov3版本，输出可能不同，如下都是合理的: 都是size x num_anchor x pred_items
+    (3,)-> (1, 255, 19, 19), (1, 255, 38, 38), (1, 255, 76, 76)
+    (3,)-> (1, 768, 85), (1, 3072, 85), (1, 12288, 85)
+    (3,)-> (1, 85, 3, 19, 19), (1, 85, 3, 38, 38), (1, 85, 3, 76, 76)
+    """
     
     mean=[0, 0, 0]  # yolov2在推理时没有做归一化，但yolov3做了归一化，不过只做了/255归一，没有减均值除方差，所以这里设置成mean=0，std=1
     std=[1, 1, 1]
@@ -121,7 +126,7 @@ def inference_yolov3(src):
             # 开始预测
             results = do_inference(context, *buffers)
             # 对结果进行处理
-            results = [result.reshape(shape) for result, shape in zip(results, cfg.output_shape)]  # 把得到的GPU展平数据恢复形状[(1, 255, 19, 19), (1, 255, 38, 38), (1, 255, 76, 76)], 255 = 5*
+            results = [result.reshape(shape) for result, shape in zip(results, cfg.output_shape)]  # 把得到的GPU展平数据恢复形状[(1, 255, 19, 19), (1, 255, 38, 38), (1, 255, 76, 76)], 255 = 25*5
             bboxes, labels, scores = postprocessor.process(results, (cam_width, cam_height))  # (k,4), (k,), (k,), 图片会被放大到cam_width, cam_height
             # 调整bbox的形式从(x,y,w,h)到(xmin,ymin,xmax,ymax)
             bboxes[:,2:] = bboxes[:, 2:] + bboxes[:, :2]

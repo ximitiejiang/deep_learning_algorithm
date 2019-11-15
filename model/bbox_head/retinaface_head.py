@@ -126,7 +126,7 @@ class RetinaFaceHead(nn.Module):
         ldmk_preds = [self.landmark_head[i](x[i]) for i in range(len(x))]
         ldmk_preds = torch.cat(ldmk_preds, dim=1) # (b,-1,10)
         
-        return dict(cls_scores=cls_scores, bbox_preds=bbox_preds, ldmk_preds=ldmk_preds)
+        return cls_scores, bbox_preds, ldmk_preds
     
     
     def get_losses(self, cls_scores, bbox_preds, ldmk_preds, 
