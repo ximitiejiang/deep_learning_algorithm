@@ -87,15 +87,18 @@ def get_config(config_path="cfg_ssd_voc.py"):
 
 
 
-def merge_config(args, cfg):
-    """把args合并到cfg, 可采用vars()把namespace转换成dict
-    其中cfg为dict, args为namespace
+def merge_config(src, des):
+    """把src合并到des, 可采用vars()把namespace转换成dict
+    其中des为dict, src为namespace
     """
-    args = vars(args)
-    for key, value in args.items():
+    if isinstance(src, dict):  # 字典可用
+        src = src         
+    else:                      #　命名空间需要转换
+        src = vars(src)
+    for key, value in src.items():
         if value is not None:
-            cfg[key] = value
-    return cfg
+            des[key] = value
+    return des
 
 
 # %%

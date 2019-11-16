@@ -10,10 +10,33 @@ import os
 import time
 import six
 import pickle
-from contextlib import ContextDecorator
+#from contextlib import ContextDecorator
+from functools import wraps
 
 # %%
+class ContextDecorator(object):
+    """该类来自：from contextlib import ContextDecorator
+    A base class or mixin that enables context managers to work as decorators.
+    """
+    def _recreate_cm(self):
+        """Return a recreated instance of self.
 
+        Allows an otherwise one-shot context manager like
+        _GeneratorContextManager to support use as
+        a decorator via implicit recreation.
+
+        This is a private interface just for _GeneratorContextManager.
+        See issue #11647 for details.
+        """
+        return self
+
+    def __call__(self, func):
+        @wraps(func)
+        def inner(*args, **kwds):
+            with self._recreate_cm():
+                return func(*args, **kwds)
+        return inner
+    
 class timer(ContextDecorator):
     """继承上下文管理装饰器实现一个双功能计时器，既可对函数计时，也可对代码块计时。
     参考：https://www.jb51.net/article/153872.htm

@@ -8,6 +8,7 @@ Created on Sun Nov  3 10:45:33 2019
 import numpy as np
 import torch
 import cv2
+import os
 import tensorrt as trt
 import pycuda.driver as cuda
 import pycuda.autoinit
@@ -16,28 +17,31 @@ from utils.tools import timer
 from utils.transform import imresize, imnormalize
 from utils.prepare_training import get_config, get_model
 from utils.checkpoint import load_checkpoint
+from utils.evaluation import data_loader
+from utils.post_processor import get_postprocessor
 
-def onnx_exporter(cfg, output_path):
-    """把一个pytorch模型转换成onnx模型，对模型的要求：
+def onnx_exporter(cfg):
+    """把一个pytorch模型转换成onnx模型。
+    对模型的要求：
     1. 模型需要有forward_dummy()函数的实施，如下是一个实例：
     def forward_dummy(self, img):
         x = self.extract_feat(img)
         x = self.bbox_head(x)
         return x
-    2. 模型的终端输出即head端的输出必须是tuple/list/variable类型，不能是dict，否则当前pytorch.onnx不支持导出。
+    2. 模型的终端输出，也就是head端的输出必须是tuple/list/variable类型，不能是dict，否则当前pytorch.onnx不支持。
     """
     img_shape = (1, 3) + cfg.img_size
     dummy_input = torch.randn(img_shape, device='cuda')
+    
     # 创建配置和创建模型
     model = get_model(cfg).cuda()
     if cfg.load_from is not None:
         _ = load_checkpoint(model, cfg.load_from)
     else:
         raise ValueError('need to assign checkpoint path to load from.')
-    # 指定模型的前向通道
+    
     model.forward = model.forward_dummy
-    # 导出模型
-    torch.onnx.export(model, dummy_input, output_path, verbose=True)
+    torch.onnx.export(model, dummy_input, cfg.work_dir + cfg.model_name + '.onnx', verbose=True)
     
 
 def img_loader(img_raw, pagelocked_buffer, input_size, 
@@ -67,12 +71,13 @@ def get_engine(model_path, logger=None, saveto=None):
     if logger is None:
         logger = trt.Logger(trt.Logger.WARNING)
     # 如果是序列化模型，则直接逆序列化即可(序列化模型建议的后缀名是.engine或.trt)
-    if model_path.split('.')[-1] in ['engine', 'trt']:
-        with open(model_path, 'rb') as f, trt.Runtime(logger) as runtime:
+    if os.path.isfile(model_path.split('.')[0] + '.trt'):
+        trt_model_path = model_path.split('.')[0] + '.trt'
+        with open(trt_model_path, 'rb') as f, trt.Runtime(logger) as runtime:
             engine = runtime.deserialize_cuda_engine(f.read())
     
     # 如果是onnx模型，则需要先转化为engine    
-    elif model_path.split('.')[-1] == 'onnx':
+    elif os.path.isfile(model_path) and model_path.split('.')[-1] == 'onnx':
         print('start transfer onnx model...')
         with trt.Builder(logger) as builder, builder.create_network() as network, trt.OnnxParser(network, logger) as parser: # with + 局部变量便于释放内存
             builder.max_workspace_size = 1*1 << 30  # 注意：2^10代表1024也就是1k, 所以2^20代表1M, 2^30代表1G (一般GPU的内存够大的建议都定义成1G) 
@@ -80,11 +85,14 @@ def get_engine(model_path, logger=None, saveto=None):
             with open(model_path, 'rb') as model:  # 打开onnx
                 parser.parse(model.read())       # 读取onnx, 解析onnx(解析的过程就是把权重填充到network的过程)
                 engine = builder.build_cuda_engine(network)  # 这个过程包括构建network层，填充权重，优化计算过程需要一定耗时
+                dest_path = os.path.dirname(model_path)
+                model_name = os.path.basename(model_path).split('.')[0] + '.trt'
                 if saveto is not None:
-                    with open(saveto + 'serialized.engine', 'wb') as f:
-                        f.write(engine.serialize())
+                    dest_path = saveto
+                with open(dest_path + model_name, 'wb') as f:
+                    f.write(engine.serialize())
     else:
-        raise ValueError('not supported model type.')
+        raise ValueError('not supported model type, need specifiy .onnx and .trt model.')
     return engine
 
 
@@ -147,45 +155,51 @@ def softmax(x):
     exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))  # 在np.exp(x - C), 相当于对x归一化，防止因x过大导致exp(x)无穷大使softmax输出无穷大 
     return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
 
+def img2buffer(img, pagelocked_buffer):
+    np.copyto(pagelocked_buffer, img.reshape(-1))
+    
 
-class DetTRTPredictor():
-    def __init__(self, model_path, input_size, labels, output_shape, postprocessor, resolution):
+class DetPredictorTRT():
+    def __init__(self, cfg):
         self.type = 'det'
-        self.model_path = model_path
-        self.input_size = input_size
-        self.labels = labels
-        self.output_shape = output_shape    # 代表输出特征图尺寸
+        self.cfg = cfg
+
         self.logger = trt.Logger(trt.Logger.WARNING)
         # 创建engine
-        self.engine = get_engine(self.model_path, self.logger)
+        model_path = self.cfg.work_dir + self.cfg.model_name + '.onnx'
+        self.engine = get_engine(model_path, self.logger)
         # 创建context
         self.context = self.engine.create_execution_context()
         # 分配内存： 分配内存可以实现分配，因为他只分配一次，是所有图片共享
         self.buffers = allocate_buffers(self.engine)
-        self.postprocessor = postprocessor
-        self.resolution = resolution
+        self.postprocessor = get_postprocessor(self.cfg)
     
     def __call__(self, src):
         # 开始预测
         if isinstance(src, np.ndarray):
             src = [src]
-        for img in src:
-            img_raw = img_loader(img, self.buffers[0][0], self.input_size)  #加载到hin
+        for img_raw in src:
+            # 先采用常规detpredictor的img loader建立数据包
+            data = data_loader(img_raw, self.cfg)
+            img = data['imgs']    # (1,c,h,w)
+            img_meta = data['img_metas']
+#            img_shape = img_meta['pad_shape'][:2]  # (h,w,c)
+            # TODO: 计算每张图的输出尺寸,对于输入图片尺寸变化的情况，如何计算?
+            output_shape = self.cfg.output_shape 
+#            img_raw = img_loader(data['imgs'], self.buffers[0][0], self.cfg.input_size)  #加载到hin
+            img2buffer(img, self.buffers[0][0])
             # do inference
-            trt_result = do_inference(self.context, *self.buffers)
+            results = do_inference(self.context, *self.buffers)
             # 结果解析
-            hout = [trt_result.reshape(self.output_shape)]  # 把得到的GPU展平数据恢复形状(1,125,13,13), 同时放入list中作为多个特征图的一张，只不过这里只使用了一张特征图
-            bboxes, labels, scores = self.postprocessor.process(hout, self.resolution)  # (k,4), (k,), (k,), 图片会被放大到cam_width, cam_height
-            # 调整bbox的形式从(x,y,w,h)到(xmin,ymin,xmax,ymax)
-            bboxes[:,2:] = bboxes[:, 2:] + bboxes[:, :2]
-            bboxes = bboxes.astype(np.int32)
+            results = [result.reshape(shape) for result, shape in zip(results, output_shape)]  # 把得到的GPU展平数据恢复形状(1,125,13,13), 同时放入list中作为多个特征图的一张，只不过这里只使用了一张特征图
+            bboxes, labels, scores = self.postprocessor.process(results, self.cfg.output_resolution)  # (k,4), (k,), (k,), 图片会被放大到cam_width, cam_height
             
             if bboxes is None:
                 bboxes = np.zeros((0, 4))
                 labels = np.zeros((0,))
                 scores = np.zeros((0,))
 
-            yield img_raw, bboxes, score           
+            yield img_raw, bboxes, scores, labels           
         
     
 

@@ -69,7 +69,6 @@ def eval_dataset_det(cfg_path,
     # 评估
     voc_eval(all_bbox_cls, dataset, iou_thr=0.5)
     
-    
    
 class DetPredictor():
     """用于对图片(非数据集的情况)进行预测计算，生成待显示的数据
@@ -93,7 +92,7 @@ class DetPredictor():
         if isinstance(src, np.ndarray):
             src = [src]
         for img in src:
-            img_data = img_loader(img, self.cfg)
+            img_data = data_loader(img, self.cfg)
             with torch.no_grad():
                 with timer('predict one img'):  # 检测一张图片的时间
                     dets = self.model(**img_data, return_loss=False)  # (n_class,)(k,5)
@@ -121,7 +120,7 @@ class SegPredictor(DetPredictor):
         if isinstance(src, np.ndarray):
             src = [src]
         for img in src:
-            img_data = img_loader(img, self.cfg)
+            img_data = data_loader(img, self.cfg)
             with torch.no_grad():
                 with timer('seg one img'):
                     seg = self.model(**img_data, return_loss=False)  # (1,21,480,480)
@@ -191,7 +190,7 @@ class ClsPredictor():
         if isinstance(src, np.ndarray):
             src = [src]
         for img in src:
-            img_data = img_loader(img, self.cfg)
+            img_data = data_loader(img, self.cfg)
             with torch.no_grad():
                 with timer('pytorch_inference'):
                     cls_score = self.model(**img_data, return_loss=False)
@@ -202,7 +201,7 @@ class ClsPredictor():
                 
 # %% 一些support函数
     
-def img_loader(img, cfg):
+def data_loader(img, cfg):
     """模拟dataloader的功能，加载单张图片：基本变换+升维+数据打包
     注意：如果是不固定尺寸的图片，那么collate_fn中的padding操作还需要增加。
     """

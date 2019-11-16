@@ -16,7 +16,7 @@ import pycuda.autoinit
 from utils.dataset_classes import get_classes
 from utils.onnx import img_loader, get_engine, allocate_buffers, do_inference
 from utils.visualization import vis_all_opencv
-from demo.trt_onnx_yolov3.data_processing import PreprocessYOLO, PostprocessYOLO, draw_bboxes
+from utils.post_processor import PostprocessorYOLO
 
 """
 这部分算法主要参考：Object Detection With The ONNX TensorRT Backend In Python
@@ -84,7 +84,7 @@ def inference_yolov3(src):
     buffers = allocate_buffers(engine)
     # 定义预处理
 #    preprocessor = PreprocessYOLO(cfg.img_size)
-    postprocessor = PostprocessYOLO(**cfg.postprocess_params)
+    postprocessor = PostprocessorYOLO(**cfg.postprocess_params)
     
     task = 'cam'
     if task == 'img':
