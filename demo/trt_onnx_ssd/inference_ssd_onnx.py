@@ -22,11 +22,11 @@ from utils.onnx import onnx_exporter, DetPredictorTRT
 """
 
 
-trt_cfg = dict(model_name = 'ssd_vgg_voc',
+trt_cfg = dict(model_name = 'ssd_vgg_voc.onnx',
                output_shape = [(1, 8732, 21),(1, 8732, 4)],
                postprocessor = dict(type='ssd',
                                     params = dict()),
-               output_resolution = ())
+               output_resolution = None)
 
 
 def inference_onnx(src, cfg):
@@ -41,20 +41,34 @@ def inference_onnx(src, cfg):
     
 
 if __name__ == "__main__":
+    task = 'img'
+        
     # cfg    
     cfg_path = './cfg_detector_ssdvgg16_voc.py'
     cfg = get_config(cfg_path)
-    cfg.load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_11.pth'
     cfg = merge_config(trt_cfg, cfg)
-    # weight to onnx
-#    onnx_exporter(cfg)
     
-    # 进行预测
-    img_paths = ['/home/ubuntu/MyDatasets/misc/1.jpg']
-#    src = 0  # cam预测
-    src = [cv2.imread(path) for path in img_paths]
+    # 进行onnx模型导出
+    if task == 'onnx':  # 
+        cfg.load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_11.pth'
+        onnx_exporter(cfg)
+        # 检查onnx模型
+        path = cfg.work_dir + cfg.model_name
+        
     
-    inference_onnx(src, cfg)
+    # 进行图片预测
+    if task == 'img':
+        # 如果是trt需要关闭tensor转换
+        cfg.transform_val.img_parasms.to_tensor=False
+        img_paths = ['/home/ubuntu/MyDatasets/misc/1.jpg']
+        src = [cv2.imread(path) for path in img_paths]
+        inference_onnx(src, cfg)
+        
+    # 进行摄像头预测
+    if task == 'cam':
+        cfg.transform_val.img_parasms.to_tensor=False
+        src = 0  # cam预测    
+        inference_onnx(src, cfg)
     
     
     

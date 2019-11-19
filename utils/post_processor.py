@@ -69,7 +69,9 @@ class PostprocessorSSD():
     
 # YOLO后处理器
 class PostprocessorYOLO(object):
-    """Class for post-processing the three outputs tensors from YOLOv3-608."""
+    """Class for post-processing the three outputs tensors from YOLOv3-608.
+    注意：形参统一采用cfg
+    """
 
     def __init__(self, cfg):
 #                 yolo_masks,
@@ -90,7 +92,7 @@ class PostprocessorYOLO(object):
         input_resolution_yolo -- two-dimensional tuple with the target network's (spatial)
         input resolution in HW order
         """
-        params = cfg.postprocessor.params
+        params = cfg.postprocessor['params']
         self.masks = params.yolo_masks
         self.anchors = params.yolo_anchors
         self.object_threshold = params.obj_threshold
@@ -98,7 +100,7 @@ class PostprocessorYOLO(object):
         self.input_resolution_yolo = params.yolo_input_resolution
         self.num_categories = params.num_categories
 
-    def process(self, outputs, resolution_raw):
+    def process(self, outputs, img_metas):
         """Take the YOLOv3 outputs generated from a TensorRT forward pass, post-process them
         and return a list of bounding boxes for detected object together with their category
         and their confidences in separate lists.
@@ -112,7 +114,7 @@ class PostprocessorYOLO(object):
             outputs_reshaped.append(self._reshape_output(output))
 
         boxes, categories, confidences = self._process_yolo_output(
-            outputs_reshaped, resolution_raw)
+            outputs_reshaped, img_metas)
         # 调整bbox的形式从(x,y,w,h)到(xmin,ymin,xmax,ymax)
         boxes[:,2:] = boxes[:, 2:] + boxes[:, :2]
         boxes = boxes.astype(np.int32)
@@ -133,7 +135,7 @@ class PostprocessorYOLO(object):
         dim4 = (4 + 1 + self.num_categories)
         return np.reshape(output, (dim1, dim2, dim3, dim4))
 
-    def _process_yolo_output(self, outputs_reshaped, resolution_raw):
+    def _process_yolo_output(self, outputs_reshaped, img_metas):
         """Take in a list of three reshaped YOLO outputs in (height,width,3,85) shape and return
         return a list of bounding boxes for detected object together with their category and their
         confidences in separate lists.
@@ -160,7 +162,7 @@ class PostprocessorYOLO(object):
         confidences = np.concatenate(confidences)
 
         # Scale boxes back to original image shape:
-        width, height = resolution_raw
+        width, height = img_metas[0]['ori_shape'][1], img_metas[0]['ori_shape'][0]   # 改成用进入模型的图片尺寸来恢复bbox，而不是用output_resolution
         image_dims = [width, height, width, height]
         boxes = boxes * image_dims
 

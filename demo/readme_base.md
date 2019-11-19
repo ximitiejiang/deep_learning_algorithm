@@ -526,6 +526,22 @@ https://discuss.pytorch.org/t/defining-my-model-encounter-a-runtimeerror-one-of-
 所以我反复寻找代码中类似x +=的操作，最后在FPNSSH中找到一处，fpn_outs[i-1] += F.interpolate(fpn_outs[i], scale_factor=1, mode='nearest')
 改成fpn_outs[i-1] = fpn_outs[i-1] + F.interpolate(fpn_outs[i], scale_factor=2, mode='nearest')即可
 
+
+
+### 验证输出的bbox的尺寸跟实际有较大偏差，主要原因是bbox转换出错？
+1. bbox的转换过程：
+    - img/bbox预处理resize
+    - img/bbox显示时可以直接按照img_raw和bbox来显示即可
+    - img/bbox变换分辨率。
+2. 特殊情况：yolov3，因为他的bbox输出时是相对于处理之后的img来说的，也就是相对尺寸。
+    - img/bbox预处理resize(608,608)
+    - img/bbox显示时采用原图img_raw，bbox则需要用原图尺寸相乘，类似于如下操作，则可得到基于img_raw的bbox实际尺寸。
+      bbox采用相对尺寸的好处是，无论要基于什么尺寸的图片进行显示，直接乘以图片尺寸就可以了，而不需要其他操作。
+```
+width, height = img_metas[0]['ori_shape'][1], img_metas[0]['ori_shape'][0]   # 改成用进入模型的图片尺寸来恢复bbox，而不是用output_resolution
+image_dims = [width, height, width, height]
+boxes = boxes * image_dims
+```
     
     
 ### 关于如何提高小物体的检测精度

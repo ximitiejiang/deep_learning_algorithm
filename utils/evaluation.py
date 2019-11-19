@@ -209,7 +209,8 @@ def data_loader(img, cfg):
     img_transform = ImgTransform(**cfg.transform_val.img_params)
     img, ori_shape, scale_shape, pad_shape, scale_factor, flip = img_transform(img)
     img = img[None,...]     # (c,h,w)->(1,c,h,w)
-    img = img.to(torch.device(cfg.load_device))
+    if cfg.transform_val.img_params.to_tensor and cfg.load_device is not None:
+        img = img.to(torch.device(cfg.load_device))
     
     img_meta = dict(ori_shape = ori_shape,
                     scale_shape = scale_shape,

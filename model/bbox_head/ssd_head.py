@@ -123,7 +123,8 @@ class ClassHead(nn.Module):
     def forward(self, x):
         out = self.conv3x3(x)
         out = out.permute(0, 2, 3, 1).contiguous()
-        out = out.view(out.shape[0], -1, self.num_classes)
+#        out = out.view(out.shape[0], -1, self.num_classes)  
+        out = out.view(int(out.size(0)), int(-1), int(self.num_classes))
         return out
         
 
@@ -136,7 +137,8 @@ class BboxHead(nn.Module):
     def forward(self, x):
         out = self.conv3x3(x)
         out = out.permute(0, 2, 3, 1).contiguous()
-        out = out.view(out.shape[0], -1, 4)
+#        out = out.view(out.shape[0], -1, 4)
+        out = out.view(int(out.size(0)), int(-1), int(4))
         return out     
 
 

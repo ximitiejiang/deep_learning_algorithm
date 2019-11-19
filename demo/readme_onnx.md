@@ -14,7 +14,7 @@ onnx所定义的数据结构存放在一个onnx.proto的文件中，是基于goo
 ```
 // copyright Facebook Inc. and Microsoft Corporation. 可见是facebook和微软一起，基于google的协议定制的数据结构
 syntax = "proto2"；
-// Nodes: 也就是模型的每一层：conv, relu...
+// Nodes: 数据结构是NodeProto，也就是模型的每一层：conv, relu...
 message NodeProto{
     repeated string input = 1;
     repeated string output = 2;
@@ -24,7 +24,7 @@ message NodeProto{
     optional string doc_string = 6;
     optional string domain = 7;
 }
-// Models: 也就是整个模型最大的集合，包含图和版本信息等
+// Models: 数据结构是ModelProto，也就是整个模型最大的集合，包含图和版本信息等
 message ModelProto{
     optional int64 ir_version = 1;
     optional string producer_name = 2;
@@ -35,7 +35,7 @@ message ModelProto{
     optional GrapProto graph = 7;
 }
 
-// Graphs: 也就是模型的构造和权重(最核心部分)
+// Graphs: 数据结构是GraphProto，也就是模型的构造和权重(最核心部分)
 message GraphProto{
     repeated NodeProto node = 1;
     optional string name = 2;
@@ -47,8 +47,9 @@ message GraphProto{
 
 ### 创建一个最简单的onnx模型
 创建onnx模型分三步：把冰箱门打开，把onnx拿出来，把冰箱门关上...哦不是，是先创建node，再创建graph，最后创建model
+通常采用onnx的python api进行onnx模型的创建，可以参考tensorRT中yolov3的onnx模型创建
 ```
-
+// 这里简单onnx模型创建参考自onnx官网tu
 ```
 
 ### 已生成的onnx模型的认识

@@ -84,11 +84,12 @@ def get_engine(model_path, logger=None, saveto=None):
             builder.max_batch_size = 1
             with open(model_path, 'rb') as model:  # 打开onnx
                 parser.parse(model.read())       # 读取onnx, 解析onnx(解析的过程就是把权重填充到network的过程)
-                engine = builder.build_cuda_engine(network)  # 这个过程包括构建network层，填充权重，优化计算过程需要一定耗时
-                dest_path = os.path.dirname(model_path)
+                engine = builder.build_cuda_engine(network)  # 这个过程主要是优化计算过程，需要一定耗时
+                dest_path = os.path.dirname(model_path) + '/'
                 model_name = os.path.basename(model_path).split('.')[0] + '.trt'
                 if saveto is not None:
                     dest_path = saveto
+                print('start save trt model...')
                 with open(dest_path + model_name, 'wb') as f:
                     f.write(engine.serialize())
     else:
@@ -120,24 +121,8 @@ def allocate_buffers(engine):
             inputs.append([host_mem, device_mem])
         else:
             outputs.append([host_mem, device_mem])
-    return [inputs, outputs, bindings, stream]      
+    return [inputs, outputs, bindings, stream]      # 注意：这里如果要取到hin，需要用buffers[0][0][0]，第1个0是inputs,第2个0是(hin,din)，第3个0是hin
     
-#    dins = []
-#    hins = []
-#    douts = []
-#    houts = []
-#    for binding in engine:
-#        size = trt.volume(engine.get_binding_shape(binding)) * engine.max_batch_size)
-#        dtype = trt.nptype(trt.float32)
-#        hin = cuda.pagelocked_empty(size, dtype
-#        hins.append(hin)   # (c*h*w,)把输入图片拉直的一维数组
-#        houts.append(cuda.pagelocked_empty(trt.volume(engine.get_binding_shape(1)), dtype=trt.nptype(trt.float32))) # (n_cls,)输出预测的一维数组
-#        dins.append(cuda.mem_alloc(hin.nbytes))    #　为GPU设备分配内存
-#        douts.append(cuda.mem_alloc(hout.nbytes))    
-#    stream = cuda.Stream()              # 创建stream流来拷贝输入输出，进行推理
-#    buffers = Dict(hin=hins, hout=houts, din=dins, dout=douts, stream=stream)  # 字典中每个元素都是list
-#    return buffers
-
 
 def do_inference(context, inputs, outputs, bindings, stream, batch_size=1):
     """如果要用trt做推断，则模型返回的每层特征图的预测结构都必须是单个数据，比如3层特征图，就输出3个tensor，每个tensor包含了pred(类别), score(置信度),bbox(坐标) 
@@ -187,17 +172,26 @@ class DetPredictorTRT():
             # TODO: 计算每张图的输出尺寸,对于输入图片尺寸变化的情况，如何计算?
             output_shape = self.cfg.output_shape 
 #            img_raw = img_loader(data['imgs'], self.buffers[0][0], self.cfg.input_size)  #加载到hin
-            img2buffer(img, self.buffers[0][0])
+            img2buffer(img, self.buffers[0][0][0])
             # do inference
             results = do_inference(self.context, *self.buffers)
             # 结果解析
             results = [result.reshape(shape) for result, shape in zip(results, output_shape)]  # 把得到的GPU展平数据恢复形状(1,125,13,13), 同时放入list中作为多个特征图的一张，只不过这里只使用了一张特征图
-            bboxes, labels, scores = self.postprocessor.process(results, self.cfg.output_resolution)  # (k,4), (k,), (k,), 图片会被放大到cam_width, cam_height
+            bboxes, labels, scores = self.postprocessor.process(results, img_meta)  # (k,4), (k,), (k,), 图片会被放大到cam_width, cam_height
             
             if bboxes is None:
                 bboxes = np.zeros((0, 4))
                 labels = np.zeros((0,))
                 scores = np.zeros((0,))
+            # 支持output_resolution: 如果传入新的resolution, 则改变img和bbox
+            if self.cfg.get('output_resolution', None) is not None:
+                w, h = img_raw.shape[1], img_raw.shape[0]
+                img_raw = imresize(img_raw, self.cfg.output_resolution)
+                # Scale boxes back to original image shape:
+                width, height = self.cfg.output_resolution
+                image_dims = [width/w, height/h, width/w, height/h]
+                bboxes = bboxes * image_dims
+
 
             yield img_raw, bboxes, scores, labels           
         

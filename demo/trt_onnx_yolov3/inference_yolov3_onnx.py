@@ -22,10 +22,31 @@ from addict import Dict
 """
 
 
-trt_cfg = Dict(model_name = 'yolov3_coco',
+trt_cfg = Dict(
+            model_name = 'yolov3_coco.onnx',
+            load_device = 'cuda',
+            img_size = (608, 608),
+            work_dir = '/home/ubuntu/mytrain/onnx_yolov3/',
+            transform_val = dict(
+                    img_params=dict(
+                            mean=[0, 0, 0],  # yolov3只做了1/255操作，不再做normalize
+                            std=[1, 1, 1],
+                            norm=True,
+                            to_rgb=True,    # bgr to rgb
+                            to_tensor=False, # 注意：trt模块只认可numpy，不能采用tensor，而是由trt自己调用tensor
+                            to_chw=True,    # hwc to chw
+                            flip_ratio=None,
+                            scale=(608,608),  # [w,h]
+                            size_divisor=None,
+                            keep_ratio=False),
+                    label_params=dict(
+                            to_tensor=True,
+                            to_onehot=None),
+                    bbox_params=dict(
+                            to_tensor=True
+                            )),
+               # 额外yolo参数
                output_shape = [(1, 255, 19, 19), (1, 255, 38, 38), (1, 255, 76, 76)],
-               img_size = (608, 608),
-               work_dir = '/home/ubuntu/mytrain/onnx_yolov3/',
                postprocessor = dict(type='yolov3',
                                     params = dict(
                                         yolo_masks = [(6,7,8), (3,4,5), (0,1,2)],
@@ -40,7 +61,7 @@ trt_cfg = Dict(model_name = 'yolov3_coco',
                                         yolo_input_resolution = (608, 608),
                                         # Number of object classes
                                         num_categories =  80)),
-               output_resolution = ())
+               output_resolution = (1000, 800))
 
 
 def inference_onnx(src, cfg):
@@ -48,28 +69,32 @@ def inference_onnx(src, cfg):
     
     if isinstance(src, (str, list)):  # 如果是list，则认为是图片预测
         for result in predictor(src):
-            vis_all_opencv(*result, class_names=get_classes('voc'), score_thr=0.5)
+            vis_all_opencv(*result, class_names=get_classes('coco'), score_thr=0.5)
     
     if isinstance(src, int):
-        vis_cam(src, predictor, class_names=get_classes('voc'), score_thr=0.2)
+        vis_cam(src, predictor, class_names=get_classes('coco'), score_thr=0.2)
     
 
 if __name__ == "__main__":
-    # cfg    
-#    cfg_path = './cfg_detector_ssdvgg16_voc.py'
-#    cfg = get_config(cfg_path)
+    task = 'cam'
+    
     cfg = Dict()
-    cfg.load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_11.pth'
     cfg = merge_config(trt_cfg, cfg)
-    # weight to onnx
-#    onnx_exporter(cfg)
     
+    if task == 'check':
+        onnx_model = 
+        onnx.checker.check_model(onnx_model)
+
     # 进行预测
-    img_paths = ['/home/ubuntu/MyDatasets/misc/1.jpg']
-#    src = 0  # cam预测
-    src = [cv2.imread(path) for path in img_paths]
-    
-    inference_onnx(src, cfg)
+    if task == 'img':
+        cfg.transform_val.img_parasms.to_tensor=False
+        img_paths = ['/home/ubuntu/MyDatasets/misc/3.jpg']
+        src = [cv2.imread(path) for path in img_paths]
+        inference_onnx(src, cfg)
+    if task == 'cam':
+        cfg.transform_val.img_parasms.to_tensor=False
+        src = 0  # cam预测
+        inference_onnx(src, cfg)
     
     
     

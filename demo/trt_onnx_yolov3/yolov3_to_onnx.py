@@ -345,14 +345,14 @@ class GraphBuilderONNX(object):
         output dimensions
         """
         self.output_tensors = output_tensors
-        self._nodes = list()
+        self._nodes = list()             # _nodes存放所有操作，每个操作一个node, 比如
         self.graph_def = None
         self.input_tensor = None
         self.epsilon_bn = 1e-5
         self.momentum_bn = 0.99
         self.alpha_lrelu = 0.1
         self.param_dict = OrderedDict()
-        self.major_node_specs = list()
+        self.major_node_specs = list()   #
         self.batch_size = 1
 
     def build_onnx_graph(
@@ -369,7 +369,7 @@ class GraphBuilderONNX(object):
         weights_file_path -- location of the weights file
         verbose -- toggles if the graph is printed after creation (default: True)
         """
-        for layer_name in layer_configs.keys():
+        for layer_name in layer_configs.keys():  # step1：生成nodes(存放每一个操作，包括conv,bn,relu...), major_node_specs(存放主要节点参数, 比如一个主节点spec包括conv/bn/relu)
             layer_dict = layer_configs[layer_name]
             major_node_specs = self._make_onnx_node(layer_name, layer_dict)
             if major_node_specs.name is not None:
@@ -382,8 +382,9 @@ class GraphBuilderONNX(object):
                 tensor_name, TensorProto.FLOAT, output_dims)  # 创建了一个proto格式的输出tensor信息
             outputs.append(output_tensor)
         inputs = [self.input_tensor]                          # 创建了一个proto格式的输入tensor信息
-        weight_loader = WeightLoader(weights_file_path)
+        weight_loader = WeightLoader(weights_file_path)# 打开权重文件
         initializer = list()
+        """创建initializer就是把每层的超参数变换成TensorProto形式"""
         # If a layer has parameters, add them to the initializer and input lists.
         for layer_name in self.param_dict.keys():
             _, layer_type = layer_name.split('_', 1)
@@ -399,7 +400,9 @@ class GraphBuilderONNX(object):
                 initializer.extend(initializer_layer)
                 inputs.extend(inputs_layer)
         del weight_loader
-        self.graph_def = helper.make_graph(
+        """注意：这里都是传引用赋值，value_info_proto.tensor_type->tensor_type_proto, tensor_type_proto.shape->tensor_shape_proto, tensor_shape_proto."""
+        """make_graph很简单，就是把前面得到的_nodes, initializer, inputs, outputs都放进去."""
+        self.graph_def = helper.make_graph(   
             nodes=self._nodes,
             name='YOLOv3-608',
             inputs=inputs,
@@ -422,7 +425,7 @@ class GraphBuilderONNX(object):
         layer_dict -- a layer parameter dictionary (one element of layer_configs)
         """
         layer_type = layer_dict['type']
-        if self.input_tensor is None:
+        if self.input_tensor is None: # 如果是第一层，则创建input_tensor
             if layer_type == 'net':
                 major_node_output_name, major_node_output_channels = self._make_input_tensor(
                     layer_name, layer_dict)
@@ -430,7 +433,7 @@ class GraphBuilderONNX(object):
                                                   major_node_output_channels)
             else:
                 raise ValueError('The first node has to be of type "net".')
-        else:
+        else:   # 如果不是第一层，则？
             node_creators = dict()
             node_creators['convolutional'] = self._make_conv_node
             node_creators['shortcut'] = self._make_shortcut_node
@@ -492,7 +495,7 @@ class GraphBuilderONNX(object):
         layer_name -- the layer's name (also the corresponding key in layer_configs)
         layer_dict -- a layer parameter dictionary (one element of layer_configs)
         """
-        previous_node_specs = self._get_previous_node_specs()
+        previous_node_specs = self._get_previous_node_specs()  # 从前一层获得node(也就是自定义的对象，通过__dict__可查看有哪些属性)
         inputs = [previous_node_specs.name]
         previous_channels = previous_node_specs.channels
         kernel_size = layer_dict['size']
@@ -505,18 +508,18 @@ class GraphBuilderONNX(object):
 
         kernel_shape = [kernel_size, kernel_size]
         weights_shape = [filters, previous_channels] + kernel_shape
-        conv_params = ConvParams(layer_name, batch_normalize, weights_shape)
+        conv_params = ConvParams(layer_name, batch_normalize, weights_shape)  # 生成存放卷积参数的对象
 
         strides = [stride, stride]
         dilations = [1, 1]
-        weights_name = conv_params.generate_param_name('conv', 'weights')
+        weights_name = conv_params.generate_param_name('conv', 'weights')   # 自动生成卷积层名字，并检查是否合法
         inputs.append(weights_name)
         if not batch_normalize:
             bias_name = conv_params.generate_param_name('conv', 'bias')
             inputs.append(bias_name)
 
-        conv_node = helper.make_node(
-            'Conv',
+        conv_node = helper.make_node(     # 采用onnx自带方法，创建conv node, onnx.helper.make_node()
+            'Conv',              # 节点的算子类型：可参考onnx的算子列表
             inputs=inputs,
             outputs=[layer_name],
             kernel_shape=kernel_shape,

@@ -30,10 +30,14 @@ logger = trt.Logger(trt.Logger.WARNING)
     - onnx发展迅速，有可能产生onnx模型版本跟parser解析器版本不匹配的问题 ——是否需要自己写一个onnx转换器？
     - tensorRT的onnx后端，参考：https://github.com/onnx/onnx-tensorrt/blob/master/README.md
     - 导入的过程主要就是创建3个对象：构造器，网络模型，解析器
-        - 创建builder: trt.Builder(logger) as builder
-        - 创建network: builder.create_network() as network
-        - 创建parser: trt.OnnxParser(network, logger) as parser
-
+        - 创建builder: trt.Builder(logger) as builder，该builder对象用来操作network生成engine
+        - 创建network: builder.create_network() as network, 该network是按照
+        - 创建parser: trt.OnnxParser(network, logger) as parser，
+    - 生成过程
+        - parser.parse(model.read())   这个过程就是先把模型读取出来，然后解析的过程就是把模型权重填充进network
+        - engine = builder.build_cuda_engine(network)   这个过程就是把network再打包成engine, 但在过程中会进行一系列优化操作，比如对conv的计算过程进行优化
+        
+        
 
 ### 创建trt的engine对象
 1. engine对象是把network的结构和权重和计算进行优化之后的结果模型。
@@ -247,6 +251,23 @@ pip install onnx==1.4.1
 ```
 可惜我用conda安装的onnx，居然没有旧版本可用，想conda uninstall onnx，提示我要下载600M的东西，我x，安装时10M不到，卸载要动600M...
 
+
+5. 报错：[TensorRT] ERROR: Network must have at least one output。该步报错发生在engine = builder.build_cuda_engine(network)
+问题原因：
+- 可能原因1：没有output，则手动标记output, 首先查看相关变量
+    parser.parse(model.read())   　　　　　　　 #首先解析模型，此时就会把权重填充到network，也就能从network查看解析结果了。(如果在解析前查看network就是一个空壳)
+    network.num_layers                         #可查看模型有多少层: 比如显示61则说明有61层(0-60)，发现我的模型只解析到60层，也就是backbone层，后边的层都没有解析出来
+    network.get_layer(60).get_output(0).shape  #可看到最后一层的输出
+
+    network.mark_output(network.get_layer(network.num_layers-1).get_output(0))   #手动标记输出层
+
+
+6. 报错：[TensorRT] ERROR: Network must have at least one output。该步报错发生在engine = builder.build_cuda_engine(network)
+- 可能原因：tensorRT只支持float32, float, int32, 但不支持int64所以如果模型采用了int64则需要替代该数据类型.
+  参考解答：https://devtalk.nvidia.com/default/topic/1045064/tensorrt/onnx-and-tensorrt-error-network-must-have-at-least-one-output/
+  在tensorRT中，针对onnx模型中的数值，以及shape输出，都默认会基于pytorch变成long()，但long()并不被tensorRT支持，所以导致报错。需要用int(x.size(0))把结果从long转化成int32  
+  解决办法：把cls_head, bbox_head的view()中的常量都用int()进行强制指定，即out = out.view(int(out.size(0)), int(-1), int(self.num_classes))
+  
 
 ### 关于硬件jetson nano
 
