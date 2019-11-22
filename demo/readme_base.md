@@ -1,4 +1,4 @@
-模型基础(baseline)
+模型基础(baseline)-主要基于pytorch进行总结
 
 ### 设计
 **关于总体结构**
