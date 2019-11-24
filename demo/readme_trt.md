@@ -215,6 +215,10 @@ raw_data: "\034
 
 
 
+### 关于模型量化
+1. 什么是模型量化：
+
+
 ### 调试：
 1. 报错：pycuda._driver.LogicError: explicit_context_dependent failed: invalid device context - no currently active context?
 也就是在预分配host，device内存的时候就报错了h_input = cuda.pagelocked_empty(trt.volume(engine.get_binding_shape(0)), dtype=trt.nptype(cfg.DTYPE))
