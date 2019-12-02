@@ -118,7 +118,7 @@ transform_val = dict(
                 to_tensor=True
                 ))
 
-data_root_path='/home/ubuntu/MyDatasets/voc/VOCdevkit/'
+data_root_path='/home/ubuntu/MyDatasets0/voc/VOCdevkit/'  #
 trainset = dict(
         type='voc',
         repeat=0,
