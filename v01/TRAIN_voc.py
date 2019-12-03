@@ -92,7 +92,7 @@ def train(cfg_path, dataset_class):
     """
     # 初始化2个默认选项
     distributed = False
-    parallel = True
+    parallel = True      # 必须设置成dataparallel模式，否则data container无法拆包(因为data container的拆包是在data parallel的scatter函数中进行的)
     
     # get cfg
     cfg = Config.fromfile(cfg_path)

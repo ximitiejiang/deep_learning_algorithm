@@ -41,7 +41,7 @@ backbone=dict(
         type='resnet',
         params=dict(
                 depth=50,
-                pretrained= '/home/ubuntu/MyWeights/resnet50-19c8e357.pth',
+                pretrained= '/home/ubuntu/MyWeights/pytorch/resnet50-19c8e357.pth',
                 out_indices=(0, 1, 2, 3),
                 strides=(1, 2, 2, 2)))
 

@@ -92,8 +92,8 @@ def focal_loss(pred, target, alpha=0.25, gamma=2.0):
     focal_loss = - at*(1-pt)^gamma * log(pt), 其中at = a*t+(1-a)(1-t), pt = p*t+(1-p)(1-t)
     当t=1时
     """
-    pred_s = pred.sigmoid()  # 用真实概率p进行weight的计算，但二值交叉熵输入非概率化p，因为内部自带了sigmoid
-    pt = pred_s * target + (1 - pred_s) * (1 - target)
+    pred_sig = pred.sigmoid()  # 用真实概率p进行weight的计算，但二值交叉熵输入非概率化p，因为内部自带了sigmoid
+    pt = pred_sig * target + (1 - pred_sig) * (1 - target)
     at = alpha * target + (1 - alpha) * (1 - target)
     weight = at * (1 - pt).pow(gamma)
     loss = F.binary_cross_entropy(pred, target, weight, reduction='none')

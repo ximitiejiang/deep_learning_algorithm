@@ -531,13 +531,13 @@ def unmap(data, count, inds, fill=0):
         ret[inds, :] = data
     return ret
 
-
+# 把原始标签转换为独热标签one_hot_code： 因为该标签需要送入focal loss进行内部的二值交叉熵计算，必须采用独热标签。
 def expand_binary_labels(labels, label_weights, label_channels):
     bin_labels = labels.new_full(
-        (labels.size(0), label_channels), 0, dtype=torch.float32)
+        (labels.size(0), label_channels), 0, dtype=torch.float32)  # (182403, 20)
     inds = torch.nonzero(labels >= 1).squeeze()
     if inds.numel() > 0:
-        bin_labels[inds, labels[inds] - 1] = 1
+        bin_labels[inds, labels[inds] - 1] = 1   # 注意这里需要把原始标签(1-20)转换到0-19，因为独热编码需要从0开始
     bin_label_weights = label_weights.view(-1, 1).expand(
         label_weights.size(0), label_channels)
     return bin_labels, bin_label_weights

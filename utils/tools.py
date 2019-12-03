@@ -6,12 +6,49 @@ Created on Thu Sep  5 14:43:44 2019
 @author: ubuntu
 """
 import torch
+import numpy as np
 import os
 import time
 import six
 import pickle
 #from contextlib import ContextDecorator
 from functools import wraps
+
+# %%
+def one_hot_encode(t, n_column=None):
+    """pytorch版本的独热编码生成
+    args:
+        t (b, ) 代表b个样本的标签，取值要从0开始，比如[0,1,2,3]
+        one_hot_t (b, )
+    """
+    t = t.long()
+    if n_column is None:
+        n_column = t.max().item() + 1
+    t = t.reshape(-1, 1)  # 转为列
+    one_hot_t = torch.FloatTensor(len(t), n_column).zero_()  # 先创建全0的独热编码
+    one_hot_t.scatter_(1, t, 1)    # 生成独热编码
+    return one_hot_t
+
+
+def label_to_onehot(labels):
+    """numpy版本的标签转换为独热编码：输入的labels需要是从0开始的整数，比如[0,1,2,...]
+    输出的独热编码为[[1,0,0,...],
+                  [0,1,0,...],
+                  [0,0,1,...]]  分别代表0/1/2的独热编码
+    """
+    assert labels.ndim ==1, 'labels should be 1-dim array.'
+    labels = labels.astype(np.int8)
+    n_col = int(np.max(labels) + 1)   # 独热编码列数，这里可以额外增加列数，填0即可，默认是最少列数
+    one_hot = np.zeros((labels.shape[0], n_col))
+    one_hot[np.arange(labels.shape[0]), labels] = 1
+    return one_hot  # (n_samples, n_col)
+
+
+def onehot_to_label(one_hot_labels):
+    """把独热编码变回0-k的数字编码"""
+    labels = np.argmax(one_hot_labels, axis=1)  # 提取最大值1所在列即原始从0开始的标签
+    return labels
+
 
 # %%
 class ContextDecorator(object):
@@ -326,5 +363,6 @@ def get_dist_info():
 # %%
 
 if __name__ == "__main__":
-    hello(1)
-    hello2(2)
+    t = torch.tensor([2, 0 , 9])
+    onehot = one_hot_encode(t)
+    print(onehot)

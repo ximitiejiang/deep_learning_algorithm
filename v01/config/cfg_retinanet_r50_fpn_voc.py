@@ -1,7 +1,7 @@
 # model settings
 model = dict(
     type='RetinaNet',
-    pretrained='modelzoo://resnet50',  # 使用pytorch的resnet50的权重
+    pretrained='/home/ubuntu/MyWeights/pytorch/resnet50-19c8e357.pth',  # 使用pytorch的resnet50的权重
     backbone=dict(
         type='ResNet',
         depth=50,
@@ -50,7 +50,7 @@ test_cfg = dict(
     max_per_img=100)
 # dataset settings
 dataset_type = 'VOCDataset'
-data_root = './data/VOCdevkit/'
+data_root = '/home/ubuntu/MyDatasets0/voc/VOCdevkit/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)  # 采用的是pytorch的模型，但mean/std还是用的caffe的？？？
 data = dict(           # repeatdataset不加了，在coco训练12epoch，voc上调成24

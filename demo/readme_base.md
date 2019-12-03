@@ -412,6 +412,8 @@
 0. 先写结论：通过重写data_parallel_model以及里边的scatter()函数，来拆开data_container，并送model, batch_data到指定gpu设备。
    并通过to_tensor函数，把数据转换成pytorch需要的float(), Long()，防止了训练出错。
    整个过程封装得非常隐蔽，虽然减少了用户出错的几率，但也让使用者不清楚应该有什么是需要做的，有什么是系统帮忙做掉的，在哪做掉的。
+   并且mmdetection当前只支持dataparallel模式，即使gpu=1也必须设置成dataparallel模式，因为必须依靠dataparallel模式里边
+   的scatter函数对data container拆包。如果不是dataparallel模式则在前向计算result = model(img)时会报错。
    
    具体来说：
     - 定义了一个data container，用来打包数据
