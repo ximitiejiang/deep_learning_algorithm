@@ -39,12 +39,13 @@ class CrossEntropyLoss(nn.Module):
         if weight is not None:
             loss = weight * loss   
         if avg_factor is not None:
+            avg_factor += 1e-6   # 防止除数=0
             loss = loss.sum() / avg_factor
         return loss
 
 
 class SigmoidBinaryCrossEntropyLoss(nn.Module):
-    """二值交叉熵：带sigmoid函数在内部
+    """二值交叉熵：带sigmoid函数在内部 (虽然pytorch还有不带sigmoid版本的，但带sigmoid版本的更高效)
     args
         pred: (b, n_class)任意
         target: (b, n_class)
@@ -60,6 +61,7 @@ class SigmoidBinaryCrossEntropyLoss(nn.Module):
         if weight is not None:
             loss = weight * loss          
         if avg_factor is not None:
+            avg_factor += 1e-6   # 防止除数=0            
             loss = loss.sum() / avg_factor
         return loss
 
@@ -84,6 +86,7 @@ class SigmoidFocalLoss(nn.Module):
         if weight is not None:
             loss = weight * loss      
         if avg_factor is not None:
+            avg_factor += 1e-6   # 防止除数=0
             loss = loss.sum() / avg_factor
         return loss
 
@@ -92,12 +95,13 @@ def focal_loss(pred, target, alpha=0.25, gamma=2.0):
     focal_loss = - at*(1-pt)^gamma * log(pt), 其中at = a*t+(1-a)(1-t), pt = p*t+(1-p)(1-t)
     当t=1时
     """
-    pred_sig = pred.sigmoid()  # 用真实概率p进行weight的计算，但二值交叉熵输入非概率化p，因为内部自带了sigmoid
+    pred_sig = pred.sigmoid()  # 计算pt, at使用的概率必须是sigmoid之后的真实概率。
     pt = pred_sig * target + (1 - pred_sig) * (1 - target)
     at = alpha * target + (1 - alpha) * (1 - target)
     weight = at * (1 - pt).pow(gamma)
-    loss = F.binary_cross_entropy(pred, target, weight, reduction='none')
-    return loss
+    loss = F.binary_cross_entropy_with_logits(pred, target, weight.detach(), reduction='none')  # 使用的是with_logits版本的二值交叉熵，所以输入的pred必须是未经sigmoid处理的。
+    return loss                                                                                 # 二值交叉熵公式禁止传入的weight带有梯度反传标志，所以必须让weight先detach才行。
+ 
 
 
 # %%
@@ -111,12 +115,14 @@ class SmoothL1Loss(nn.Module):
         if weight is not None:
             loss = weight * loss      
         if avg_factor is not None:
+            avg_factor += 1e-6   # 防止除数=0
             loss = loss.sum() / avg_factor
         return loss
 
 
 def smooth_l1_loss(pred, target, beta=1.):
-    """柔性l1 loss底层函数, 用作参考，但底层实际还是采用pytorch的F函数库
+    """柔性l1 loss底层函数, 用作参考，但我的smoothl1loss类的底层实际还是采用pytorch的F函数库
+    pytorch的smooth_l1底层的bata取值应该采用1/9, 类似于tensorflow
     args:
         pred: (k,4)
         target: (k,4)
@@ -140,6 +146,7 @@ class IouLoss(nn.Module):
         if weight is not None:
             loss = weight * loss      
         if avg_factor is not None:
+            avg_factor += 1e-6   # 防止除数=0
             loss = loss.sum() / avg_factor
         return loss
 

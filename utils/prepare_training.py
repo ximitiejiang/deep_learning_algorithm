@@ -33,6 +33,7 @@ from model.backbone.mobilenet_lib import MobileNetV1
 from model.neck.neck_lib import FPN, FPNSSH
 from model.bbox_head.ssd_head import SSDHead
 from model.bbox_head.retinaface_head import RetinaFaceHead
+from model.bbox_head.retinanet_head import RetinaNetHead
 from model.bbox_head.fcos_head import FCOSHead
 from model.seg_head.fcn_head import FCN8sHead
 
@@ -62,6 +63,7 @@ models = {
         'fpnssh': FPNSSH,
         'ssd_head' : SSDHead,
         'retinaface_head' : RetinaFaceHead,
+        'retinanet_head': RetinaNetHead,
         'fcos_head': FCOSHead,
         'fcn8s_head': FCN8sHead}
 

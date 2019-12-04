@@ -43,7 +43,11 @@ from model.loss_lib import IouLoss, SigmoidBinaryCrossEntropyLoss, SigmoidFocalL
 #    return layers
     
 
-def get_base_anchor_params(img_size, ratio_range, n_featmap, strides, ratios):
+def get_base_anchor_params(img_size=(300,300), 
+                           ratio_range=(0.2, 0.9), 
+                           n_featmap=6, 
+                           strides=(8, 16, 32, 64, 100, 300), 
+                           ratios=([2], [2, 3], [2, 3], [2, 3], [2], [2])):
     """这是SSD使用的一种通用的设计anchor尺寸的方法
     假定已知图像尺寸img_size：
     1.定义一个anchor相对于图像的尺寸比例范围ratio_range, 也就是最小anchor大概是图像的百分之多少，最大anchor大概是图像的百分之多少.
@@ -260,16 +264,16 @@ class SSDHead(nn.Module):
         # 解析target
         bboxes_t, bboxes_w, labels_t, labels_w, _, _, num_pos, num_neg = target_result  # (b,-1,4)x2, (b,-1)x2
         
-        # bbox回归损失
-        pfunc = partial(self.loss_bbox, avg_factor=num_pos)
-        loss_bbox = list(map(pfunc, bbox_preds, bboxes_t, bboxes_w))  # (b,)
         # cls分类损失
         loss_cls = list(map(self.loss_cls, cls_scores, labels_t))
         loss_cls = [loss_cls[i] * labels_w[i].float() for i in range(len(loss_cls))]  # (b,)(8732,)没有做loss缩减因为需要做负样本挖掘
         # cls loss的ohem
         pfunc = partial(ohem, neg_pos_ratio=self.neg_pos_ratio, avg_factor=num_pos)
         loss_cls = list(map(pfunc, loss_cls, labels_t))   # (b,)
-
+        # bbox回归损失
+        pfunc = partial(self.loss_bbox, avg_factor=num_pos)
+        loss_bbox = list(map(pfunc, bbox_preds, bboxes_t, bboxes_w))  # (b,)
+        
         return dict(loss_cls = loss_cls, loss_bbox = loss_bbox)  # {(b,), (b,)} 每张图对应一个分类损失值和一个回归损失值。
     
     

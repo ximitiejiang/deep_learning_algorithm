@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 from model.activation_lib import activation_dict
-from utils.init_weights import common_init_weights
+from utils.init_weights import common_init_weights, kaiming_init
 
 def conv_bn_relu(in_channels, out_channels, kernel_size, 
                  with_bn=False, activation='relu', with_maxpool=False, 
@@ -118,7 +118,11 @@ class FPN(nn.Module):
         return tuple(outs)
     
     def init_weights(self):
-        common_init_weights(self)
+        """FPN初始化，mmdetection采用的是Xavier，但如果带了relu的话Xavier似乎不是最好选择，这里改成kaiming初始化"""
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                kaiming_init(m)
+#        common_init_weights(self)
         
 
 # %%

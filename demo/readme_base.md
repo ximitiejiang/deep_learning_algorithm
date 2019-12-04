@@ -509,6 +509,13 @@
 直到得到bbox正常的数据才return
 
 
+### 训练中报错，binary_cross_entropy_with_logits(pred, target, weight)损失函数报错：RuntimeError: the derivative for 'weight' is not implemented
+
+1. 这个问题主要原因在于传入的weight是带有梯度反传标志的，但二值交叉熵公式并不支持对weight进行梯度反传更新。所以报错。
+实际上我并不需要weight进行梯度反传，之前的旧版本pytorch似乎不会报错，现在pytorch1.1爆出来反而是好事。
+解决方案：weight.detach()代替weight
+参考：https://blog.csdn.net/sinat_24424445/article/details/101022092
+
 
 ### 训练中报错variable has been modified by an inplace operation：
 

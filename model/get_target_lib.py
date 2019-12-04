@@ -17,7 +17,7 @@ def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list, gt_landmarks_
     """
     if gt_landmarks_list is None:
         gt_landmarks_list = [None for _ in anchor_list]
-    pfunc = partial(anchor_match_target, assigner_cfg=assigner_cfg, 
+    pfunc = partial(anchor_target_single, assigner_cfg=assigner_cfg, 
                     sampler_cfg=sampler_cfg, means=means, stds=stds)
     targets = list(map(pfunc, anchor_list, gt_bboxes_list, gt_labels_list, gt_landmarks_list))  # (b,) (6,)生成每张图的target
     # targets里边(b,)每张图包含8个变量(8,)，提取相同变量进行堆叠
@@ -37,7 +37,7 @@ def get_anchor_target(anchor_list, gt_bboxes_list, gt_labels_list, gt_landmarks_
     return bboxes_t, bboxes_w, labels_t, labels_w, ldmk_t, ldmk_w, num_pos, num_neg
     
 
-def anchor_match_target(anchors, gt_bboxes, gt_labels, gt_ldmks,
+def anchor_target_single(anchors, gt_bboxes, gt_labels, gt_ldmks,
                         assigner_cfg, sampler_cfg, means, stds):
     """核心程序: 对单张图的anchor进行目标匹配。
     让每个anchor都能匹配到合适的target，如果匹配的target是gt就获得对应gt的数据(bbox,label,ldmk)
@@ -149,7 +149,7 @@ def get_point_target(points, regress_ranges, gt_bboxes_list, gt_labels_list, num
     bbox_targets = []
     labels = []
     for i in range(num_imgs):
-        bbox_target, label = point_match_target(
+        bbox_target, label = point_target_single(
                 points, regress_ranges, gt_bboxes_list[i], gt_labels_list[i])
         bbox_targets.append(bbox_targets)  # (b,)(k,4)
         labels.append(labels)             # (b,)(k,)
@@ -167,7 +167,7 @@ def get_point_target(points, regress_ranges, gt_bboxes_list, gt_labels_list, num
     
     
     
-def point_match_target(points, regress_ranges, gt_bboxes, gt_labels):
+def point_target_single(points, regress_ranges, gt_bboxes, gt_labels):
     """单张图的target计算
     1. 如果point在某一gt bbox内，则该点为正样本，否则为负样本
     2. 如果point对应最大l/r/t/b大于回归值，则该点不适合在该特征图，取为负样本

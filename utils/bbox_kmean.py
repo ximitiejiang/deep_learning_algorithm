@@ -150,7 +150,7 @@ def get_voc_avg_area_iou(anchors, cfg_path):
 
 
 if __name__ =='__main__':
-    task = 'widerface'
+    task = 'voc'
     
     if task == 'voc':    
         cfg_path = '../demo/cfg_detector_ssdvgg16_voc.py'
@@ -159,7 +159,7 @@ if __name__ =='__main__':
         cfg_path = '../demo/cfg_detector_ssdvgg16_widerface.py'
     
  
-        k_clusters, *_ = get_voc_anchor_params(cfg_path, k=12)  # k=9(0.672), k=12
+    k_clusters, *_ = get_voc_anchor_params(cfg_path, k=9)  # k=9(0.672), k=12
 
-#        get_voc_avg_area_iou(k_clusters, cfg_path)
+#    get_voc_avg_area_iou(k_clusters, cfg_path)
     

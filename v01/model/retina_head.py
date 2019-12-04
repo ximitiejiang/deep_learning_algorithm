@@ -149,15 +149,15 @@ class RetinaHead(nn.Module):  # based on anchor head
 
     def loss_single(self, cls_score, bbox_pred, labels, label_weights,
                     bbox_targets, bbox_weights, num_total_samples, cfg):
-        # classification loss
+        """"""
         if self.use_sigmoid_cls:
-            labels = labels.reshape(-1, self.cls_out_channels)
-            label_weights = label_weights.reshape(-1, self.cls_out_channels)
+            labels = labels.reshape(-1, self.cls_out_channels)               # (4, 151200, 20)->(604800, 20)
+            label_weights = label_weights.reshape(-1, self.cls_out_channels) # (4, 151200, 20)->(604800, 20)
         else:
             labels = labels.reshape(-1)
             label_weights = label_weights.reshape(-1)
         cls_score = cls_score.permute(0, 2, 3, 1).reshape(
-            -1, self.cls_out_channels)
+            -1, self.cls_out_channels)       # (4, 9*20, h, w) -> (4*9*h*w, 20)=(604800, 20)
         if self.use_sigmoid_cls:
             if self.use_focal_loss:
                 cls_criterion = weighted_sigmoid_focal_loss
@@ -216,7 +216,7 @@ class RetinaHead(nn.Module):  # based on anchor head
         (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
          num_total_pos, num_total_neg) = cls_reg_targets
         num_total_samples = (num_total_pos if self.use_focal_loss else
-                             num_total_pos + num_total_neg)
+                             num_total_pos + num_total_neg)  # retinanet只取正样本
         losses_cls, losses_reg = multi_apply(
             self.loss_single,
             cls_scores,

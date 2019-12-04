@@ -538,7 +538,7 @@ def expand_binary_labels(labels, label_weights, label_channels):
     inds = torch.nonzero(labels >= 1).squeeze()
     if inds.numel() > 0:
         bin_labels[inds, labels[inds] - 1] = 1   # 注意这里需要把原始标签(1-20)转换到0-19，因为独热编码需要从0开始
-    bin_label_weights = label_weights.view(-1, 1).expand(
+    bin_label_weights = label_weights.view(-1, 1).expand(   # (201600)->(201600, 20)，相当于把第一列复制20份
         label_weights.size(0), label_channels)
     return bin_labels, bin_label_weights
 
