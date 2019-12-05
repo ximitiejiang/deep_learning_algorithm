@@ -109,6 +109,9 @@ class RetinaNetHead(nn.Module):
         
         super().__init__()        
         self.num_classes = num_classes
+        self.anchor_strides = anchor_strides
+        self.target_means = target_means
+        self.target_stds = target_stds
         # 参数
         """retinanet生成anchor的逻辑：3个核心参数的定义过程
         base_size = [8, 16, 32, 64, 128] 采用的就是strides
@@ -146,20 +149,20 @@ class RetinaNetHead(nn.Module):
     
     def get_losses(self, cls_scores, bbox_preds, gt_bboxes, gt_labels, cfg, **kwargs):
         """retinanet
-        cls_scores()
-        bbox_preds()
-        gt_bboxes()
-        gt_labels()
+        cls_scores(5,) (b, -1, 20)
+        bbox_preds(5,) (b, -1, 4)
+        gt_bboxes(b, )
+        gt_labels(b, )
         """
         num_imgs = len(gt_labels)
         multi_layer_anchors = []
         for i in range(len(self.featmap_sizes)):
-            device = cls_scores.device
+            device = cls_scores[0].device
             anchors = self.anchor_generators[i].grid_anchors(
                 self.featmap_sizes[i], self.anchor_strides[i], device=device)
             multi_layer_anchors.append(anchors)  # (6,)(k, 4)
-        multi_layer_anchors = torch.cat(multi_layer_anchors, dim=0)  # 堆叠(8732, 4)    
-        anchor_list = [multi_layer_anchors for _ in range(num_imgs)]  # (b,) (s,4)
+        multi_layer_anchors = torch.cat(multi_layer_anchors, dim=0)   # 堆叠(5,)(m, 4)->(652239, 4)    
+        anchor_list = [multi_layer_anchors for _ in range(num_imgs)]  # 复制batch份
         # 计算target: None表示gt_landmarks=None
         target_result = get_anchor_target(anchor_list, gt_bboxes, gt_labels, None,
                                           cfg.assigner, cfg.sampler,
@@ -169,7 +172,7 @@ class RetinaNetHead(nn.Module):
         """retinanet的变化：只取正样本数量作为total_sample"""
         
         """retinanet的变化：labels需要转换成独热编码方式输入focal loss"""
-        labels_t = one_hot_encode(labels_t, self.num_classes-1)
+        labels_t = one_hot_encode(labels_t, self.num_classes-1)  # (b, 728973)每张图的5张特征图放在一起get_target了
         labels_w = labels_w.view(-1, 1).expand(labels_w.size(0), self.num_classes-1)
         """retinanet的变化：计算损失时是把1个batch的比如4张图的某一特征层的labels, weights放在一起算，即(b, -1, 20)reshape成(-1, 20)
         但我这里调整了，改成一张图的5个featmap放在一起算，4张图就map4次

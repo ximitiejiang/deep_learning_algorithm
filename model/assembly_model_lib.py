@@ -89,7 +89,7 @@ class OneStageDetector(nn.Module):
     def forward_dummy(self, img):
         """用于onnx模型转出: img要求batchsize=1, 即(1,3,h,w)
         参考：https://github.com/open-mmlab/mmdetection/pull/1082
-        注意：由于onnx模型仅支持保存模型本体权重，所以只能获得bbox_head的输出，后续操作需要放在post_process.
+        注意：由于onnx模型支持的算子不是很全，所以最好不要把额外的运算放到模型中，head模型导出后就直接导出，其他操作尽量放到get_loss/get_bbox的函数中去。
         """
         x = self.backbone(img)
         if self.cfg.neck:

@@ -10,8 +10,8 @@ gpus = [0]
 parallel = False
 distribute = False                       
 n_epochs = 1
-imgs_per_core = 4               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
-workers_per_core = 2
+imgs_per_core = 2               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
+workers_per_core = 1
 save_checkpoint_interval = 1     # 每多少个epoch保存一次epoch
 work_dir = '/home/ubuntu/mytrain/retinanet_resnet50_voc/'
 resume_from = None               # 恢复到前面指定的设备
@@ -69,6 +69,26 @@ head=dict(
                 alpha=0.25,
                 gamma=2))
 
+assigner = dict(
+        type='max_iou_assigner',
+        params=dict(
+                pos_iou_thr=0.5,
+                neg_iou_thr=0.5,
+                min_pos_iou=0.))
+
+sampler = dict(
+        type='posudo_sampler',
+        params=dict(
+                ))
+
+neg_pos_ratio = 3  
+nms = dict(
+        type='nms',
+        score_thr=0.02,
+        max_per_img=200,
+        params=dict(
+                iou_thr=0.5)) # nms过滤iou阈值
+
 transform = dict(
         img_params=dict(
                 mean=[123.675, 116.28, 103.53],  # 采用pytorch的模型，且没有归一化
@@ -104,7 +124,10 @@ transform_val = dict(
         label_params=dict(
                 to_tensor=True,
                 to_onehot=None),
-        bbox_params=None)
+        bbox_params=dict(
+                to_tensor=True
+                ),
+        aug_params=None)
 
 data_root_path='/home/ubuntu/MyDatasets0/voc/VOCdevkit/'
 trainset = dict(
@@ -139,7 +162,7 @@ trainloader = dict(
 valloader = dict(        
         params=dict(
                 shuffle=False,
-                batch_size=imgs_per_core,
+                batch_size=1,
                 num_workers=workers_per_core,
                 pin_memory=False,   # 数据送入GPU进行加速(默认False)
                 drop_last=False,
