@@ -89,7 +89,7 @@ class FPN(nn.Module):
                 in_channels = self.in_channels[-1]  # 对于多层extra conv，第一层的输入是从input来，其他extra conv就是接前一层extra conv的输出作为输入
             else:
                 in_channels = self.out_channels    # 如果extra conv不是作用在输入，则就是作用在输出，则只可能是256的输入层数
-            # 添加额外的层数
+            # 添加额外的层数放入fpn_conv
             for i in range(extra_layers):
                 extra_fpn_conv = conv_bn_relu(in_channels, self.out_channels, 3,
                                               False, None, False, 2, 1)  # 注意extra conv需要缩减特征尺寸s=2

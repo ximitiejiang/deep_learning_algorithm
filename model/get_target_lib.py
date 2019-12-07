@@ -61,24 +61,25 @@ def anchor_target_single(anchors, gt_bboxes, gt_labels, gt_ldmks,
     ldmk_targets = anchors.new_zeros(len(anchors), 10, dtype=torch.float32)
     ldmk_weights = anchors.new_zeros(len(anchors), 10, dtype=torch.float32)    
     # 4. 把正样本 bbox坐标转换成delta坐标并填入
-    pos_bboxes = anchors[pos_inds]                   # (k,4)表示从8000多个anchors里边提取出对应正样本的anchor作为bbox
-    pos_assigned_gt_inds = assigned_gt_inds[pos_inds] - 1 # 表示正样本对应的label也就是gt_bbox是第几个，并且从第0个开始(减1所以从1-n变成0-n-1)
-    pos_gt_bboxes = gt_bboxes[pos_assigned_gt_inds]  # (k,4)获得正样本bbox对应的gt bbox坐标
-    pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, means, stds)  # 
-    bbox_targets[pos_inds] = pos_bbox_targets
-    bbox_weights[pos_inds] = 1    
+    if len(pos_inds) > 0:
+        pos_bboxes = anchors[pos_inds]                   # (k,4)表示从8000多个anchors里边提取出对应正样本的anchor作为bbox
+        pos_assigned_gt_inds = assigned_gt_inds[pos_inds] - 1 # 表示正样本对应的label也就是gt_bbox是第几个，并且从第0个开始(减1所以从1-n变成0-n-1)
+        pos_gt_bboxes = gt_bboxes[pos_assigned_gt_inds]  # (k,4)获得正样本bbox对应的gt bbox坐标
+        pos_bbox_targets = bbox2delta(pos_bboxes, pos_gt_bboxes, means, stds)  # 
+        bbox_targets[pos_inds] = pos_bbox_targets
+        bbox_weights[pos_inds] = 1    
     # 把正样本landmark坐标转换成delta并填入
-    if gt_ldmks is not None:
-        pos_gt_ldmks = gt_ldmks[pos_assigned_gt_inds]  # (k, 5, 2) k为k个正样本
-        pos_ldmk_targets = landmark2delta(pos_bboxes, pos_gt_ldmks, means, stds)  # 展平操作在2delta里边完成, 从(16800,5,2)->(16800,10)
-        ldmk_targets[pos_inds] = pos_ldmk_targets
-        ldmk_weights[pos_inds] = 1
-    else:
-        ldmk_targets = None
-        ldmk_weights = None
+        if gt_ldmks is not None:
+            pos_gt_ldmks = gt_ldmks[pos_assigned_gt_inds]  # (k, 5, 2) k为k个正样本
+            pos_ldmk_targets = landmark2delta(pos_bboxes, pos_gt_ldmks, means, stds)  # 展平操作在2delta里边完成, 从(16800,5,2)->(16800,10)
+            ldmk_targets[pos_inds] = pos_ldmk_targets
+            ldmk_weights[pos_inds] = 1
+        else:
+            ldmk_targets = None
+            ldmk_weights = None
     # 5. 把正样本labels填入
     label_targets[pos_inds] = gt_labels[pos_assigned_gt_inds] # 获得正样本对应label
-    label_weights[pos_inds] = 1  # 这里设置正负样本权重都为=1， 如果有需要可以提高正样本权重
+    label_weights[pos_inds] = 1  # 这里设置正负样本权重都为=1，剔除了assign_result里边的-1的少量样本，原因??? 
     label_weights[neg_inds] = 1
       
     return (bbox_targets, bbox_weights, 

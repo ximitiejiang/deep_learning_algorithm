@@ -32,7 +32,7 @@ def nms_wrapper(bboxes, scores, ldmks=None, type=None, score_thr=None, max_per_i
     if ldmks is None:
         ldmks = bboxes.new_zeros((0, 0, 2))
     n_cls = scores.shape[1]
-    for i in range(1, n_cls):  # 按类别: 但不再考虑背景的筛选
+    for i in range(1, n_cls):  # 按类别: 但不再考虑背景
         # score过滤
         cls_inds = scores[:, i] > score_thr
         _bboxes = bboxes[cls_inds, :]  # (n, 4)
@@ -48,6 +48,8 @@ def nms_wrapper(bboxes, scores, ldmks=None, type=None, score_thr=None, max_per_i
         bbox_outs.append(_dets)
         ldmk_outs.append(_ldmks)
         label_outs.append(_labels)
+
+            
     return bbox_outs, label_outs, ldmk_outs   # (n_cls,)(m,5),  (n_cls,)(m,),  (n_cls,)(m,5,2) 
         
 

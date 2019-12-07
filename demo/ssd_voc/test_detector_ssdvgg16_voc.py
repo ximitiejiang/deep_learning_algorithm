@@ -22,7 +22,7 @@ def train_ssd(cfg_path, resume_from=None):
     
 if __name__ == "__main__":
     
-    task = 'train'
+    task = 'test'
     cfg_path = './cfg_detector_ssdvgg16_voc.py'
     cfg = get_config(cfg_path)
     
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     if task == 'test':  # 测试单张图或多张图的结果： cpu上0.649 sec， gpu上0.388 sec
         img = cv2.imread('/home/ubuntu/MyDatasets/misc/test13.jpg')
         predictor = DetPredictor(cfg_path,                         
-                                 load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_61.pth',
+                                 load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/old weights/epoch_61.pth',
                                  load_device='cpu')
         for results in predictor([img]):
             vis_all_pyplot(*results, class_names=get_classes('voc'), score_thr=0.5)
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     if task == 'video': # 测试视频预测结果：注意方法稍有不同，vis_cam需要传入一个predictor
         src = 0  # src可以等于int(cam_id), str(video path), list(img_list)
         predictor = DetPredictor(cfg_path,                         
-                                 load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/epoch_11.pth',
+                                 load_from = '/home/ubuntu/mytrain/ssd_vgg_voc/old weights/epoch_61.pth',
                                  load_device='cpu')
         vis_cam(src, predictor, class_names=get_classes('voc'), score_thr=0.2)
             

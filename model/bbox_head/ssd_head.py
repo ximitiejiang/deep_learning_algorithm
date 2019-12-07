@@ -277,7 +277,7 @@ class SSDHead(nn.Module):
         return dict(loss_cls = loss_cls, loss_bbox = loss_bbox)  # {(b,), (b,)} 每张图对应一个分类损失值和一个回归损失值。
     
     
-    def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg, **Kwargs):
+    def get_bboxes(self, cls_scores, bbox_preds, img_metas, cfg, **kwargs):
         # 拆包装
         if cls_scores.shape[0] == 1:
             cls_scores = cls_scores[0] # (-1,2)

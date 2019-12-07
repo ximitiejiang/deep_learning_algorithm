@@ -9,9 +9,9 @@ Created on Mon Sep  2 11:31:23 2019
 gpus = [0]
 parallel = False
 distribute = False                       
-n_epochs = 1
+n_epochs = 10
 imgs_per_core = 2               # 如果是gpu, 则core代表gpu，否则core代表cpu(等效于batch_size)
-workers_per_core = 1
+workers_per_core = 2
 save_checkpoint_interval = 1     # 每多少个epoch保存一次epoch
 work_dir = '/home/ubuntu/mytrain/retinanet_resnet50_voc/'
 resume_from = None               # 恢复到前面指定的设备
@@ -32,7 +32,7 @@ lr_processor = dict(
 logger = dict(
                 log_level='INFO',
                 log_dir=work_dir,
-                interval=100)
+                interval=1)
 
 model = dict(
         type='one_stage_detector')
@@ -42,7 +42,7 @@ backbone=dict(
         params=dict(
                 depth=50,
                 pretrained= '/home/ubuntu/MyWeights/pytorch/resnet50-19c8e357.pth',
-                out_indices=(0, 1, 2, 3),
+                out_indices=(0, 1, 2, 3),  # 代表第几组block输出
                 strides=(1, 2, 2, 2)))
 
 neck=dict(
@@ -50,7 +50,7 @@ neck=dict(
         params=dict(
                 in_channels=(256, 512, 1024, 2048),
                 out_channels=256,
-                use_levels=(0, 1, 2, 3),  # 表示作用在哪几层，默认4层都是，但新的FPN只使用了1,2,3层，0层丢弃
+                use_levels=(1, 2, 3),  # 表示作用在哪几层，但mmdetection中FPN只使用了1,2,3层，0层丢弃
                 num_outs=5,  # 额外输出一层
                 extra_convs_on_inputs=True
                 ))
@@ -67,13 +67,14 @@ head=dict(
                 target_means=(.0, .0, .0, .0),
                 target_stds=(0.1, 0.1, 0.2, 0.2),
                 alpha=0.25,
-                gamma=2))
+                gamma=2,
+                ))
 
 assigner = dict(
         type='max_iou_assigner',
         params=dict(
                 pos_iou_thr=0.5,
-                neg_iou_thr=0.5,
+                neg_iou_thr=0.4,
                 min_pos_iou=0.))
 
 sampler = dict(
@@ -84,6 +85,7 @@ sampler = dict(
 neg_pos_ratio = 3  
 nms = dict(
         type='nms',
+        pre_nms=4000,
         score_thr=0.02,
         max_per_img=200,
         params=dict(

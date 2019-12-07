@@ -20,13 +20,11 @@ def one_hot_encode(t, n_column=None):
     args:
         t (b, ) 代表b个样本的标签，取值要从0开始，比如[0,1,2,3]
         one_hot_t (b, )
-    """
-    t = t.long()
-    if n_column is None:
-        n_column = t.max().item() + 1
-    t = t.reshape(-1, 1)  # 转为列
-    one_hot_t = torch.FloatTensor(len(t), n_column).zero_()  # 先创建全0的独热编码
-    one_hot_t.scatter_(1, t, 1)    # 生成独热编码
+    """    
+    one_hot_t = t.new_full((t.size(0), n_column), 0, dtype=torch.float32)
+    inds = torch.nonzero(t >= 1).squeeze()
+    if inds.numel() > 0:  # 如果有正样本则填充标签，否则自动返回0
+        one_hot_t[inds, t[inds]-1] = 1  # 注意：这里要把得到的标签从[1,20]变为[0-19]，去除背景的0号标签，只计算前景。
     return one_hot_t
 
 

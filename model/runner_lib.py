@@ -43,6 +43,7 @@ def batch_detector(model, data, device, return_loss=True, **kwargs): # kwargs用
             loss_sum[name] = sum(data for data in value)
         loss = sum(data for data in loss_sum.values())
         outputs = dict(loss=loss)
+        outputs = {**outputs, **loss_sum}
         
     return outputs
 
@@ -214,17 +215,21 @@ class Runner():
                 self.optimizer.step()   
                 # 存放结果
                 self.buffer['loss'].append(outputs.get('loss', torch.tensor(0.)))
+                self.buffer['loss_cls'].append(outputs.get('loss_cls', torch.tensor(0.)))
+                self.buffer['loss_reg'].append(outputs.get('loss_reg', torch.tensor(0.)))
                 self.buffer['acc1'].append(outputs.get('acc1', torch.tensor(0.)))
                 self.buffer['acc5'].append(outputs.get('acc5', torch.tensor(0.)))
                 self.buffer['lr'].append(self.current_lr()[0])
                 # 显示text
                 if (self.c_iter+1)%self.cfg.logger.interval == 0:
                     lr_str = ','.join(['{:.4f}'.format(lr) for lr in self.current_lr()]) # 用逗号串联学习率得到一个字符串
-                    log_str = 'Epoch [{}][{}/{}]\tloss: {:.4f}, acc1: {:.4f}, acc5: {:.4f}\tlr: {}'.format(self.c_epoch+1, 
-                                     self.c_iter+1, len(self.dataloader), 
-                                     self.buffer['loss'][-1].item(),
-                                     self.buffer['acc1'][-1].item(), 
-                                     self.buffer['acc5'][-1].item(), lr_str)
+                    log_str = 'Epoch [{}][{}/{}] - loss: {:.3f} - loss_cls: {:.3f} - loss_reg: {:.5f} - lr: {}'.format(\
+                            self.c_epoch+1, 
+                            self.c_iter+1, len(self.dataloader), 
+                            self.buffer['loss'][-1].item(),
+                            self.buffer['loss_cls'][-1].item(), 
+                            self.buffer['loss_reg'][-1].item(), 
+                            lr_str)
 
                     self.logger.info(log_str)
             

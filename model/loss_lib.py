@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from utils.ious import calc_ious_tensor
+from utils.tools import one_hot_encode
 
 """损失函数库：
 1. 采用独立函数定义损失函数的底层实现，但不包括权重和缩减
@@ -81,10 +82,14 @@ class SigmoidFocalLoss(nn.Module):
         self.gamma = gamma
     
     def forward(self, pred, target, weight=None, avg_factor=None):
-        loss = focal_loss(pred, target, self.alpha, self.gamma) 
-        
+        # 如果target不是独热编码形式，则转换
+        if len(target.shape) == 1:  
+            target = one_hot_encode(target, pred.size(1))         # (-1)->(-1, n_class)
+            
+        loss = focal_loss(pred, target, self.alpha, self.gamma)         
         if weight is not None:
-            loss = weight * loss      
+            weight = weight.view(-1, 1).float()  # 需要广播所以先转为列向量, 并转为float才能与loss计算
+            loss = loss * weight  # (-1, n_class)*(-1, 1)->(-1, n_class)      
         if avg_factor is not None:
             avg_factor += 1e-6   # 防止除数=0
             loss = loss.sum() / avg_factor
@@ -93,8 +98,10 @@ class SigmoidFocalLoss(nn.Module):
 def focal_loss(pred, target, alpha=0.25, gamma=2.0):
     """focal loss底层函数: alpha是正负样本比例控制参数，gamma是难样本控制参数
     focal_loss = - at*(1-pt)^gamma * log(pt), 其中at = a*t+(1-a)(1-t), pt = p*t+(1-p)(1-t)
-    当t=1时
-    """
+    args:
+        pred: (b, n_class)任意数据
+        target: (b, n_class)必须是n_class列的独热编码形式
+    """        
     pred_sig = pred.sigmoid()  # 计算pt, at使用的概率必须是sigmoid之后的真实概率。
     pt = pred_sig * target + (1 - pred_sig) * (1 - target)
     at = alpha * target + (1 - alpha) * (1 - target)
